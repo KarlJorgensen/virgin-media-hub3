@@ -78,7 +78,6 @@ cat <<EOF
 /nvram/8/dhcpd/udhcpd.192.168.0.1.static_leases
 74:2f:68:71:e1:69 192.168.0.3
 8a:62:20:e2:c8:57 192.168.0.2
-b8:27:eb:e1:7a:2b 192.168.0.32
 </STATICFILE>
 </STATIC>
 EOF
