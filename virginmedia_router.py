@@ -8,8 +8,6 @@ class LoginFailed(IOError):
     def __init__(self, msg):
         IOError.__init__(self, msg)
 
-# /snmpGet?oids=1.3.6.1.4.1.4115.1.20.1.1.1.17.0;&_n=00509&_=1519764723471
-
 def params(dict = None):
     result = {
         "_": int(round(time.time() * 1000)),
@@ -33,7 +31,7 @@ class Session:
             return requests.get(self._url + '/' + url, cookies={"credential": self._credential}, **kwargs)
         else:
             return requests.get(self._url + '/' + url, **kwargs)
-    
+
     def login(self, username="admin", password="admin"):
         """Log into the router.
 
@@ -52,11 +50,6 @@ class Session:
             raise LoginFailed(r.content)
 
         self._credential = r.content
-
-        # GET '/login?arg=' + base64(username+':'+password) + '&_n=10136&_=1494013230814'
-        # Result is base64 encoded json, e.g.
-        # { "unique":"qGN3pqVbj9", "family":"852", "modelname":"TG2492LG-85", "name":"admin", "tech":false, "moca":0, "wifi":5, "conType":"LAN", "gwWan":"f", "DefPasswdChanged":"YES" }
-        # The whole base64 encoded string should be used as the 'credential' cookie in future requests
 
     def logout(self):
         if self._credential:
