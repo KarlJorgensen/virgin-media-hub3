@@ -98,6 +98,9 @@ class Hub:
         r = json.loads(self._get('checkConnType').content)
         return r["conType"]
 
+    @property
+    def language(self):
+        return self.snmpGet("1.3.6.1.4.1.4115.1.20.1.1.5.6.0")
 
 def __demo():
     with Hub(hostname = '192.168.0.1') as hub:
@@ -107,6 +110,7 @@ def __demo():
 
 #        hub.login(password='dssD04vy0z4t')
         print "Connection type", hub.connectionType
+        print "Language:", hub.language
         for oid in [
                 "1.3.6.1.4.1.4115.1.20.1.1.1.17.0",
                 "1.3.6.1.4.1.4115.1.20.1.1.1.18.1.0",
