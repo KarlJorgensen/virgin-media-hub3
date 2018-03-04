@@ -102,23 +102,32 @@ class Hub:
     def language(self):
         return self.snmpGet("1.3.6.1.4.1.4115.1.20.1.1.5.6.0")
 
-def __demo():
+    @property
+    def username(self):
+        return self.snmpGet("1.3.6.1.4.1.4115.1.20.1.1.5.16.1.2.1")
+
+def _demo():
     with Hub(hostname = '192.168.0.1') as hub:
         print "Got", hub
         # print "foo", hub.snmpGet("1.3.6.1.4.1.4115.1.20.1.1.1.17.0")
         # print "bar", hub.snmpGet("1.3.6.1.4.1.4115.1.20.1.1.1.13")
 
-#        hub.login(password='dssD04vy0z4t')
+        hub.login(password='dssD04vy0z4t')
         print "Connection type", hub.connectionType
         print "Language:", hub.language
-        for oid in [
-                "1.3.6.1.4.1.4115.1.20.1.1.1.17.0",
-                "1.3.6.1.4.1.4115.1.20.1.1.1.18.1.0",
-                "1.3.6.1.4.1.4115.1.20.1.1.5.14.0",
-                "1.3.6.1.4.1.4115.1.20.1.1.5.62.0",
-                "1.3.6.1.4.1.4491.2.1.14.1.5.4.0"
-                ]:
-            print oid, hub.snmpGet(oid)
+        print "Username", hub.username
+
+def _describe_oids():
+    with open('oid-list') as fp, Hub() as hub:
+        hub.login(password='dssD04vy0z4t')
+        for oid in fp:
+            oid = oid.rstrip('\n')
+            try:
+                r = hub.snmpGet(oid)
+                print oid, '=', hub.snmpGet(oid)
+            except Exception as e:
+                print oid, ':', e
 
 if __name__ == '__main__':
-    __demo()
+    #    _describe_oids()
+    _demo()
