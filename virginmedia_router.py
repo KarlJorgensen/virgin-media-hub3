@@ -132,6 +132,10 @@ class Hub:
     def DSLiteWanEnable(self):
         return self.snmpGet("1.3.6.1.4.1.4115.1.20.1.1.1.18.1.0")
 
+    @property
+    def customID(self):
+        return self.snmpGet("1.3.6.1.4.1.4115.1.20.1.1.5.14.0")
+
 def _demo():
     with Hub(hostname = '192.168.0.1') as hub:
         print "Got", hub
@@ -144,6 +148,7 @@ def _demo():
         print "Username", hub.username
         print "docsBpi2CmPrivacyEnable", "<%s>" % hub.docsBpi2CmPrivacyEnable
         print "DSLiteWanEnable:", hub.DSLiteWanEnable
+        print "customID:", hub.customID
 
 def _describe_oids():
     with open('oid-list') as fp, Hub() as hub:
