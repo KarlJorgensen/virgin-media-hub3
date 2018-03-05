@@ -128,6 +128,10 @@ class Hub:
     def wanIPProvMode(self):
         return self.snmpGet("1.3.6.1.4.1.4115.1.20.1.1.1.17.0")
 
+    @property
+    def DSLiteWanEnable(self):
+        return self.snmpGet("1.3.6.1.4.1.4115.1.20.1.1.1.18.1.0")
+
 def _demo():
     with Hub(hostname = '192.168.0.1') as hub:
         print "Got", hub
@@ -139,6 +143,7 @@ def _demo():
         print "Language:", hub.language
         print "Username", hub.username
         print "docsBpi2CmPrivacyEnable", "<%s>" % hub.docsBpi2CmPrivacyEnable
+        print "DSLiteWanEnable:", hub.DSLiteWanEnable
 
 def _describe_oids():
     with open('oid-list') as fp, Hub() as hub:
