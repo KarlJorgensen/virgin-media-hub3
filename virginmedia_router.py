@@ -106,6 +106,18 @@ class Hub:
     def username(self):
         return self.snmpGet("1.3.6.1.4.1.4115.1.20.1.1.5.16.1.2.1")
 
+    @property
+    def docsisBaseCapability(self):
+        return self.snmpGet("1.3.6.1.2.1.10.127.1.1.5")
+
+    @property
+    def configFile(self):
+        return self.snmpGet("1.3.6.1.2.1.69.1.4.5")
+
+    @property
+    def docsBpi2CmPrivacyEnable(self):
+        return self.snmpGet("1.3.6.1.2.1.126.1.1.1.1.1")
+
 def _demo():
     with Hub(hostname = '192.168.0.1') as hub:
         print "Got", hub
@@ -116,6 +128,7 @@ def _demo():
         print "Connection type", hub.connectionType
         print "Language:", hub.language
         print "Username", hub.username
+        print "docsBpi2CmPrivacyEnable", "<%s>" % hub.docsBpi2CmPrivacyEnable
 
 def _describe_oids():
     with open('oid-list') as fp, Hub() as hub:
