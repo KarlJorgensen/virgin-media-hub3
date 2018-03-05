@@ -81,7 +81,13 @@ class Hub:
         return False
 
     def snmpGet(self, oid):
-        r = json.loads(self._get("snmpGet", params = { "oids": oid }).content)
+        r = self._get("snmpGet", params = { "oid": oid })
+        c = r.content
+        try:
+            r = json.loads(c)
+        except ValueError as e:
+            print 'Response content:', c
+            raise
         return r[oid]
 
     def __str__(self):
