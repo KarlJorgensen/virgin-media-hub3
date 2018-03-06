@@ -106,15 +106,16 @@ class Hub:
         return r["conType"]
 
 _snmpAttributes = [
-    ("docsisBaseCapability",     "1.3.6.1.2.1.10.127.1.1.5"),
-    ("docsBpi2CmPrivacyEnable",  "1.3.6.1.2.1.126.1.1.1.1.1"),
-    ("configFile",               "1.3.6.1.2.1.69.1.4.5"),
-    ("wanIPProvMode",            "1.3.6.1.4.1.4115.1.20.1.1.1.17.0"),
-    ("DSLiteWanEnable",          "1.3.6.1.4.1.4115.1.20.1.1.1.18.1.0"),
-    ("customID",                 "1.3.6.1.4.1.4115.1.20.1.1.5.14.0"),
-    ("username",                 "1.3.6.1.4.1.4115.1.20.1.1.5.16.1.2.1"),
-    ("language",                 "1.3.6.1.4.1.4115.1.20.1.1.5.6.0")
-    ]
+    ("docsisBaseCapability",                "1.3.6.1.2.1.10.127.1.1.5"),
+    ("docsBpi2CmPrivacyEnable",             "1.3.6.1.2.1.126.1.1.1.1.1"),
+    ("configFile",                          "1.3.6.1.2.1.69.1.4.5"),
+    ("wanIPProvMode",                       "1.3.6.1.4.1.4115.1.20.1.1.1.17.0"),
+    ("DSLiteWanEnable",                     "1.3.6.1.4.1.4115.1.20.1.1.1.18.1.0"),
+    ("customID",                            "1.3.6.1.4.1.4115.1.20.1.1.5.14.0"),
+    ("username",                            "1.3.6.1.4.1.4115.1.20.1.1.5.16.1.2.1"),
+    ("language",                            "1.3.6.1.4.1.4115.1.20.1.1.5.6.0"),
+    ("firstInstallWizardCompletionStatus",  "1.3.6.1.4.1.4115.1.20.1.1.5.62.0")
+         ]
 
 for name,oid in _snmpAttributes:
     def newGetter(name, oid):
