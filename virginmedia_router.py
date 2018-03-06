@@ -117,11 +117,11 @@ _snmpAttributes = [
     ("wanIPProvMode",                       "1.3.6.1.4.1.4115.1.20.1.1.1.17.0"),
     ("DSLiteWanEnable",                     "1.3.6.1.4.1.4115.1.20.1.1.1.18.1.0"),
     ("customID",                            "1.3.6.1.4.1.4115.1.20.1.1.5.14.0"),
-    ("username",                            "1.3.6.1.4.1.4115.1.20.1.1.5.16.1.2.1"),
+    ("authUserName",                        "1.3.6.1.4.1.4115.1.20.1.1.5.16.1.2.1"),
+    ("authAccountEnabled",                  "1.3.6.1.4.1.4115.1.20.1.1.5.16.1.6.2"),
     ("language",                            "1.3.6.1.4.1.4115.1.20.1.1.5.6.0"),
     ("firstInstallWizardCompletionStatus",  "1.3.6.1.4.1.4115.1.20.1.1.5.62.0"),
     ("esafeErouterInitModeCtrl",            "1.3.6.1.4.1.4491.2.1.14.1.5.4.0"),
-    ("authAccountEnabled",                  "1.3.6.1.4.1.4115.1.20.1.1.5.16.1.6.2")
 ]
 
 for name,oid in _snmpAttributes:
