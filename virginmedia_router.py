@@ -36,9 +36,9 @@ class Hub:
     def _get(self, url, **kwargs):
         """Shorthand for requests.get"""
         if self._credential:
-            r = requests.get(self._url + '/' + url, cookies={"credential": self._credential}, **kwargs)
+            r = requests.get(self._url + '/' + url, cookies={"credential": self._credential}, timeout=10, **kwargs)
         else:
-            r = requests.get(self._url + '/' + url, **kwargs)
+            r = requests.get(self._url + '/' + url, timeout=10, **kwargs)
         r.raise_for_status()
         if r.status_code == 401:
             raise AccessDenied(url)
