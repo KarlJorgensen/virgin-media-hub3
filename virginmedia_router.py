@@ -100,10 +100,15 @@ class Hub:
     def __del__(self):
         self.logout()
 
+    def _walk(self, oid):
+        r = self._get('walk', params={ "oids": oid })
+        return json.loads(r.content)
+
     @property
     def connectionType(self):
         r = json.loads(self._get('checkConnType').content)
         return r["conType"]
+
 
 _snmpAttributes = [
     ("docsisBaseCapability",                "1.3.6.1.2.1.10.127.1.1.5"),
@@ -125,13 +130,25 @@ for name,oid in _snmpAttributes:
         return property(MethodType(getter, None, Hub), None, None, name)
     setattr(Hub, name, newGetter(name, oid))
 
+# Some properties cannot be snmpGet()'ed - they have to be snmpWalk()'ed instead??
+_snmpWalks = [
+    ("webAccessTable", "1.3.6.1.4.1.4115.1.20.1.1.6.7")
+]
+
+for name, oid in _snmpWalks:
+    def newGetter(name, oid):
+        def getter(self):
+            return self._walk(oid)
+        return property(MethodType(getter, None, Hub), None, None, name)
+    setattr(Hub, name, newGetter(name, oid))
+
 def _demo():
     global _snmpAttributes
     with Hub(hostname = '192.168.0.1') as hub:
         print "Got", hub
 
         hub.login(password='dssD04vy0z4t')
-        for name,oid in _snmpAttributes:
+        for name,oid in _snmpAttributes + _snmpWalks:
             print '%s:' % name, '"%s"' % getattr(hub, name)
 
         print "Connection type", hub.connectionType
