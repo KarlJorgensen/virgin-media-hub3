@@ -45,11 +45,17 @@ class Hub:
             raise AccessDenied(url)
         return r
 
-    def login(self, username="admin", password="admin"):
+    def login(self, username=None, password="admin"):
         """Log into the router.
 
-        This will capture the credentials to be used in subsequent requests
+        This will capture the credentials to be used in subsequent requests.
+
+        If no username is given, it will query the router for the
+        default username first.
         """
+        if not username:
+            username = self.authUserName
+
         r = self._get('login', params = params( { "arg": base64.b64encode(username + ':' + password) } ) )
 
         if not r.content:
@@ -117,7 +123,7 @@ _snmpAttributes = [
     ("wanIPProvMode",                       "1.3.6.1.4.1.4115.1.20.1.1.1.17.0"),
     ("DSLiteWanEnable",                     "1.3.6.1.4.1.4115.1.20.1.1.1.18.1.0"),
     ("customID",                            "1.3.6.1.4.1.4115.1.20.1.1.5.14.0"),
-    ("authUserName",                        "1.3.6.1.4.1.4115.1.20.1.1.5.16.1.2.1"),
+    ("authUserName",                        "1.3.6.1.4.1.4115.1.20.1.1.5.16.1.2.1"),  # The admin user name to log in as
     ("authAccountEnabled",                  "1.3.6.1.4.1.4115.1.20.1.1.5.16.1.6.2"),
     ("language",                            "1.3.6.1.4.1.4115.1.20.1.1.5.6.0"),
     ("firstInstallWizardCompletionStatus",  "1.3.6.1.4.1.4115.1.20.1.1.5.62.0"),
