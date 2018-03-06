@@ -3,6 +3,7 @@ import base64
 import random
 import time
 import json
+from types import MethodType
 
 class LoginFailed(IOError):
     def __init__(self, msg):
@@ -104,51 +105,34 @@ class Hub:
         r = json.loads(self._get('checkConnType').content)
         return r["conType"]
 
-    @property
-    def language(self):
-        return self.snmpGet("1.3.6.1.4.1.4115.1.20.1.1.5.6.0")
+_snmpAttributes = [
+    ("docsisBaseCapability",     "1.3.6.1.2.1.10.127.1.1.5"),
+    ("docsBpi2CmPrivacyEnable",  "1.3.6.1.2.1.126.1.1.1.1.1"),
+    ("configFile",               "1.3.6.1.2.1.69.1.4.5"),
+    ("wanIPProvMode",            "1.3.6.1.4.1.4115.1.20.1.1.1.17.0"),
+    ("DSLiteWanEnable",          "1.3.6.1.4.1.4115.1.20.1.1.1.18.1.0"),
+    ("customID",                 "1.3.6.1.4.1.4115.1.20.1.1.5.14.0"),
+    ("username",                 "1.3.6.1.4.1.4115.1.20.1.1.5.16.1.2.1"),
+    ("language",                 "1.3.6.1.4.1.4115.1.20.1.1.5.6.0")
+    ]
 
-    @property
-    def username(self):
-        return self.snmpGet("1.3.6.1.4.1.4115.1.20.1.1.5.16.1.2.1")
-
-    @property
-    def docsisBaseCapability(self):
-        return self.snmpGet("1.3.6.1.2.1.10.127.1.1.5")
-
-    @property
-    def configFile(self):
-        return self.snmpGet("1.3.6.1.2.1.69.1.4.5")
-
-    @property
-    def docsBpi2CmPrivacyEnable(self):
-        return self.snmpGet("1.3.6.1.2.1.126.1.1.1.1.1")
-
-    @property
-    def wanIPProvMode(self):
-        return self.snmpGet("1.3.6.1.4.1.4115.1.20.1.1.1.17.0")
-
-    @property
-    def DSLiteWanEnable(self):
-        return self.snmpGet("1.3.6.1.4.1.4115.1.20.1.1.1.18.1.0")
-
-    @property
-    def customID(self):
-        return self.snmpGet("1.3.6.1.4.1.4115.1.20.1.1.5.14.0")
+for name,oid in _snmpAttributes:
+    def newGetter(name, oid):
+        def getter(self):
+            return self.snmpGet(oid)
+        return property(MethodType(getter, None, Hub), None, None, name)
+    setattr(Hub, name, newGetter(name, oid))
 
 def _demo():
+    global _snmpAttributes
     with Hub(hostname = '192.168.0.1') as hub:
         print "Got", hub
 
         hub.login(password='dssD04vy0z4t')
-        print "wanIPProvMode:", hub.wanIPProvMode
-        #print "bar", hub.snmpGet("1.3.6.1.4.1.4115.1.20.1.1.1.13")
+        for name,oid in _snmpAttributes:
+            print '%s:' % name, '"%s"' % getattr(hub, name)
+
         print "Connection type", hub.connectionType
-        print "Language:", hub.language
-        print "Username", hub.username
-        print "docsBpi2CmPrivacyEnable", "<%s>" % hub.docsBpi2CmPrivacyEnable
-        print "DSLiteWanEnable:", hub.DSLiteWanEnable
-        print "customID:", hub.customID
 
 def _describe_oids():
     with open('oid-list') as fp, Hub() as hub:
