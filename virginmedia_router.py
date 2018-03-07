@@ -73,10 +73,12 @@ class Hub:
 
     def logout(self):
         if self._credential:
-            self._credential = None
-            self._username = None
-            self._password = None
-            self._get('logout', params= params() )
+            try:
+                self._get('logout', params= params() )
+            finally:
+                self._credential = None
+                self._username = None
+                self._password = None
 
     def __enter__(self):
         """Context manager support: Called on the way in"""
