@@ -1,3 +1,5 @@
+#!/usr/bin/python
+
 import requests
 import base64
 import random
@@ -176,3 +178,8 @@ def _describe_oids():
 if __name__ == '__main__':
     #    _describe_oids()
     _demo()
+
+
+# Local Variables:
+# compile-command: "./virginmedia.py"
+# End:
