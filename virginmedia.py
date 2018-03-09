@@ -64,10 +64,21 @@ class Hub:
             raise LoginFailed("Unknown reason. Sorry. Headers were {h}".format(h=r.headers))
 
         try:
-            result = json.loads(base64.b64decode(r.content))
-            print result
+            attrs = json.loads(base64.b64decode(r.content))
+            print attrs
         except Exception:
             raise LoginFailed(r.content)
+
+        if attrs.get("gwWan") == "f" and attrs.get("conType") == "LAN":
+            if attrs.get("muti") == "GW_WAN":
+                raise LoginFailed("Remote user has already logged in, please wait...")
+            elif attrs.get("muti") == "LAN":
+                raise LoginFailed("Other local user has already logged in, please wait...")
+        elif attrs.get("gwWan") == "t":
+            if attrs.get("muti") == "LAN":
+                raise LoginFailed("Local user has already logged in, please wait...")
+            elif attrs.get("muti") == "GW_WAN":
+                raise LoginFailed("Other remote user has already logged in, please wait...")
 
         self._credential = r.content
         self._username = username
