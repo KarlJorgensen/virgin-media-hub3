@@ -24,7 +24,7 @@ def params(dict = None):
         result.update(dict)
     return result
 
-class Hub:
+class Hub(object):
 
     def __init__(self, hostname='192.168.0.1', **kwargs):
 
