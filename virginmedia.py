@@ -73,14 +73,14 @@ class Hub(object):
 
         if attrs.get("gwWan") == "f" and attrs.get("conType") == "LAN":
             if attrs.get("muti") == "GW_WAN":
-                print "Warning: Remote user has already logged in, please wait..."
+                print "Warning: Remote user has already logged in: Some things may fail with HTTP 401..."
             elif attrs.get("muti") == "LAN":
-                print "Warning: Other local user has already logged in, please wait..."
+                print "Warning: Other local user has already logged in: Some things may fail with HTTP 401..."
         elif attrs.get("gwWan") == "t":
             if attrs.get("muti") == "LAN":
-                print "Warning: Local user has already logged in, please wait..."
+                print "Warning: Local user has already logged in: Some things may fail with HTTP 401..."
             elif attrs.get("muti") == "GW_WAN":
-                print "Warning: Other remote user has already logged in, please wait..."
+                print "Warning: Other remote user has already logged in: Some things may fail with HTTP 401..."
 
         self._credential = r.content
         self._username = username
