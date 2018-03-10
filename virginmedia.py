@@ -15,15 +15,6 @@ class AccessDenied(IOError):
     def __init__(self, msg):
         IOError.__init__(self, msg)
 
-def params(dict = None):
-    result = {
-        "_": int(round(time.time() * 1000)),
-        "_n": "%05d" % random.randint(1,32768)
-        }
-    if dict:
-        result.update(dict)
-    return result
-
 class Hub(object):
 
     def __init__(self, hostname='192.168.0.1', **kwargs):
@@ -33,6 +24,11 @@ class Hub(object):
         self._hostname = hostname
         self._username = None
         self._password = None
+        self._nonce = {
+            "_": int(round(time.time() * 1000)),
+            "_n": "%05d" % random.randint(10000,99999)
+            }
+        self._nonce_str = "_n=%s&_=%s" % (self._nonce["_n"], self._nonce["_"])
         if kwargs:
             self.login(**kwargs)
 
@@ -47,6 +43,12 @@ class Hub(object):
             raise AccessDenied(url)
         return r
 
+    def _params(self, keyvalues):
+        res = { }
+        res.update(self._nonce)
+        res.update(keyvalues)
+        return res
+
     def login(self, username=None, password="admin"):
         """Log into the router.
 
@@ -58,7 +60,7 @@ class Hub(object):
         if not username:
             username = self.authUserName
 
-        r = self._get('login', params = params( { "arg": base64.b64encode(username + ':' + password) } ) )
+        r = self._get('login', params = self._params( { "arg": base64.b64encode(username + ':' + password) } ) )
 
         if not r.content:
             raise LoginFailed("Unknown reason. Sorry. Headers were {h}".format(h=r.headers))
@@ -87,7 +89,7 @@ class Hub(object):
     def logout(self):
         if self._credential:
             try:
-                self._get('logout', params= params() )
+                self._get('logout', params= self._nonce )
             finally:
                 self._credential = None
                 self._username = None
