@@ -403,6 +403,40 @@ class Hub(object):
         """The name of the admin user"""
         return snmpValue
 
+    @_collect_stats
+    def deviceList(self):
+        """Get a list of devices known to the hub.
+
+        This will return a dict (not list, sorry!) of devices known to
+        the hub, indexed by IP address.
+
+        If the name of the device is known it will be included. Devices
+        which have an unknown name will not have a name entry.
+
+        Example result:
+
+        {
+          "192.168.0.32" : {'macAddr': u'b8:27:eb:e1:7a:2b', 'name': u'raspberrypi'},
+          "192.168.0.19" : {'macAddr': u'd0:81:7a:65:a1:c9', 'name': u'Blondies-iPhone'}
+        }
+        """
+        result = dict()
+
+        name_prefix = "1.3.6.1.4.1.4115.1.20.1.1.2.4.2.1.3.200.1.4"
+        for iod, name in self.snmpWalk(name_prefix).items():
+            ip = iod[ len(name_prefix)+1 : ]
+            result.setdefault(ip, {})
+            if name and name != 'unknown':
+                result[ip]["name"] = name
+
+        mac_prefix = "1.3.6.1.4.1.4115.1.20.1.1.2.4.2.1.4.200.1.4"
+        for iod, mac in self.snmpWalk(mac_prefix).items():
+            ip = iod[ len(mac_prefix)+1 : ]
+            result.setdefault(ip, {})
+            result[ip]["macAddr"] = _extract_mac(mac)
+
+        return result
+
 snmpHelpers = [
     ("docsisBaseCapability",                "1.3.6.1.2.1.10.127.1.1.5"),
     ("docsBpi2CmPrivacyEnable",             "1.3.6.1.2.1.126.1.1.1.1.1"),
@@ -449,6 +483,10 @@ def _demo():
         print 'Old-style properties:'
         for name,oid in snmpHelpers + _snmpWalks:
             print '- %s:' % name, '"%s"' % getattr(hub, name)
+
+        print "Device List"
+        for ip, dev in hub.deviceList().items():
+            print "-", ip, ":", dev
 
         print "Session counters:"
         for c in sorted(hub.counters):
