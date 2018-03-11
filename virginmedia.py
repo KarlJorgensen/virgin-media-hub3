@@ -82,7 +82,7 @@ class Namespace(object):
                 print key, ':', getattr(self, key)
 
 
-_known_snmp_attributes = set()
+_demo_properties = set()
 
 class Hub(object):
 
@@ -269,7 +269,13 @@ class Hub(object):
         r = self._get('walk', params={ "oids": oid })
         return json.loads(r.content)
 
+    def listed_property(func):
+        """A function decorator which adds the function to the list of known attributes"""
+        _demo_properties.add(func.__name__)
+        return func
+
     @property
+    @listed_property
     def connectionType(self):
         r = json.loads(self._get('checkConnType').content)
         return r["conType"]
@@ -281,7 +287,7 @@ class Hub(object):
                 self = args[0]
                 kwargs["snmpValue"] = self.snmpGet(oid)
                 return function(*args, **kwargs)
-            _known_snmp_attributes.add(function.__name__)
+            _demo_properties.add(function.__name__)
             return wrapper
         return real_wrapper
 
@@ -411,15 +417,13 @@ def _demo():
 
         hub.login(password='dssD04vy0z4t')
 
-        print 'SNMP Properties:'
-        for name in sorted(_known_snmp_attributes):
+        print 'Demo Properties:'
+        for name in sorted(_demo_properties):
             print '- %s:' % name, '"%s"' % getattr(hub, name)
 
         print 'Old-style properties:'
         for name,oid in snmpHelpers + _snmpWalks:
             print '- %s:' % name, '"%s"' % getattr(hub, name)
-
-        print "Connection type", hub.connectionType
 
         print "Session counters:"
         for c in sorted(hub.counters):
