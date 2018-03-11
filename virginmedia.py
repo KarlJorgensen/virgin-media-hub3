@@ -85,7 +85,11 @@ class Namespace(object):
 _demo_properties = set()
 
 class Hub(object):
+    """A Virgin Media Hub3.
 
+    This class provides a pythonic interface to the Virgin Media Hub3.
+
+    """
     def __init__(self, hostname='192.168.0.1', **kwargs):
 
         self._credential = None
