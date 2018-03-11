@@ -98,12 +98,32 @@ class Hub(object):
         if kwargs:
             self.login(**kwargs)
 
-    def _get(self, url, **kwargs):
-        """Shorthand for requests.get"""
-        if self._credential:
-            r = requests.get(self._url + '/' + url, cookies={"credential": self._credential}, timeout=10, **kwargs)
-        else:
-            r = requests.get(self._url + '/' + url, timeout=10, **kwargs)
+    def _get(self, url, retry401=3, retry500=3, **kwargs):
+        """Shorthand for requests.get.
+
+        If the request fails, it can get retried after a short wait with exponential back-off.
+        """
+        sleep = 0.5
+        while True:
+            if self._credential:
+                r = requests.get(self._url + '/' + url, cookies={"credential": self._credential}, timeout=10, **kwargs)
+            else:
+                r = requests.get(self._url + '/' + url, timeout=10, **kwargs)
+            if r.status_code == 401:
+                retry401 -= 1
+                if retry401 > 0:
+                    print "Got http status %s - retrying after %s seconds" % (r.status_code, sleep)
+                    time.sleep(sleep)
+                    sleep *= 2
+                    continue
+            if r.status_code == 500:
+                retry500 -= 1
+                if retry500 > 0:
+                    print "Got http status %s - retrying after %s seconds" % (r.status_code, sleep)
+                    time.sleep(sleep)
+                    sleep *= 2
+                    continue
+            break
         r.raise_for_status()
         if r.status_code == 401:
             raise AccessDenied(url)
