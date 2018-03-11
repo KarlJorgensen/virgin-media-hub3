@@ -377,6 +377,13 @@ class Hub(object):
     def esafeErouterInitModeCtrl(self, snmpValue):
         return int(snmpValue)
 
+
+    @property
+    @snmpHelper("1.3.6.1.4.1.4115.1.20.1.1.5.16.1.2.1")
+    def authUserName(self, snmpValue):
+        """The name of the admin user"""
+        return snmpValue
+
 snmpHelpers = [
     ("docsisBaseCapability",                "1.3.6.1.2.1.10.127.1.1.5"),
     ("docsBpi2CmPrivacyEnable",             "1.3.6.1.2.1.126.1.1.1.1.1"),
@@ -384,7 +391,6 @@ snmpHelpers = [
     ("wanIPProvMode",                       "1.3.6.1.4.1.4115.1.20.1.1.1.17.0"),
     ("DSLiteWanEnable",                     "1.3.6.1.4.1.4115.1.20.1.1.1.18.1.0"),
     ("customID",                            "1.3.6.1.4.1.4115.1.20.1.1.5.14.0"),
-    ("authUserName",                        "1.3.6.1.4.1.4115.1.20.1.1.5.16.1.2.1"),  # The admin user name to log in as
     ("authAccountEnabled",                  "1.3.6.1.4.1.4115.1.20.1.1.5.16.1.6.2"),
     ("esafeErouterInitModeCtrl",            "1.3.6.1.4.1.4491.2.1.14.1.5.4.0"),
 ]
