@@ -81,6 +81,7 @@ class Namespace(object):
             else:
                 print key, ':', getattr(self, key)
 
+
 class Hub(object):
 
     def __init__(self, hostname='192.168.0.1', **kwargs):
@@ -95,26 +96,52 @@ class Hub(object):
             "_n": "%05d" % random.randint(10000,99999)
             }
         self._nonce_str = "_n=%s&_=%s" % (self._nonce["_n"], self._nonce["_"])
+        self.counters = { }
         if kwargs:
             self.login(**kwargs)
 
-    def _get(self, url, retry401=3, retry500=3, **kwargs):
+    def _bump_counter(self, name, by=1):
+        """Increase a counter by (usually) 1.
+
+        If the counter does not exist yet, it will be created"""
+        if name in self.counters:
+            self.counters[name] += by
+        else:
+            self.counters[name] = by
+
+    def _count_calls(function):
+        """A function decorator to count how many calls are done to the function"""
+        def debug_wrapper(*args, **kwargs):
+            self = args[0]
+            self._bump_counter(function.__name__ + '_calls')
+            return function(*args, **kwargs)
+        return debug_wrapper
+
+    @_count_calls
+    def _get(self, url, retry401=5, retry500=3, **kwargs):
         """Shorthand for requests.get.
 
-        If the request fails, it can get retried after a short wait with exponential back-off.
+        If the request fails with HTTP 500, it will be retried after a
+        short wait with exponential back-off.
+
+        This also tries to work around bugs in the Virgin Media Hub3
+        firmware: Requests can (randomly?) fail with HTTP status 401
+        (Unauthorized) for no apparent reason.  Logging in again before
+        retrying usually solves that.
         """
-        sleep = 0.5
+        sleep = 1
         while True:
             if self._credential:
                 r = requests.get(self._url + '/' + url, cookies={"credential": self._credential}, timeout=10, **kwargs)
             else:
                 r = requests.get(self._url + '/' + url, timeout=10, **kwargs)
+            self._bump_counter('received_http_' + str(r.status_code))
             if r.status_code == 401:
                 retry401 -= 1
-                if retry401 > 0:
-                    print "Got http status %s - retrying after %s seconds" % (r.status_code, sleep)
-                    time.sleep(sleep)
-                    sleep *= 2
+                if retry401 > 0 and self.is_loggedin:
+                    print "Got http status %s - Retrying after logging in again" % (r.status_code)
+                    self.login(username=self._username, password=self._password)
+                    self._bump_counter('_get_retries_401')
                     continue
             if r.status_code == 500:
                 retry500 -= 1
@@ -122,6 +149,8 @@ class Hub(object):
                     print "Got http status %s - retrying after %s seconds" % (r.status_code, sleep)
                     time.sleep(sleep)
                     sleep *= 2
+                    self._bump_counter('_get_retries_500')
+                    self._bump_counter('_get_retries_500_sleep_secs', by=sleep)
                     continue
             break
         r.raise_for_status()
@@ -129,12 +158,14 @@ class Hub(object):
             raise AccessDenied(url)
         return r
 
+    @_count_calls
     def _params(self, keyvalues):
         res = { }
         res.update(self._nonce)
         res.update(keyvalues)
         return res
 
+    @_count_calls
     def login(self, username=None, password="admin"):
         """Log into the router.
 
@@ -146,14 +177,13 @@ class Hub(object):
         if not username:
             username = self.authUserName
 
-        r = self._get('login', params = self._params( { "arg": base64.b64encode(username + ':' + password) } ) )
+        r = self._get('login', retry401=0, params = self._params( { "arg": base64.b64encode(username + ':' + password) } ) )
 
         if not r.content:
             raise LoginFailed("Unknown reason. Sorry. Headers were {h}".format(h=r.headers))
 
         try:
             attrs = json.loads(base64.b64decode(r.content))
-            print attrs
         except Exception:
             raise LoginFailed(r.content)
 
@@ -172,19 +202,26 @@ class Hub(object):
         self._username = username
         self._password = password
 
+    @property
+    def is_loggedin(self):
+        return self._credential != None
+
+    @_count_calls
     def logout(self):
-        if self._credential:
+        if self.is_loggedin:
             try:
-                self._get('logout', params= self._nonce )
+                self._get('logout', retry401=0, retry500=0, params= self._nonce )
             finally:
                 self._credential = None
                 self._username = None
                 self._password = None
 
+    @_count_calls
     def __enter__(self):
         """Context manager support: Called on the way in"""
         return self
 
+    @_count_calls
     def __exit__(self, exc_type, exc_value, traceback):
         """Context manager support: Called on the way out"""
         try:
@@ -197,6 +234,7 @@ class Hub(object):
                 raise
         return False
 
+    @_count_calls
     def snmpGet(self, oid):
         r = self._get("snmpGet", params = { "oid": oid })
         c = r.content
@@ -207,6 +245,7 @@ class Hub(object):
             raise
         return r[oid]
 
+    @_count_calls
     def snmpGets(self, oids):
         r = self._get("snmpGet?oids=" + ';'.join(oids) + ';&' + self._nonce_str )
         c = r.content
@@ -217,15 +256,19 @@ class Hub(object):
             raise
         return r
 
+    @_count_calls
     def __str__(self):
         return "Hub(hostname=%s, username=%s)" % (self._hostname, self._username)
 
+    @_count_calls
     def __nonzero__(self):
         return (self._credential != None)
 
+    @_count_calls
     def __del__(self):
         self.logout()
 
+    @_count_calls
     def _walk(self, oid):
         r = self._get('walk', params={ "oids": oid })
         return json.loads(r.content)
@@ -320,6 +363,9 @@ def _demo():
         print "Connection type", hub.connectionType
         print "Router Info:"
         hub.routerInfo.prettyPrint("-")
+        print "Session counters:"
+        for c in sorted(hub.counters):
+            print '-', c, hub.counters[c]
 
 def _describe_oids():
     with open('oid-list') as fp, Hub() as hub:
