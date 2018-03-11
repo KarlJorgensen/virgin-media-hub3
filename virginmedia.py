@@ -17,10 +17,27 @@ class AccessDenied(IOError):
         IOError.__init__(self, msg)
 
 def _extract_ip(ip):
+    """Extract an IP address to a sensible format.
+
+    The router encodes IPv4 addresses in hex, prefixed by a dollar
+    sign, e.g. "$c2a80464" => 192.168.4.100
+    """
     return (       str(int(ip[1:3],base=16))
            + '.' + str(int(ip[3:5],base=16))
            + '.' + str(int(ip[5:7],base=16))
            + '.' + str(int(ip[7:9],base=16)) )
+
+def _extract_ipv6(ip):
+    """Extract an IPv6 address to a sensible format
+
+    The router encodes IPv6 address in hex, prefixed by a dollar sign
+    """
+    if ip == "$00000000000000000000000000000000":
+        return None
+    res = ip[1:5]
+    for x in range(5, 30, 4):
+        res += ':' + ip[x:x+4]
+    return res
 
 def _extract_mac(mac):
     res = mac[1:3]
@@ -214,17 +231,19 @@ class Hub(object):
             raise
 
         return Namespace( {
-             "hardwareVersion": r["1.3.6.1.4.1.4115.1.20.1.1.5.10.0"],
-             "softwareVersion": r["1.3.6.1.4.1.4115.1.20.1.1.5.11.0"],
-             "wanMACAddr": _extract_mac(r["1.3.6.1.4.1.4115.1.20.1.1.1.13.0"]),
-             "serialNo": r["1.3.6.1.4.1.4115.1.20.1.1.5.8.0"],
-             "wanIPAddr": _extract_ip(r["1.3.6.1.4.1.4115.1.20.1.1.1.7.1.3.1"]),
-             "defaultGateway": _extract_ip(r["1.3.6.1.4.1.4115.1.20.1.1.1.7.1.6.1"]),
+             "cmDoc30SetupPacketCableRegion": int(r["1.3.6.1.4.1.4115.1.3.4.1.3.8.0"]),
              "dnsServers": _extract_ip(r["1.3.6.1.4.1.4115.1.20.1.1.1.11.2.1.3.1"]),
-             "wanIPV4LeaseExpiryDate": _extract_date(r["1.3.6.1.4.1.4115.1.20.1.1.1.12.4.0"]),
-             "wanIPV4LeaseTimeSecsRemaining": int(r["1.3.6.1.4.1.4115.1.20.1.1.1.12.3.0"]),
-             "CmDoc30SetupPacketCableRegion": int(r["1.3.6.1.4.1.4115.1.3.4.1.3.8.0"]),
              "esafeErouterInitModeCtrl": int(r["1.3.6.1.4.1.4491.2.1.14.1.5.4.0"]),
+             "hardwareVersion": r["1.3.6.1.4.1.4115.1.20.1.1.5.10.0"],
+             "serialNo": r["1.3.6.1.4.1.4115.1.20.1.1.5.8.0"],
+             "softwareVersion": r["1.3.6.1.4.1.4115.1.20.1.1.5.11.0"],
+             "wanIPv4Addr": _extract_ip(r["1.3.6.1.4.1.4115.1.20.1.1.1.7.1.3.1"]),
+             "wanIPv4Gateway": _extract_ip(r["1.3.6.1.4.1.4115.1.20.1.1.1.7.1.6.1"]),
+             "wanIPv4LeaseExpiryDate": _extract_date(r["1.3.6.1.4.1.4115.1.20.1.1.1.12.4.0"]),
+             "wanIPv4LeaseTimeSecsRemaining": int(r["1.3.6.1.4.1.4115.1.20.1.1.1.12.3.0"]),
+             "wanIPv6Addr": _extract_ipv6(r["1.3.6.1.4.1.4115.1.20.1.1.1.7.1.3.2"]),
+             "wanIPv6Gateway": _extract_ipv6(r["1.3.6.1.4.1.4115.1.20.1.1.1.7.1.6.2"]),
+             "wanMACAddr": _extract_mac(r["1.3.6.1.4.1.4115.1.20.1.1.1.13.0"]),
              })
 
 _snmpAttributes = [
