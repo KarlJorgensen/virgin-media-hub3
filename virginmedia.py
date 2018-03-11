@@ -236,13 +236,7 @@ class Hub(object):
 
     @_count_calls
     def snmpGet(self, oid):
-        r = self._get("snmpGet", params = { "oid": oid })
-        c = r.content
-        try:
-            r = json.loads(c)
-        except ValueError as e:
-            print 'Response content:', c
-            raise
+        r = self.snmpGets(oids = [ oid ])
         return r[oid]
 
     @_count_calls
