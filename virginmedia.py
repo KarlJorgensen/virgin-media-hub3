@@ -5,6 +5,7 @@ import base64
 import random
 import time
 import json
+import datetime
 from types import MethodType
 
 class LoginFailed(IOError):
@@ -14,6 +15,54 @@ class LoginFailed(IOError):
 class AccessDenied(IOError):
     def __init__(self, msg):
         IOError.__init__(self, msg)
+
+def _extract_ip(ip):
+    return (       str(int(ip[1:3],base=16))
+           + '.' + str(int(ip[3:5],base=16))
+           + '.' + str(int(ip[5:7],base=16))
+           + '.' + str(int(ip[7:9],base=16)) )
+
+def _extract_mac(mac):
+    res = mac[1:3]
+    for x in range(3,13,2):
+        res += ':' + mac[x:x+2]
+    return res
+
+def _extract_date(vmdate):
+    # Dates (such as the DHCP lease expiry time) are encoded somewhat stranger
+    # than even IP addresses:
+    #
+    # E.g. "$07e2030e10071100" is:
+    #      0x07e2 : year = 2018
+    #          0x03 : month = March
+    #            0x0e : day-of-month = 14
+    #              0x10 : hour = 16 (seems to at least use 24hr clock!)
+    #                0x07 : minute = 07
+    #                  0x11 : second = 17
+    #                    0x00 : junk
+    year = int(vmdate[1:5], base=16)
+    month = int(vmdate[5:7], base=16)
+    dom = int(vmdate[7:9], base=16)
+    hour = int(vmdate[9:11], base=16)
+    minute = int(vmdate[11:13], base=16)
+    second = int(vmdate[13:15], base=16)
+    return datetime.datetime(year, month, dom, hour, minute, second)
+
+class Namespace(object):
+    def __init__(self, keyvals):
+        self._keyvals = keyvals
+        for key in keyvals:
+            setattr(self, key, keyvals[key])
+
+    def __str__(self):
+        return "NameSpace(" + str(self._keyvals) + ")"
+
+    def prettyPrint(self, prefix=None):
+        for key in sorted(self._keyvals):
+            if prefix:
+                print prefix, key, ':', getattr(self, key)
+            else:
+                print key, ':', getattr(self, key)
 
 class Hub(object):
 
@@ -132,6 +181,51 @@ class Hub(object):
         r = json.loads(self._get('checkConnType').content)
         return r["conType"]
 
+    @property
+    def routerInfo(self):
+        r = self._get("snmpGet?"
+        "oids="
+        "1.3.6.1.4.1.4115.1.20.1.1.1.11.2.1.3.1;"
+        "1.3.6.1.4.1.4115.1.20.1.1.1.11.2.1.3.4;"
+        "1.3.6.1.4.1.4115.1.20.1.1.1.12.3.0;"
+        "1.3.6.1.4.1.4115.1.20.1.1.1.12.4.0;"
+        "1.3.6.1.4.1.4115.1.20.1.1.1.12.7.0;"
+        "1.3.6.1.4.1.4115.1.20.1.1.1.12.8.0;"
+        "1.3.6.1.4.1.4115.1.20.1.1.1.13.0;"
+        "1.3.6.1.4.1.4115.1.20.1.1.1.18.1.0;"
+        "1.3.6.1.4.1.4115.1.20.1.1.1.18.3.0;"
+        "1.3.6.1.4.1.4115.1.20.1.1.1.18.6.0;"
+        "1.3.6.1.4.1.4115.1.20.1.1.1.7.1.3.1;"
+        "1.3.6.1.4.1.4115.1.20.1.1.1.7.1.3.1;"
+        "1.3.6.1.4.1.4115.1.20.1.1.1.7.1.3.2;"
+        "1.3.6.1.4.1.4115.1.20.1.1.1.7.1.6.1;"
+        "1.3.6.1.4.1.4115.1.20.1.1.1.7.1.6.2;"
+        "1.3.6.1.4.1.4115.1.20.1.1.5.10.0;"
+        "1.3.6.1.4.1.4115.1.20.1.1.5.11.0;"
+        "1.3.6.1.4.1.4115.1.20.1.1.5.8.0;"
+        "1.3.6.1.4.1.4115.1.3.4.1.3.8.0;"
+        "1.3.6.1.4.1.4491.2.1.14.1.5.4.0;"
+        "&" + self._nonce_str)
+        c = r.content
+        try:
+            r = json.loads(c)
+        except ValueError as e:
+            print 'Response content:', c
+            raise
+
+        return Namespace( {
+             "hardwareVersion": r["1.3.6.1.4.1.4115.1.20.1.1.5.10.0"],
+             "softwareVersion": r["1.3.6.1.4.1.4115.1.20.1.1.5.11.0"],
+             "wanMACAddr": _extract_mac(r["1.3.6.1.4.1.4115.1.20.1.1.1.13.0"]),
+             "serialNo": r["1.3.6.1.4.1.4115.1.20.1.1.5.8.0"],
+             "wanIPAddr": _extract_ip(r["1.3.6.1.4.1.4115.1.20.1.1.1.7.1.3.1"]),
+             "defaultGateway": _extract_ip(r["1.3.6.1.4.1.4115.1.20.1.1.1.7.1.6.1"]),
+             "dnsServers": _extract_ip(r["1.3.6.1.4.1.4115.1.20.1.1.1.11.2.1.3.1"]),
+             "wanIPV4LeaseExpiryDate": _extract_date(r["1.3.6.1.4.1.4115.1.20.1.1.1.12.4.0"]),
+             "wanIPV4LeaseTimeSecsRemaining": int(r["1.3.6.1.4.1.4115.1.20.1.1.1.12.3.0"]),
+             "CmDoc30SetupPacketCableRegion": int(r["1.3.6.1.4.1.4115.1.3.4.1.3.8.0"]),
+             "esafeErouterInitModeCtrl": int(r["1.3.6.1.4.1.4491.2.1.14.1.5.4.0"]),
+             })
 
 _snmpAttributes = [
     ("docsisBaseCapability",                "1.3.6.1.2.1.10.127.1.1.5"),
@@ -176,6 +270,8 @@ def _demo():
             print '%s:' % name, '"%s"' % getattr(hub, name)
 
         print "Connection type", hub.connectionType
+        print "Router Info:"
+        hub.routerInfo.prettyPrint("-")
 
 def _describe_oids():
     with open('oid-list') as fp, Hub() as hub:
