@@ -111,15 +111,21 @@ class Hub(object):
         else:
             self.counters[name] = by
 
-    def _count_calls(function):
-        """A function decorator to count how many calls are done to the function"""
-        def debug_wrapper(*args, **kwargs):
-            self = args[0]
-            self._bump_counter(function.__name__ + '_calls')
-            return function(*args, **kwargs)
-        return debug_wrapper
+    def _collect_stats(function):
+        """A function decorator to count how many calls are done to the function.
 
-    @_count_calls
+        it also collects timing information
+        """
+        def wrapper(*args, **kwargs):
+            self = args[0]
+            self._bump_counter(function.__name__ + ':calls')
+            start = time.time()
+            result = function(*args, **kwargs)
+            self._bump_counter(function.__name__ + ':secs', by=time.time()-start)
+            return result
+        return wrapper
+
+    @_collect_stats
     def _get(self, url, retry401=5, retry500=3, **kwargs):
         """Shorthand for requests.get.
 
@@ -160,14 +166,14 @@ class Hub(object):
             raise AccessDenied(url)
         return r
 
-    @_count_calls
+    @_collect_stats
     def _params(self, keyvalues):
         res = { }
         res.update(self._nonce)
         res.update(keyvalues)
         return res
 
-    @_count_calls
+    @_collect_stats
     def login(self, username=None, password="admin"):
         """Log into the router.
 
@@ -208,7 +214,7 @@ class Hub(object):
     def is_loggedin(self):
         return self._credential != None
 
-    @_count_calls
+    @_collect_stats
     def logout(self):
         if self.is_loggedin:
             try:
@@ -218,12 +224,12 @@ class Hub(object):
                 self._username = None
                 self._password = None
 
-    @_count_calls
+    @_collect_stats
     def __enter__(self):
         """Context manager support: Called on the way in"""
         return self
 
-    @_count_calls
+    @_collect_stats
     def __exit__(self, exc_type, exc_value, traceback):
         """Context manager support: Called on the way out"""
         try:
@@ -236,12 +242,12 @@ class Hub(object):
                 raise
         return False
 
-    @_count_calls
+    @_collect_stats
     def snmpGet(self, oid):
         r = self.snmpGets(oids = [ oid ])
         return r[oid]
 
-    @_count_calls
+    @_collect_stats
     def snmpGets(self, oids):
         r = self._get("snmpGet?oids=" + ';'.join(oids) + ';&' + self._nonce_str )
         c = r.content
@@ -252,19 +258,17 @@ class Hub(object):
             raise
         return r
 
-    @_count_calls
     def __str__(self):
         return "Hub(hostname=%s, username=%s)" % (self._hostname, self._username)
 
-    @_count_calls
     def __nonzero__(self):
         return (self._credential != None)
 
-    @_count_calls
+    @_collect_stats
     def __del__(self):
         self.logout()
 
-    @_count_calls
+    @_collect_stats
     def _walk(self, oid):
         r = self._get('walk', params={ "oids": oid })
         return json.loads(r.content)
