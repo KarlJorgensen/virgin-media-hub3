@@ -273,9 +273,12 @@ class Hub(object):
         self.logout()
 
     @_collect_stats
-    def _walk(self, oid):
-        r = self._get('walk', params={ "oids": oid })
-        return json.loads(r.content)
+    def snmpWalk(self, oid):
+        result = json.loads(self._get('walk?oids=%s;%s' % (oid, self._nonce_str)).content)
+        # Strip off the final ANNOYING "1" entry!
+        if result.get("1") == "Finish":
+            del result["1"]
+        return result
 
     def _listed_property(func):
         """A function decorator which adds the function to the list of known attributes"""
@@ -428,7 +431,7 @@ _snmpWalks = [
 for name, oid in _snmpWalks:
     def newGetter(name, oid):
         def getter(self):
-            return self._walk(oid)
+            return self.snmpWalk(oid)
         return property(MethodType(getter, None, Hub), None, None, name)
     setattr(Hub, name, newGetter(name, oid))
 
