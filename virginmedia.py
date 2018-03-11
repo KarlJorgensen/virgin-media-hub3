@@ -167,7 +167,14 @@ class Hub(object):
 
     def __exit__(self, exc_type, exc_value, traceback):
         """Context manager support: Called on the way out"""
-        self.logout()
+        try:
+            self.logout()
+        except requests.exceptions.HTTPError as err:
+            # Avoid raising exceptions on the way out if our app had a problem
+            if exc_type:
+                pass
+            else:
+                raise
         return False
 
     def snmpGet(self, oid):
