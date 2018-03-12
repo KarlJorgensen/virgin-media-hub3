@@ -84,6 +84,22 @@ class Namespace(object):
 
 _demo_properties = set()
 
+def cache_result(function):
+    """A function decorator to cache function results.
+
+    This will only work for instance methods"""
+    def wrapper(*args, **kwargs):
+        self = args[0]
+        if not hasattr(self, '__result_cache'):
+            setattr(self, '__result_cache', {})
+        if function.__name__ in self.__result_cache:
+            return self.__result_cache[function.__name__]
+
+        result = self.__result_cache[function.__name__] = function(*args, **kwargs)
+        return result
+    return wrapper
+
+
 class Hub(object):
     """A Virgin Media Hub3.
 
@@ -388,37 +404,17 @@ class Hub(object):
 
     @_collect_stats
     def deviceList(self):
-        """Get a list of devices known to the hub.
+        """Iterator which retrieves devices known to the hub.
 
-        This will return a dict (not list, sorry!) of devices known to
-        the hub, indexed by IP address.
-
-        If the name of the device is known it will be included. Devices
-        which have an unknown name will not have a name entry.
-
-        Example result:
-
-        {
-          "192.168.0.32" : {'macAddr': u'b8:27:eb:e1:7a:2b', 'name': u'raspberrypi'},
-          "192.168.0.19" : {'macAddr': u'd0:81:7a:65:a1:c9', 'name': u'Blondies-iPhone'}
-        }
+        This will return successive DeviceInfo instances, which can be
+        queried for each device.
         """
-        result = dict()
-
-        name_prefix = "1.3.6.1.4.1.4115.1.20.1.1.2.4.2.1.3.200.1.4"
-        for iod, name in self.snmpWalk(name_prefix).items():
-            ip = iod[ len(name_prefix)+1 : ]
-            result.setdefault(ip, {})
-            if name and name != 'unknown':
-                result[ip]["name"] = name
-
         mac_prefix = "1.3.6.1.4.1.4115.1.20.1.1.2.4.2.1.4.200.1.4"
         for iod, mac in self.snmpWalk(mac_prefix).items():
             ip = iod[ len(mac_prefix)+1 : ]
-            result.setdefault(ip, {})
-            result[ip]["macAddr"] = _extract_mac(mac)
+            yield DeviceInfo(self, ip, _extract_mac(mac))
 
-        return result
+        raise StopIteration()
 
 snmpHelpers = [
     ("docsisBaseCapability",                "1.3.6.1.2.1.10.127.1.1.5"),
@@ -452,6 +448,55 @@ for name, oid in _snmpWalks:
         return property(MethodType(getter, None, Hub), None, None, name)
     setattr(Hub, name, newGetter(name, oid))
 
+class DeviceInfo(object):
+    """Information about a device known to a hub
+
+    This makes the information known about a device available as attributes.
+
+    Generally, querying the Virgin Media hub is agonizingly slow, so
+    attributes are not retrieved from the hub until necessary.
+    """
+    def __init__(self, hub, ipv4_address, mac_address):
+        self._ipv4_address = ipv4_address
+        self._mac_address = mac_address
+        self._hub = hub
+
+    @property
+    def ipv4_address(self):
+        """The IPv4 address of the device"""
+        return self._ipv4_address
+
+    @property
+    @cache_result
+    def connected(self):
+        """Whether the device is currently connected to the hub.
+
+        For some reason, the hub "remembers" recently connected
+        devices - which is useful.
+        """
+        return self._hub.snmpGet("1.3.6.1.4.1.4115.1.20.1.1.2.4.2.1.14.200.1.4.%s" % self._ipv4_address) == "1"
+
+    @property
+    @cache_result
+    def name(self):
+        """The name the device reports to the hub.
+
+        This name most likely comes from the DHCP request issued by
+        the device, or possibly the mDNS name broadcasted by
+        it.  Nobody knows for sure, but the hub knows somehow!
+        """
+        n = self._hub.snmpGet("1.3.6.1.4.1.4115.1.20.1.1.2.4.2.1.3.200.1.4.%s" % self._ipv4_address)
+        if n == "unknown":
+            n = None
+        return n
+
+    @property
+    def mac_address(self):
+        return self._mac_address
+
+    def __str__(self):
+        return "DeviceInfo(ipv4_address=%s, mac_address=%s, connected=%s, name=%s)" % (self.ipv4_address, self.mac_address, self.connected, self.name)
+
 def _demo():
     global snmpHelpers
     with Hub(hostname = '192.168.0.1') as hub:
@@ -468,8 +513,8 @@ def _demo():
             print '- %s:' % name, '"%s"' % getattr(hub, name)
 
         print "Device List"
-        for ip, dev in hub.deviceList().items():
-            print "-", ip, ":", dev
+        for dev in filter(lambda x: x.connected, hub.deviceList()):
+            print "-", dev
 
         print "Session counters:"
         for c in sorted(hub.counters):
