@@ -256,9 +256,7 @@ class Hub(object):
             self.logout()
         except requests.exceptions.HTTPError as err:
             # Avoid raising exceptions on the way out if our app had a problem
-            if exc_type:
-                pass
-            else:
+            if not exc_type:
                 raise
         return False
 
@@ -308,7 +306,12 @@ class Hub(object):
         return r["conType"]
 
     def _snmpProperty(oid):
-        """A function decorator to present an SNMP MIB value as a readonly attribute"""
+        """A function decorator to present an MIB value as an attribute.
+
+        The function will receive an extra parameter: "snmpValue" in
+        which it gets passed the value of the oid as retrieved from
+        the hub.
+        """
         def real_wrapper(function):
             def wrapper(*args, **kwargs):
                 self = args[0]
