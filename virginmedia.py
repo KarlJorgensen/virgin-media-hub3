@@ -291,25 +291,23 @@ class Hub(object):
         r = json.loads(self._get('checkConnType').content)
         return r["conType"]
 
-    def _snmpHelper(oid):
-        """A function decorator to retrieve SNMP MIB attributes - the SNMP value will be passed to the function"""
+    def _snmpProperty(oid):
+        """A function decorator to present an SNMP MIB value as a readonly attribute"""
         def real_wrapper(function):
             def wrapper(*args, **kwargs):
                 self = args[0]
                 kwargs["snmpValue"] = self.snmpGet(oid)
                 return function(*args, **kwargs)
             _demo_properties.add(function.__name__)
-            return wrapper
+            return property(wrapper)
         return real_wrapper
 
-    @property
-    @_snmpHelper("1.3.6.1.4.1.4115.1.20.1.1.1.7.1.3.1")
+    @_snmpProperty("1.3.6.1.4.1.4115.1.20.1.1.1.7.1.3.1")
     def wanIPv4Address(self, snmpValue):
         """The current external IP address of the hub"""
         return _extract_ip(snmpValue)
 
-    @property
-    @_snmpHelper("1.3.6.1.4.1.4115.1.20.1.1.1.11.2.1.3.1")
+    @_snmpProperty("1.3.6.1.4.1.4115.1.20.1.1.1.11.2.1.3.1")
     def dns_servers(self, snmpValue):
         """DNS servers used by the hub.
 
@@ -321,84 +319,69 @@ class Hub(object):
         """
         return _extract_ip(snmpValue)
 
-    @property
-    @_snmpHelper("1.3.6.1.4.1.4115.1.20.1.1.1.7.1.6.1")
+    @_snmpProperty("1.3.6.1.4.1.4115.1.20.1.1.1.7.1.6.1")
     def wanIPv4Gateway(self, snmpValue):
         """Default gateway of the hub"""
         return _extract_ip(snmpValue)
 
-    @property
-    @_snmpHelper("1.3.6.1.4.1.4115.1.20.1.1.5.10.0")
+    @_snmpProperty("1.3.6.1.4.1.4115.1.20.1.1.5.10.0")
     def hardwareVersion(self, snmpValue):
         "Hardware version of the hub"
         return snmpValue
 
-    @property
-    @_snmpHelper("1.3.6.1.4.1.4115.1.20.1.1.5.8.0")
+    @_snmpProperty("1.3.6.1.4.1.4115.1.20.1.1.5.8.0")
     def serialNo(self, snmpValue):
         "Serial number of the hub"
         return snmpValue
 
-    @property
-    @_snmpHelper("1.3.6.1.4.1.4115.1.20.1.1.5.11.0")
+    @_snmpProperty("1.3.6.1.4.1.4115.1.20.1.1.5.11.0")
     def softwareVersion(self, snmpValue):
         """Software version of the hub."""
         return snmpValue
 
-    @property
-    @_snmpHelper("1.3.6.1.4.1.4115.1.20.1.1.1.13.0")
+    @_snmpProperty("1.3.6.1.4.1.4115.1.20.1.1.1.13.0")
     def wanMACAddr(self, snmpValue):
         "WAN Mac address"
         return _extract_mac(snmpValue)
 
-    @property
-    @_snmpHelper("1.3.6.1.4.1.4115.1.20.1.1.5.6.0")
+    @_snmpProperty("1.3.6.1.4.1.4115.1.20.1.1.5.6.0")
     def language(self, snmpValue):
         return snmpValue
 
-    @property
-    @_snmpHelper("1.3.6.1.4.1.4115.1.20.1.1.5.62.0")
+    @_snmpProperty("1.3.6.1.4.1.4115.1.20.1.1.5.62.0")
     def firstInstallWizardCompleted(self, snmpValue):
         return snmpValue == "1"
 
-    @property
-    @_snmpHelper("1.3.6.1.4.1.4115.1.20.1.1.1.12.4.0")
+    @_snmpProperty("1.3.6.1.4.1.4115.1.20.1.1.1.12.4.0")
     def wanIPv4LeaseExpiryDate(self, snmpValue):
         return _extract_date(snmpValue)
 
-    @property
-    @_snmpHelper("1.3.6.1.4.1.4115.1.20.1.1.1.12.3.0")
+    @_snmpProperty("1.3.6.1.4.1.4115.1.20.1.1.1.12.3.0")
     def wanIPv4LeaseTimeSecsRemaining(self, snmpValue):
         "No of seconds remaining of the DHCP lease of the WAN IP address"
         return int(snmpValue)
 
-    @property
-    @_snmpHelper("1.3.6.1.4.1.4115.1.20.1.1.1.7.1.3.2")
+    @_snmpProperty("1.3.6.1.4.1.4115.1.20.1.1.1.7.1.3.2")
     def wanIPv6Addr(self, snmpValue):
         "Current external IPv6 address of hub"
         return  _extract_ipv6(snmpValue)
 
-    @property
-    @_snmpHelper("1.3.6.1.4.1.4115.1.20.1.1.1.7.1.6.2")
+    @_snmpProperty("1.3.6.1.4.1.4115.1.20.1.1.1.7.1.6.2")
     def wanIPv6Gateway(self, snmpValue):
         "Default IPv6 gateway"
         return  _extract_ipv6(snmpValue)
 
-    @property
-    @_snmpHelper("1.3.6.1.4.1.4115.1.3.4.1.3.8.0")
+    @_snmpProperty("1.3.6.1.4.1.4115.1.3.4.1.3.8.0")
     def cmDoc30SetupPacketCableRegion(self, snmpValue):
         "TODO: Figure out what this is..."
         return int(snmpValue)
 
-    @property
-    @_snmpHelper("1.3.6.1.4.1.4491.2.1.14.1.5.4.0")
+    @_snmpProperty("1.3.6.1.4.1.4491.2.1.14.1.5.4.0")
     def esafeErouterInitModeCtrl(self, snmpValue):
         "TODO: Figure out what this is..."
         return int(snmpValue)
 
-
-    @property
-    @_snmpHelper("1.3.6.1.4.1.4115.1.20.1.1.5.16.1.2.1")
+    @_snmpProperty("1.3.6.1.4.1.4115.1.20.1.1.5.16.1.2.1")
     def authUserName(self, snmpValue):
         """The name of the admin user"""
         return snmpValue
