@@ -419,6 +419,20 @@ class Hub(object):
 
         raise StopIteration()
 
+    def getDevice(self, ipv4_address):
+        """Get information for the given device
+
+        If the hub knows about a network device on the local lan (or
+        wifi) with the given IP address, a DeviceInfo will be
+        returned.
+
+        If the device is not known to the hub, None will be returned.
+        """
+        mac = self.snmpGet("1.3.6.1.4.1.4115.1.20.1.1.2.4.2.1.4.200.1.4.%s" % ipv4_address)
+        if not mac:
+            return None
+        return DeviceInfo(self, ipv4_address, _extract_mac(mac))
+
 snmpHelpers = [
     ("docsisBaseCapability",                "1.3.6.1.2.1.10.127.1.1.5"),
     ("docsBpi2CmPrivacyEnable",             "1.3.6.1.2.1.126.1.1.1.1.1"),
@@ -514,6 +528,9 @@ def _demo():
         print 'Old-style properties:'
         for name,oid in snmpHelpers + _snmpWalks:
             print '- %s:' % name, '"%s"' % getattr(hub, name)
+
+        print "Some device:", hub.getDevice("192.168.0.26")
+        print "Nonexistent device:", hub.getDevice("192.168.99.99")
 
         print "Device List"
         for dev in filter(lambda x: x.connected, hub.deviceList()):
