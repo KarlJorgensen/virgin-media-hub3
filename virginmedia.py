@@ -381,7 +381,8 @@ class Hub(object):
 
     @_snmpProperty("1.3.6.1.4.1.4115.1.20.1.1.1.12.4.0")
     def wanIPv4LeaseExpiryDate(self, snmpValue):
-        return _extract_date(snmpValue)
+        if snmpValue == '$0000000000000000': return None
+        else: return _extract_date(snmpValue)
 
     @_snmpProperty("1.3.6.1.4.1.4115.1.20.1.1.1.12.3.0")
     def wanIPv4LeaseTimeSecsRemaining(self, snmpValue):
