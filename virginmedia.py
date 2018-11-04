@@ -547,11 +547,16 @@ def _demo():
 
         print 'Demo Properties:'
         for name in sorted(_demo_properties):
-            print '- %s:' % name, '"%s"' % getattr(hub, name)
+            try:
+                print '- %s:' % name, '"%s"' % getattr(hub, name)
+            except Exception as e:
+                print "Problem with property", name
+                raise
 
         print 'Old-style properties:'
         for name,oid in snmpHelpers + _snmpWalks:
-            print '- %s:' % name, '"%s"' % getattr(hub, name)
+            print '- %s:' % name,
+            print '"%s"' % getattr(hub, name)
 
         print "Some device:", hub.getDevice("192.168.0.26")
         print "Nonexistent device:", hub.getDevice("192.168.99.99")
