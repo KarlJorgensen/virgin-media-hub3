@@ -335,10 +335,14 @@ class Hub(object):
         This will probably also be the DNS servers the hub hands out
         in DHCP responses.
 
-        For the virgin media Hub3 this always appears as a string with
-        a SINGLE dns server IP address in it.
+        For the virgin media Hub3 this always appears as a string with a
+        SINGLE dns server IP address in it, except when disconnected
+        from the internet, in which case it may be None.
         """
-        return _extract_ip(snmpValue)
+        if snmpValue:
+            return _extract_ip(snmpValue)
+        else:
+            return None
 
     @_snmpProperty("1.3.6.1.4.1.4115.1.20.1.1.1.7.1.6.1")
     def wanIPv4Gateway(self, snmpValue):
