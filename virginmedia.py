@@ -288,7 +288,22 @@ class Hub(object):
 
     @_collect_stats
     def snmpWalk(self, oid):
-        result = json.loads(self._get('walk?oids=%s;%s' % (oid, self._nonce_str)).content)
+        jsondata = self._get('walk?oids=%s;%s' % (oid, self._nonce_str)).content
+
+        # The hub has an ANNOYING bug: Sometimes the json result include the single line
+        #
+        #    "Error in OID formatting!"
+        #
+        # which really messes up the JSON decoding (!). Since the IOD
+        # is obviously correct, and the hub happily returns other
+        # data, our only recourse is to remove such lines before
+        # attempting to interpret it as JSON... (sigh).
+        #
+        jsondata = "\n".join(filter(lambda x:x != "Error in OID formatting!", jsondata.split("\n")))
+
+        # print "snmpWalk of %s:" % oid
+        # print jsondata
+        result = json.loads(jsondata)
         # Strip off the final ANNOYING "1" entry!
         if result.get("1") == "Finish":
             del result["1"]
