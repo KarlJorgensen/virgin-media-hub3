@@ -343,7 +343,9 @@ class Hub(object):
     @_snmpProperty("1.3.6.1.4.1.4115.1.20.1.1.1.7.1.6.1")
     def wanIPv4Gateway(self, snmpValue):
         """Default gateway of the hub"""
-        return _extract_ip(snmpValue)
+        x = _extract_ip(snmpValue)
+        if x == "0.0.0.0": return None
+        else: return x
 
     @_snmpProperty("1.3.6.1.4.1.4115.1.20.1.1.5.10.0")
     def hardwareVersion(self, snmpValue):
