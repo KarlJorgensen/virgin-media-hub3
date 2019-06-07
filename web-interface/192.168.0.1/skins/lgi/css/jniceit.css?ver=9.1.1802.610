@@ -1,0 +1,425 @@
+
+/*	INPUT	*/
+
+.fmInput {
+	background: url("./images/jniceit/boxes_set.png") no-repeat right top; 
+	width: 102%;
+	float: left;
+	padding-right:7px;
+	height:38px;
+}
+
+.fmInput SPAN {
+	display: block;
+	padding: 8px 0px;
+	background: transparent url("./images/jniceit/boxes_set.png") no-repeat left top;
+	padding-left:7px;
+	position: relative;
+	left:-2px;
+	width:99%;
+	margin-right:14px;
+}
+
+.fmInput SPAN INPUT { 
+	border: 0px;
+	outline: none; 
+	width: 40px;
+	padding: 0 0px; 
+	position: relative;
+	left:0px;
+	height:20px;
+} 
+
+.fmInput.fmInFocus, .fmInput:HOVER { background-position: right -39px; }
+.fmInput.fmInFocus SPAN, .fmInput:HOVER SPAN { background-position: left -39px; }
+.fmInput.fmInFocus SPAN INPUT, .fmInput:HOVER SPAN INPUT { background-color:#FFF; }
+
+.fmInput.disabled, .fmInput.readonly  {background-position: right -78px;height:37px}
+.fmInput.disabled SPAN, .fmInput.readonly SPAN { background-position: left -78px; }
+.fmInput.disabled SPAN INPUT, .fmInput.readonly SPAN INPUT { background-color:#f1f1f1; }
+
+.fmInput.fmInError { background-position: right -117px; }
+.fmInput.fmInError SPAN { background-position: left -117px; }
+.fmInput.fmInError SPAN INPUT { background-color:#FFF; }
+
+/*	BUTTON	*/
+
+.fmButton { 
+	background: none;
+	border: none;
+	margin: 0;
+	padding: 0;
+	float: left;
+	white-space: nowrap;
+	cursor: pointer;
+
+	width: auto;
+	overflow: visible;
+}
+
+.fmButton STRONG {
+	background: url("./images/jniceit/button-submit-left.gif") no-repeat left top;
+	float: left;
+}
+
+.fmButton SPAN  {
+	background: url("./images/jniceit/button-left.gif") no-repeat left top;
+	float: left;
+}
+
+.fmButton STRONG SPAN {
+	background: url("./images/jniceit/button-submit-right.gif") no-repeat right top;
+	padding: 8px 15px;
+	float: left;
+}
+
+.fmButton SPAN SPAN {
+	background: url("./images/jniceit/button-right.gif") no-repeat right top;
+	padding: 8px 15px;
+	float: left;
+	font-weight: bold;
+}
+
+.fmButton:HOVER SPAN  { background-position: left -33px; } 
+.fmButton:HOVER SPAN SPAN { background-position: right -33px; }
+
+.fmButton:HOVER STRONG { background-position: left -33px; }
+.fmButton:HOVER STRONG SPAN { background: url("./images/jniceit/button-submit-right.gif") no-repeat right -33px; }
+
+
+/*  CHECKBOX */
+
+B.fmCheckbox {
+	float: left;
+	width: 25px;
+	height: 25px;
+	background: red;
+	position: relative;
+	cursor: pointer;
+	background: url("./images/jniceit/icons_set.png") no-repeat left -25px;
+	margin-top: 0px;
+	font-size: 9px;
+	line-height: 1%;
+	text-indent: -1000em;
+}
+
+B.fmCheckbox.checked { background-position: left top; }
+B.fmCheckbox:HOVER { background-position: -25px -25px; }
+B.fmCheckbox.checked:HOVER { background-position: -25px top; }
+
+B.fmCheckbox.disabled { background-position: -50px -25px; }
+
+B.fmCheckbox.checked.disabled,
+B.fmCheckbox.checked.disabled:HOVER { background-position: -50px top; }
+
+/*  TEXTAREA */
+
+.fmTextarea {
+	float: left;
+	background: url("./images/jniceit/textarea-tl.gif") no-repeat left top;
+	border: 2px solid #cccccc;
+}
+
+.fmTextarea SPAN {
+	float: left;
+	height: 100%;
+	width: 100%;
+	background: url("./images/jniceit/textarea-br.gif") no-repeat right bottom;
+}
+
+.fmTextarea SPAN SPAN {
+	float: left;
+	height: 100%;
+	width: 100%;
+	background: url("./images/jniceit/textarea-blc.gif") no-repeat left bottom;
+}
+
+.fmTextarea SPAN SPAN SPAN {
+	float: left;
+	width: 100%;
+	//padding-bottom: 10px;
+	_padding-bottom: 0;
+	background: url("./images/jniceit/textarea-trc.gif") no-repeat right top;
+}
+
+HTML BODY .fmTextarea TEXTAREA {
+	margin: 2%;
+	width: 96%;
+	height: 96%;
+	background: none;
+	border: none;
+	overflow: auto;
+	outline: none;
+	font-size: 13px;
+	color: #777;
+	font-family: Arial, Tahoma, Verdana, sans-serif;
+	
+	max-width: 96%;
+	max-height: 500px;
+}
+
+HTML BODY .fmTextarea.fmInFocus,
+HTML BODY .fmTextarea.fmInFocus TEXTAREA { background-color: #FBFBFB; }
+
+
+SPAN.fmTextarea.tx-disabled,
+SPAN.fmTextarea.tx-disabled TEXTAREA { background-color: #F0F0F0; }
+
+/*	SELECT BOX	*/
+
+.fmSelect {
+	width: 102%;
+	
+	float: left;
+	position: relative;
+	outline: none;
+	background: white;
+	z-index: 150;
+	
+}
+
+.fmSelect STRONG { 
+	float: left;
+	width: 100%;
+	background: url("./images/jniceit/boxes_set.png") no-repeat left top;
+	/*border:2px solid #D3D3D3;
+	border-radius:3px; */
+	cursor: pointer;
+	position: relative;
+	/*height:38px;*/
+}
+
+.fmSelect STRONG SPAN {
+	display: block;
+	font-size: 16px;
+	font-weight: normal;
+	background: url("./images/jniceit/boxes_set.png") no-repeat right top;
+	height:38px;
+	margin-left:5px;
+	width:102%;
+	position: relative;
+}
+
+.fmSelect STRONG SPAN CITE{
+	display: block;
+	padding: 10px 15px 10px 5px;
+	white-space: nowrap;
+	overflow: hidden;
+	font-style: normal;
+	margin-right: 15px;
+}
+
+.fmSelect UL {
+	position: absolute;
+	left: 2px;
+	top: 30px;
+	margin: 0 !important;
+	padding: 0;
+	border: 1px solid #AEAFB0;
+	width: 100%;
+	list-style: none;
+	font-size: 16px;
+	background: white;
+	padding-top: 1px;
+
+	max-height: 108px;
+	_height: 108px;
+	overflow-y: scroll;
+	z-index: 1500;
+
+	display: none;
+}
+
+.fmSelect UL LI {
+	display: block;
+	padding: 5px 7px;
+	border-bottom: 1px solid white;
+}
+
+.fmSelect UL LI.active {
+	background: #D3E9F6;
+	cursor: pointer;
+}
+
+.fmSelect.disabled { background-color:#F0F0F0; }
+.fmSelect.disabled STRONG, .fmSelect.disabled:HOVER STRONG {background-position: left -78px;}
+.fmSelect.disabled STRONG SPAN, .fmSelect.disabled:HOVER STRONG SPAN {background-position: right -78px; height:37px;}
+
+.fmSelect:HOVER STRONG { background-position: left -39px; }
+.fmSelect:HOVER STRONG SPAN { background-position: right -39px;  }
+
+
+/* RADIO BUTTON */
+
+.fmRadio {
+	float: left;
+	width: 25px;
+	height: 25px;
+	font-size: 0;
+	line-height: 1%;
+	text-decoration: none;
+	cursor: pointer;
+	background: url("./images/jniceit/icons_set.png") no-repeat -75px -25px;
+}
+
+.fmRadio.checked { background-position: -75px top; }
+.fmRadio:HOVER { 
+	background-position: -100px -25px;
+	text-decoration: none;
+}
+.fmRadio.checked:HOVER { background-position: -100px top; }
+
+.fmRadio.disabled,
+.fmRadio.disabled:HOVER { background-position: -125px -25px; }
+.fmRadio.checked.disabled { background-position: -125px top; }
+/*	FILE INPUT	*/
+
+.fnFileInput {
+	float: left;
+	background: url("./images/jniceit/file-input-left.gif") no-repeat left top;
+	font-size: 20px;
+	cursor: text;
+	text-decoration: none;
+	position: relative;
+}
+
+.fnFileInput SPAN {
+	float: right;
+	width: 100%;
+	height: 34px;
+	position: relative;
+	z-index: 150;
+	background: url("./images/jniceit/file-input-right.gif") no-repeat right top;
+}
+
+.fnFileInput SPAN CITE {
+	float: right;
+	margin: 6px 7px;
+	display: inline;
+	font-size: 16px;
+	width: 67%;
+	white-space: nowrap;
+	overflow: hidden;
+	color: #777;
+	cursor: text;
+}
+
+.fnFileInput SPAN STRONG {
+	float: left;
+	display: inline;
+	border-left: 2px solid #CDDFE9;
+	font-family: Arial, Verdana, Tahoma, sans-serif;
+	font-size: 16px;
+	font-weight: normal;
+	margin: 1px 2px;
+	line-height: 195%;
+	overflow: hidden;
+	height: 32px;
+	width: 22%;
+	color: #000033;
+	white-space: nowrap;
+	text-decoration: none;
+	/*background: url("./images/jniceit/file-input-button.gif") repeat-x left top;*/
+	text-align: center;
+	position: relative;
+	z-index: 1;
+	max-width: 230px;
+
+	background:#fbfbfb url(images/arrow-blue-grad.svg) no-repeat 92% center; 
+	background-size: 10px; 
+	color: #224499; 
+	padding-right: 10px;
+	border:1px solid #d2d2d2; 
+	border-radius:3px; 
+	margin-right:4px;
+}
+
+A.fnFileInput.fmInFocus { background-image: url("./images/jniceit/file-input-left-focus.gif"); }
+A.fnFileInput:HOVER SPAN { background-image: url("./images/jniceit/file-input-right-hover.gif"); }
+A.fnFileInput:HOVER SPAN STRONG { /*background-image: url("./images/jniceit/file-input-button-hover.gif"); border-color: #DCE9F0;*/ }
+
+.fnFileInput.disabled,
+A.fnFileInput.fmInFocus.disabled { background-image: url("./images/jniceit/file-input-left-disabled.gif"); }
+
+A.fnFileInput.disabled:HOVER SPAN STRONG {
+	background-image: url("./images/jniceit/file-input-button.gif");
+	border-left: 2px solid #CDDFE9;
+}
+
+.fnFileHidden {
+	position: absolute;
+	top: 0;
+	right: 0;
+	
+	z-index: 150;
+	height: 30px;
+	width: 15em !important;
+	filter: alpha(opacity: 0);
+	opacity: 0;
+	font-size: 30px;
+	padding: 0 1px;
+}
+
+/*	MULTIPLE SELECT BOX 	*/
+
+.fmMultipleSelect {
+	float: left;
+	background: url("./images/jniceit/textarea-tl.gif") no-repeat left top;
+}
+
+.fmMultipleSelect SPAN {
+	float: left;
+	height: 100%;
+	width: 100%;
+	background: url("./images/jniceit/textarea-br.gif") no-repeat right bottom;
+}
+
+.fmMultipleSelect SPAN SPAN {
+	float: left;
+	height: 100%;
+	width: 100%;
+	background: url("./images/jniceit/textarea-blc.gif") no-repeat left bottom;
+}
+
+.fmMultipleSelect SPAN SPAN SPAN {
+	float: left;
+	width: 100%;
+	//padding-bottom: 10px;
+	_padding-bottom: 0;
+	background: url("./images/jniceit/textarea-trc.gif") no-repeat right top;
+}
+
+.fmMultipleSelect SELECT {
+	margin: 2%;
+	width: 96%;
+	height: 96%;
+	background: none;
+	padding: 0;
+	border: 0px;
+	outline: none;
+	font-size: 15px;
+	color: #777;
+	font-family: Arial, Tahoma, Verdana, sans-serif;
+	
+	max-width: 96%;
+	max-height: 500px;
+}
+
+.fmMultipleSelect SELECT OPTION { 
+	padding: 3px 7px;
+	margin: 0;
+	cursor: pointer;
+}
+
+.fmMultipleSelect.fmInFocus,
+.fmMultipleSelect.fmInFocus SELECT { background-color: #FBFBFB; }
+
+/* * */
+
+.fmZero {
+	margin: 0 !important;
+	position: relative !important;
+}
+
+.fmHidden { display: none; }
+.fmInput.disabled span input, .fmSelect.disabled{color:#d3d3d3;}

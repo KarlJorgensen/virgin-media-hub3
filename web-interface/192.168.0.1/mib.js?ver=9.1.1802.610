@@ -1,0 +1,1668 @@
+//(c) Copyright 2011-2014, ARRIS Group, Inc., All rights reserved.
+var walk = { };
+var loads = [];
+var stores = [];
+var table = { };
+var container = { };
+var oidsRead = [ ];
+var mib = { };
+var bulkLoading = false;
+var bulkList = [ ];
+// UNIHAN ADD START
+var wpspinoid   = "1.3.6.1.4.1.4115.1.20.1.1.3.30.10.0";
+var wps50pinoid = "1.3.6.1.4.1.4115.1.20.1.1.3.65.10.0";
+// UNIHAN ADD END 
+var bulkSetList = [];
+
+function bulkLoad(load_func) {
+    bulkLoading = true;
+    bulkList = [];
+    load_func();
+    bulkLoading = false;
+    if (bulkList.length === 0)
+        return;
+    var oids = [];
+    _.each(bulkList, function (oid, index) {
+        oids.push(oid);
+        if (oids.length === 20 || index === (bulkList.length-1)) {
+            var v = snmpGet(oids);
+            _.each(v, function (val, key) {
+              walk[key] = val;
+            });
+            oids = [];
+        }
+    });
+}
+
+function sliceOid(oid, start, end) {
+    var oids = oid.split(".");
+    if (start < 0) {
+        start = oids.length + start;
+        end = oids.length;
+    } else {
+        end = (end === undefined ? oids.length : end);
+    }
+    if (end < 0) {
+        end = oids.length + end;
+    }
+    return _(oids.slice(start, end)).reduce(function(acc, next) {
+        return acc ? acc + "." + next : next;
+    });
+}
+
+//function getWalkOids(targetOid) {
+//    $.each(oidMap, function(oid,def) {
+//        if (!oid.startsWith(target))
+//            return;
+//
+//
+//    });
+//}
+
+if (window["preWalk"])
+    walk = window["preWalk"];
+
+function afterLoad(f) {
+    {
+        f.loaded = true;
+        if (f.afterLoad) f.afterLoad();
+    }
+}
+function load1(f, json) {
+    if (json === undefined)
+        json = snmpWalk([ f.oid ]);
+    // json = JSON.parse(json || "{ }");
+    _(json).each(function(val, oid) {
+        walk[oid] = val;
+    });
+    {
+        f.loaded = true;
+        if (f.afterLoad) f.afterLoad();
+    }
+}
+
+var loadLogData = "";
+
+function loadLogger(l) {
+    $.log(l);
+    if (debug()&2 && !(l.contains("assword", "TAC","RadiusKey")) )
+        loadLogData += (l+"<br/>");
+}
+
+function load() {
+    loadLogData = "";
+    var args = _(_.toArray(arguments));
+    if (!window["preWalk"]) {
+        var oids = args.map(function(f) {
+            return f.oid;
+        });
+        var json = snmpWalk(oids);
+        // json = JSON.parse(json || "{ }");
+        _(json).each(function(val, oid) {
+            walk[oid] = val;
+        });
+    }
+    args.each(function(f) {
+        f.loaded = true;
+        if (f.afterLoad) f.afterLoad();
+    })
+    loadRowStatus();
+
+// mb
+//    args.each(function(f) {
+//        f.dump(loadLogger);
+//    })
+//    if (debug()&2)
+//        afterBuild( function() {
+//            showWalk(loadLogData);
+//        });
+
+}
+
+function loadFake() {
+    var args = _(_.toArray(arguments));
+    args.each(function(f) {
+        f.loaded = true;
+        if (f.afterLoad) f.afterLoad();
+    })
+}
+function loadOids(oa) {
+    function doget(a) {
+        var json = snmpWalk(a);
+        // json = JSON.parse(json || "{ }");
+        _(json).each(function(val, oid) {
+            walk[oid] = val;
+        });
+    }
+
+    var soa = [ ];
+    _.each(oa, function(o) {
+        soa.push(o);
+        if (soa.length > 5) {
+            doget(soa);
+            soa = [ ];
+        }
+    });
+    if (soa.length)
+        doget(soa);
+}
+
+
+function store() {
+    MibObjects.ApplyAllSettings.set(1);
+    refresh();
+}
+// UNIHAN ADD START
+function startApplyAllSettings() {
+    MibObjects.ApplyAllSettings.set(1);
+}
+// UNIHAN ADD END
+
+function listAccessed() {
+    _.each(_.extend({}, container, table), function(f) {
+        if (f.accessed) $.log(f.name);
+    });
+}
+
+function decodeOid(oid) {
+    var d = "";
+    var match = { oid: "" };
+    _.each(_.extend({}, container, table), function(f) {
+        _.each(f.children, function(e) {
+            if (oid.startsWith(e.oid + ".") && e.oid.length > match.oid.length) {
+                match = e;
+            }
+        })
+    });
+    //d = e.name+oid.substr(e.oid.length);
+    return match.oid ? match.name + oid.substr(match.oid.length) : "???" + oid;
+}
+
+function decodeOid(oid) {
+    var d = "";
+    var match = { oid: "" };
+    _.each(_.extend({}, container, table), function(f) {
+        _.each(f.children, function(e) {
+            if (oid.startsWith(e.oid + ".") && e.oid.length > match.oid.length) {
+                match = e;
+            }
+        })
+    });
+    //d = e.name+oid.substr(e.oid.length);
+    return match.oid ? match.name + oid.substr(match.oid.length) : "???" + oid;
+}
+
+
+
+function dumpOidsRead() {
+    _.each(oidsRead, function(o) {
+        $.log(o);
+    });
+}
+
+
+function oidValuesEqual(a,b) {
+    if ((""+a).startsWith("$") && (""+b).startsWith("$")) {
+        return a.replace(/ /g,"") === b.replace(/ /g,"")
+    }
+    return a == b;
+}
+
+
+function Container(name, oid) {
+    this.name = name;
+    this.oid = oid;
+    mib[oid] = this;
+    container[oid] = this;
+    this.parent = mib[sliceOid(oid, 0, -1)];
+    if (this.parent)
+        this.parent.children.push(this);
+    //$.log("container "+name+" parent "+(this.parent ? this.parent.name : "ROOT"));
+    this.children = [ ];
+    this.loaded = false;
+    this.accessed = false;
+    this.dump = function(f) {
+        var or = oidsRead.slice(0);
+        if (f === undefined)
+            f = $.log;
+        accessed = this.accessed;
+        f(name + " ===============");
+        _.each(this.children, function(v) {
+            if (v !== undefined && v.scalar)
+                f(v.name + ":" + v.get());
+        });
+        this.accessed = accessed;
+        oidsRead = or;
+    };
+    this.json = function() {
+        return { name:this.name,type:"container",oid:this.oid,
+            children: _.map(this.children, function(f) {
+                return f.json();
+            }) };
+    }
+}
+
+function Table(name, oid) {
+    this.oid = oid;
+    this.name = name;
+    mib[oid] = this;
+    table[oid] = this;
+    this.parent = mib[sliceOid(oid, 0, -1)];
+    if (this.parent)
+        this.parent.children.push(this);
+    //$.log("table "+name+" parent "+(this.parent ? this.parent.name : "???"));
+    this.key = [];
+    this.children = [ ];
+    this.loaded = false;
+    this.accessed = false;
+    this.rowStatus = null;
+    this.rowVisibleMask = 1; // 0x00000001: active(1)
+                             // 0x00000002: notInService(2)
+                             // set mask to 3 if notInService needs to be visible.
+    this.rowVisible = function(key) {
+        var vis = true;
+        if (this.rowStatus) {
+            if(this.rowVisibleMask & 0x01){
+                vis =  this.rowStatus.getOid(key) == 1;
+            }
+            if(!vis && (this.rowVisibleMask & 0x02)){
+                vis =  this.rowStatus.getOid(key) == 2;
+            }
+            if (!vis)
+                $.log(name+"."+key+" not visible: "+this.rowStatus.getOid(key));
+        }
+        return vis;
+    };
+    this.length = function() {
+        return this.key.length;
+    };
+    this.afterLoad = function() {
+        var hash = { };
+        _.each(walk, function(v, k) {
+            if (k.startsWith(oid + ".")) {
+                //key = sliceOid(k.substr(oid.length+1),2);
+                //var tableoid = sliceOid(k,0,-2);
+                var testKey = sliceOid(k.substr(oid.length + 1), 2);
+                if (testKey && !hash[testKey]) {
+                    hash[testKey] = testKey;
+                    this.key.push(testKey);
+                }
+            }
+        }, this);
+        this.loaded = true;
+        loadRowStatus();
+    }
+    this.dumpGroupRow = true;
+    this.dump = function(f) {
+        var or = oidsRead.slice(0);
+        if (f === undefined)
+            f = $.log;
+        accessed = this.accessed;
+        var rv = "";
+        for (var i = 0; i < this.length(); i++) {
+            rv += this.key[i] + ";";
+        }
+        f("table " + name + " size=" + this.length() + "  " + rv);
+        var rv = "";
+        for (var i = 0; i < this.length(); i++) {
+            $.each(this.children, function(k, v) {
+                if (v.get(i)) {
+                    rv += (v.name + ":" + v.get(i) + ";");
+                    if (!this.dumpGroupRow) {
+                        f("===" + this.table.key[i] + "==>" + rv);
+                        rv = "";
+                    }
+                }
+            });
+            if (rv.length && this.dumpGroupRow)
+                f("===" + this.key[i] + "==>" + rv);
+        }
+        this.accessed = accessed;
+        oidsRead = or;
+        f("rowStatus: "+ (this.rowStatus ? this.rowStatus.name : ""));
+    }
+    this.json = function() {
+        return { name:this.name,type:"table",oid:this.oid,
+            children: _.map(this.children, function(f) {
+                return f.json();
+            }) };
+    }
+    this.getTable = function(cola, func) {
+        var oidToWalk = this.oid;
+	if (cola && (cola.length == 1))
+	    oidToWalk = cola[0].oid;
+
+	if (walk[oidToWalk] === undefined) {
+            walk[oidToWalk] = "";
+            _.extend(walk, snmpWalk([oidToWalk]));
+            this.afterLoad();
+        }
+        var or = oidsRead.slice(0);
+        var table = [ ];
+        if (!cola)
+            cola = this.children;
+        for (var i = 0; i < this.length(); i++) {
+            if (!this.rowVisible(this.key[i]))
+                continue;
+            var row = [];
+            _.each(cola, function(c) {
+                row.push(c.get(c.table.key[i]));
+            });
+            if (func) {
+                row = func(i, row, this.key[i]);
+                if (row)
+                    table.push(row);
+            }
+            else table.push(row);
+        }
+        oidsRead = or;
+        return table;
+    }
+
+    this.getTableAsync = function(cola, func, callback_done) {
+        var mytable = this;
+        function handleAsyncResponse(rs){
+            if(rs)
+            {
+                _.extend(walk, rs);
+                $.log("walk = " + JSON.stringify(walk));
+                //$.log("mytable = " + JSON.stringify(mytable));
+                mytable.afterLoad();
+            }
+            var or = oidsRead.slice(0);
+            var table = [ ];
+            if (!cola)
+                cola = mytable.children;
+            for (var i = 0; i < mytable.length(); i++) {
+                if (!mytable.rowVisible(mytable.key[i]))
+                    continue;
+                var row = [];
+                _.each(cola, function(c) {
+                    row.push(c.get(c.table.key[i]));
+                });
+                if (func) {
+                    row = func(i, row, mytable.key[i]);
+                    if (row)
+                        table.push(row);
+                }
+                else table.push(row);
+            }
+            oidsRead = or;
+            //return table;
+            if(callback_done)
+                callback_done();
+        }
+
+        var oidToWalk = this.oid;
+        if (cola && (cola.length == 1))
+            oidToWalk = cola[0].oid;
+
+        if (walk[oidToWalk] === undefined) {
+            walk[oidToWalk] = "";
+            snmpWalkAsync([oidToWalk], handleAsyncResponse);
+        }
+        else
+        {
+            handleAsyncResponse();
+        }
+    }
+
+    this.getConnectedDevices = function(cola, func, callback_done) {	
+        var mytable = this;
+        function handleAsyncResponse(rs){
+            if(rs)
+            {
+                _.extend(walk, rs);
+                $.log("walk = " + JSON.stringify(walk));
+                mytable.afterLoad();
+            }
+            var or = oidsRead.slice(0);
+            var table = [ ];
+            if (!cola)
+                cola = mytable.children;
+            for (var i = 0; i < mytable.length(); i++) {
+                if (!mytable.rowVisible(mytable.key[i]))
+                    continue;
+                var row = [];
+                _.each(cola, function(c) {
+                    row.push(c.get(c.table.key[i]));
+                });
+                if (func) {
+                    row = func(i, row, mytable.key[i]);
+                    if (row)
+                        table.push(row);
+                }
+                else table.push(row);
+            }
+            oidsRead = or;
+            if(callback_done)
+                callback_done();
+        }
+
+        var oidToWalk = this.oid;
+        if (walk[oidToWalk] === undefined) {
+            walk[oidToWalk] = "";
+            getConnDevices(handleAsyncResponse);
+        } else {
+            handleAsyncResponse();
+        }
+    }
+
+    this.getRouterStatusData = function(cola, func, callback_done) {	
+        var mytable = this;
+        mytable.afterLoad();
+			
+        var or = oidsRead.slice(0);
+        var table = [ ];
+        if (!cola)
+            cola = mytable.children;
+        for (var i = 0; i < mytable.length(); i++) {
+            if (!mytable.rowVisible(mytable.key[i]))
+                continue;
+            var row = [];
+            _.each(cola, function(c) {
+                  row.push(c.get(c.table.key[i]));
+            });
+            if (func) {
+               row = func(i, row, mytable.key[i]);
+               if (row)
+                  table.push(row);
+            }
+            else table.push(row);
+				
+        }
+        oidsRead = or;
+	if(callback_done)
+          callback_done();
+    }
+
+    this.deleteVisible = function(index) {
+        for (var i=0;i<this.key.length;i++) {
+            if (this.rowVisible(this.key[i])) {
+                if (index===0) {
+                    this.rowStatus.set(this.key[i],"6"); // delete
+                    return;
+                } else {
+                    index--;
+                }
+            }
+        }
+    }
+    this.findLowestFree = function(col, max) {
+        var or = oidsRead.slice(0);
+        var keyMap = { };
+        _.each(this.key, function(k, i) {
+            var index = k.lastIndexOf(".");
+            index = index == -1 ? k : k.substr(index+1);
+            keyMap["" + index] = col.get(k);
+        });
+        var key = _.detect(_.range(1, max + 1), function(i) {
+            return keyMap["" + i] === undefined
+        });
+        if (key == max)
+            alert("Table " + this.name + " is full");
+        oidsRead = or;
+        return key;
+    }
+    this.addRow = function(rowKey, cva, label) {
+
+       stores = [];
+
+        try {
+            this.beforeAddRow(rowKey);
+            for (var i = 0; i < cva.length / 2; i++) {
+                var col = cva[i * 2];
+                var val = cva[i * 2 + 1];
+                if (col.table && col.table != this)
+                    throw "Wrong table " + this.name + " for " + col.name;
+                stores.push({oid:col.oid + "." + rowKey, value:val, type:col.type});
+
+                $.log("addRow " + col.name + "." + rowKey + "=" + val);
+            }
+            this.afterAddRow(rowKey);
+            _.each(stores, function(kvt) {
+                try {
+                    snmpSet1(kvt.oid, kvt.value, kvt.type);
+                } catch (e) {
+                    if (e == "unauthorized")
+                        refresh();
+                    else if (label)
+                       throw { oid:kvt.oid, label:label };
+                    throw e;
+                }
+            });
+        } finally {
+            stores = [];
+        }
+
+    }
+
+    this.addRowBulk = function(rowKey, cva, label) {
+        try {
+            for (var i = 0; i < cva.length / 2; i++) {
+                var col = cva[i * 2];
+                var val = cva[i * 2 + 1];
+                if (col.table && col.table != this)
+                    throw "Wrong table " + this.name + " for " + col.name;
+                col.addtoSetBulk(rowKey,val);
+                $.log("addRow " + col.name + "." + rowKey + "=" + val);
+            }
+            bulkSet();
+        } catch (e) {
+            throw e;
+        }
+    }
+    this.beforeAddRow = function(key) {
+        if (this.rowStatus) {
+            //if (this.rowStatus.getOid(key) === "") //remove for PROD00214573
+                stores.push({oid:this.rowStatus.oid + "." + key, value:5, type:this.rowStatus.type}); // createAndWait
+        }
+    };
+    this.afterAddRow = function(key) {
+        if (this.rowStatus)
+            stores.push({oid:this.rowStatus.oid + "." + key, value:1, type:this.rowStatus.type}); // active
+    };
+}
+
+function Scalar(name, oid, type) {
+    mib[oid] = this;
+    this.name = name;
+    this.oid = oid;
+    this.type = type;
+    this.scalar = true;
+    this.parent = container[sliceOid(oid, 0, -1)];
+    //$.log("scalar "+name+" parent "+this.parent.name);
+    if (!this.parent)
+        alert("container for" + name + ":" + oid + " not found");
+    this.parent.children.push(this);
+    this.get = function() {
+        if (arguments.length !== 0)
+            alert("unexpected index for scalar " + this.name);
+        var oid = this.oid+".0";
+        if (bulkLoading) {
+            bulkList.push(oid);
+            return "";
+        }
+        if (walk[oid] === undefined)
+            walk[oid] = snmpGet1(oid) || "";
+        // UNIHAN ADD START
+        else
+        {
+            if( exception_oid( oid ) == true )
+            {
+                walk[oid] = snmpGet1(oid) || "";
+            }
+        }
+        // UNIHAN ADD END 
+
+        return decodeEntities(walk[oid]);
+
+        if (!this.parent.loaded)
+            $.log(this.parent.name + " not loaded");//alert(this.parent.name + " not loaded"); // MOD for PROD00202247
+        this.parent.accessed = true;
+        oidsRead.push(oid + ".0");
+        return decodeEntities(walk[oid + ".0"]) || "";
+    };
+    this.set = function(v, label, forceSubmit) {
+        try {
+            snmpSet1(this.oid + ".0", v, this.type, forceSubmit);
+        } catch (e) {
+            if (e == "unauthorized")
+                //refresh(); // Handle "unauthorized" exception in top handler.
+            	throw e;
+            else if (label)
+                throw { oid:this.oid + ".0", label:label };
+            throw e;
+        }
+    };
+
+    this.addtoSetBulk = function(index, value) {
+        var found = false;
+        var oid = this.oid + "." + index;
+        var type = this.type;
+        _.each (bulkSetList, function(element) {
+            if ((oid == element[0]) && (value == element[1]) && (type == element[2])) {
+                $.log("addtoSetBulk: " + JSON.stringify([oid, value, type]) + " already exists");
+                found = true;
+                return false;
+            }
+        });
+        if (!found) {
+            $.log("addtoSetBulk = " + JSON.stringify([this.oid + "." + index, value, this.type]));
+            bulkSetList.push([this.oid + "." + index, value, this.type]);
+        }
+    }
+	
+    this.defined = function(index) {
+        return walk[oid + ".0"] !== undefined;
+    }
+    this.json = function() {
+        return { name:this.name,type:"scalar",oid:this.oid };
+    }
+}
+
+function Column(name, oid, type) {
+    mib[oid] = this;
+    this.name = name;
+    this.oid = oid;
+    this.type = type;
+    this.table = table[sliceOid(oid, 0, -2)];
+    //$.log("column "+name+" parent "+this.table.name);
+    if (!this.table)
+        alert("table for " + name + ":" + oid + " not found");
+    this.table.children.push(this);
+    this.length = function() {
+        return this.table.length();
+    };
+    this.getKey = function(index) {
+        if (!this.table.loaded)
+            $.log(this.table.name + " not loaded");//alert(this.table.name + " not loaded"); // MOD for PROD00202247
+        if (index < 0 || index > this.table.key.length)
+            $.log("index " + index + " out of range for " + table.name);
+        return this.table.key[index] || "";
+    }
+    this.get = function(index, index2) {
+        if (!index || index.asInt() === 0)
+           return "";
+        if (index2 !== undefined)
+            index += "."+index2;
+        var oid = this.oid+"."+index;
+
+        if (bulkLoading) {
+            bulkList.push(oid);
+            return;
+        }
+
+        if (walk[oid] === undefined)
+            walk[oid] = snmpGet1(oid) || "";
+        return decodeEntities(walk[oid]);
+
+        if (arguments.length !== 1)
+            alert("expected index for column " + this.name);
+        if (!this.table.loaded)
+            $.log(this.table.name + " not loaded");//alert(this.table.name + " not loaded"); // MOD for PROD00202247
+        this.table.accessed = true;
+        if (index < 0 || index > this.table.key.length) {
+            $.log("index " + index + " out of existing range for " + table.name);
+            oidsRead.push(oid + "." + (parseInt(index) + 1));
+            return decodeEntities(walk[oid + "." + (parseInt(index) + 1)]) || "";
+        }
+        oidsRead.push(oid + "." + this.table.key[index]);
+        return decodeEntities(walk[oid + "." + this.table.key[index]]) || "";
+    }
+    this.getOid = function(index) {
+        if (arguments.length !== 1)
+            alert("expected index for column " + this.name);
+        if (!this.table.loaded)
+            $.log(this.table.name + " not loaded");//alert(this.table.name + " not loaded"); // MOD for PROD00202247, PROD00202094
+        oidsRead.push(oid + "." + index);
+        $.log(this.name+"."+index+" = "+walk[oid + "." + index] || "");
+        return walk[oid + "." + index] || "";
+    }
+
+    this.set = function(index, value, label, forceSubmit) {
+        try {
+            snmpSet1(this.oid + "."+index, value, this.type, forceSubmit);
+        } catch (e) {
+            if (e == "unauthorized")
+                refresh();
+            else if (label)
+                throw { oid:this.oid + index, label:label };
+            throw e;
+        }
+        return;
+
+
+        if (v !== undefined)
+            throw "this.set v WAS set";
+
+        if (!index || index.asInt() === 0)
+           return "";
+        if (v !== undefined) {
+            index += "."+index2;
+        } else {
+            v = index2;
+        }
+
+        if (arguments.length < 2)
+            alert("expected index for column " + this.name);
+
+        stores.push({oid: this.oid + "."+index,value:v, type:this.type});
+        return;
+
+        if (!this.table.loaded)
+            $.log(this.table.name + " not loaded");//alert(this.table.name + " not loaded"); // MOD for PROD00202247
+        var oid = this.oid;
+        if (index < 0 || index > this.table.key.length) {
+            $.log("index " + index + " out of existing range for " + table.name);
+            oid += "." + (parseInt(index) + 1);
+        } else {
+            oid = this.oid + "." + this.getKey(index);
+        }
+       // if (!oidValuesEqual(this.get(index), v)) {
+            $.log("set " + name + "." + this.getKey(index) + ":" + v);
+            stores.push({oid:oid,value:v, type:this.type});
+      //  }
+      //  else $.log(name + " (" + oid + ") not changed " + v);
+    };
+  //  this.setOid = function(index, v) {
+   //     if (arguments.length !== 2)
+   //         alert("expected index for column " + this.name);
+      //  if (!oidValuesEqual(this.get(index), v)) {
+  //          $.log("setOid " + name + "." + index + ":" + v);
+  //          stores.push({oid:this.oid + "." + index,value:v, type:this.type});
+       // }
+       // else $.log(name + "." + index + " not changed " + v);
+  //  };
+
+    this.addtoSetBulk = function(index, value, label, forceSubmit) {
+        var found = false;
+        var oid = this.oid + "." + index;
+        var type = this.type;
+        _.each(bulkSetList, function(element) {
+            if((oid == element[0]) && (value == element[1]) && (type == element[2]))
+            {
+                $.log("addtoSetBulk: " + JSON.stringify([oid, value, type]) + " already exists");
+                found = true;
+                return false;
+            }
+        });
+        if(!found)
+        {
+            $.log("addtoSetBulk = " + JSON.stringify([this.oid + "." + index, value, this.type]));
+            bulkSetList.push([this.oid + "." + index, value, this.type]);
+        }
+    }
+
+    this.defined = function(index) {
+        if (index === undefined || index < 0 || index > this.table.key.length)
+            return false;
+        return walk[oid + "." + this.table.key[index]] !== undefined;
+    }
+    this.json = function() {
+        return { name:this.name,type:"column",oid:this.oid };
+    }
+}
+
+var MibObjects = new Container("MibObjects", "1.3.6.1.4.1.4115.1.20.1.1");
+MibObjects.ApplyAllSettings= new Scalar("ApplyAllSettings","1.3.6.1.4.1.4115.1.20.1.1.9",2);
+var arApplyAllSettings=MibObjects.ApplyAllSettings;
+
+var IfTable = new Table("IfTable", "1.3.6.1.2.1.2.2");
+IfTable.IfSpeed = new Column("IfSpeed", "1.3.6.1.2.1.2.2.1.5", 66);
+var ifSpeed=IfTable.IfSpeed;
+
+var WanConfig = new Container("WanConfig", "1.3.6.1.4.1.4115.1.20.1.1.1");
+WanConfig.WanMTUSize= new Scalar("WanMTUSize","1.3.6.1.4.1.4115.1.20.1.1.1.4",66);
+WanConfig.WanIFMacAddr= new Scalar("WanIFMacAddr","1.3.6.1.4.1.4115.1.20.1.1.1.13",4);
+WanConfig.WanIPProvMode= new Scalar("WanIPProvMode","1.3.6.1.4.1.4115.1.20.1.1.1.17",2);
+var arWanMTUSize=WanConfig.WanMTUSize;
+var arWanIFMacAddr=WanConfig.WanIFMacAddr;
+var arWanIPProvMode=WanConfig.WanIPProvMode;
+
+var WanCurrentTable = new Table("WanCurrentTable", "1.3.6.1.4.1.4115.1.20.1.1.1.7");
+WanCurrentTable.WanCurrentIPAddr = new Column("WanCurrentIPAddr","1.3.6.1.4.1.4115.1.20.1.1.1.7.1.3",4);
+WanCurrentTable.WanCurrentGW = new Column("WanCurrentGW","1.3.6.1.4.1.4115.1.20.1.1.1.7.1.6",4);
+WanCurrentTable.WanCurrentPrefixDelegationV6 = new Column("WanCurrentPrefixDelegationV6","1.3.6.1.4.1.4115.1.20.1.1.1.7.1.9",4);
+WanCurrentTable.WanCurrentPrefixDelegationV6Len = new Column("WanCurrentPrefixDelegationV6Len","1.3.6.1.4.1.4115.1.20.1.1.1.7.1.10",66);
+var arWanCurrentIPAddr=WanCurrentTable.WanCurrentIPAddr;
+var arWanCurrentGW=WanCurrentTable.WanCurrentGW;
+var arWanCurrentPrefixDelegationV6=WanCurrentTable.WanCurrentPrefixDelegationV6;
+var arWanCurrentPrefixDelegationV6Len=WanCurrentTable.WanCurrentPrefixDelegationV6Len;
+
+var WanCurrentDNSTable = new Table("WanCurrentDNSTable", "1.3.6.1.4.1.4115.1.20.1.1.1.11.2");
+WanCurrentDNSTable.WanCurrentDNSIPAddrType = new Column("WanCurrentDNSIPAddrType","1.3.6.1.4.1.4115.1.20.1.1.1.11.2.1.2",2);
+WanCurrentDNSTable.WanCurrentDNSIPAddr = new Column("WanCurrentDNSIPAddr","1.3.6.1.4.1.4115.1.20.1.1.1.11.2.1.3",4);
+var arWanCurrentDNSIPAddrType=WanCurrentDNSTable.WanCurrentDNSIPAddrType;
+var arWanCurrentDNSIPAddr=WanCurrentDNSTable.WanCurrentDNSIPAddr;
+
+var WanStaticDNSTable = new Table("WanStaticDNSTable", "1.3.6.1.4.1.4115.1.20.1.1.1.11.4");
+WanStaticDNSTable.WanStaticDNSRowStatus = new Column("WanStaticDNSRowStatus","1.3.6.1.4.1.4115.1.20.1.1.1.11.4.1.4",2);
+var arWanStaticDNSRowStatus=WanStaticDNSTable.WanStaticDNSRowStatus;
+
+var WanDHCPObjects = new Container("WanDHCPObjects", "1.3.6.1.4.1.4115.1.20.1.1.1.12");
+WanDHCPObjects.WanDHCPDuration= new Scalar("WanDHCPDuration","1.3.6.1.4.1.4115.1.20.1.1.1.12.3",66);
+WanDHCPObjects.WanDHCPExpire= new Scalar("WanDHCPExpire","1.3.6.1.4.1.4115.1.20.1.1.1.12.4",4);
+WanDHCPObjects.WanDHCPDurationV6= new Scalar("WanDHCPDurationV6","1.3.6.1.4.1.4115.1.20.1.1.1.12.7",66);
+WanDHCPObjects.WanDHCPExpireV6= new Scalar("WanDHCPExpireV6","1.3.6.1.4.1.4115.1.20.1.1.1.12.8",4);
+var arWanDHCPDuration=WanDHCPObjects.WanDHCPDuration;
+var arWanDHCPExpire=WanDHCPObjects.WanDHCPExpire;
+var arWanDHCPDurationV6=WanDHCPObjects.WanDHCPDurationV6;
+var arWanDHCPExpireV6=WanDHCPObjects.WanDHCPExpireV6;
+
+var DSLiteWanObjects = new Container("DSLiteWanObjects", "1.3.6.1.4.1.4115.1.20.1.1.1.18");
+DSLiteWanObjects.DSLiteWanEnable= new Scalar("DSLiteWanEnable","1.3.6.1.4.1.4115.1.20.1.1.1.18.1",2);
+DSLiteWanObjects.DSLiteWanResolvedAddr= new Scalar("DSLiteWanResolvedAddr","1.3.6.1.4.1.4115.1.20.1.1.1.18.6",4);	
+DSLiteWanObjects.DSLiteWanLSNATAddr1= new Scalar("DSLiteWanLSNATAddr1","1.3.6.1.4.1.4115.1.20.1.1.1.18.8",4);
+var arDSLiteWanEnable=DSLiteWanObjects.DSLiteWanEnable;
+var arDSLiteWanResolvedAddr=DSLiteWanObjects.DSLiteWanResolvedAddr;
+var arDSLiteWanLSNATAddr1= DSLiteWanObjects.DSLiteWanLSNATAddr1;
+
+var LanConfig = new Container("LanConfig", "1.3.6.1.4.1.4115.1.20.1.1.2");
+LanConfig.LanMaxIPv6RAInterval= new Scalar("LanMaxIPv6RAInterval","1.3.6.1.4.1.4115.1.20.1.1.2.13",66);
+LanConfig.LanIPv6RALifetime= new Scalar("LanMaxIPv6RALifetime","1.3.6.1.4.1.4115.1.20.1.1.2.19",66);
+var arLanMaxIPv6RAInterval=LanConfig.LanMaxIPv6RAInterval;
+var arLanIPv6RALifetime=LanConfig.LanIPv6RALifetime;
+
+var LanSrvTable = new Table("LanSrvTable", "1.3.6.1.4.1.4115.1.20.1.1.2.2");
+LanSrvTable.LanName = new Column("LanName","1.3.6.1.4.1.4115.1.20.1.1.2.2.1.1",4);
+LanSrvTable.LanSubnetMask = new Column("LanSubnetMask","1.3.6.1.4.1.4115.1.20.1.1.2.2.1.3",4);
+LanSrvTable.LanGatewayIp = new Column("LanGatewayIp","1.3.6.1.4.1.4115.1.20.1.1.2.2.1.5",4);
+LanSrvTable.LanGatewayIp2 = new Column("LanGatewayIp2","1.3.6.1.4.1.4115.1.20.1.1.2.2.1.7",4);
+LanSrvTable.LanUseDHCP = new Column("LanUseDHCP","1.3.6.1.4.1.4115.1.20.1.1.2.2.1.9",2);
+LanSrvTable.LanStartDHCP = new Column("LanStartDHCP","1.3.6.1.4.1.4115.1.20.1.1.2.2.1.11",4);
+LanSrvTable.LanEndDHCP = new Column("LanEndDHCP","1.3.6.1.4.1.4115.1.20.1.1.2.2.1.13",4);
+LanSrvTable.LanLeaseTime = new Column("LanLeaseTime","1.3.6.1.4.1.4115.1.20.1.1.2.2.1.14",66);
+LanSrvTable.LanUPnPEnable = new Column("LanUPnPEnable","1.3.6.1.4.1.4115.1.20.1.1.2.2.1.23",2);
+LanSrvTable.LanPrefixLengthV6 = new Column("LanPrefixLengthV6","1.3.6.1.4.1.4115.1.20.1.1.2.2.1.29",66);
+LanSrvTable.LanUseDHCPV6 = new Column("LanUseDHCPV6","1.3.6.1.4.1.4115.1.20.1.1.2.2.1.30",2);
+LanSrvTable.LanStartDHCPV6 = new Column("LanStartDHCPV6","1.3.6.1.4.1.4115.1.20.1.1.2.2.1.31",4);
+LanSrvTable.LanEndDHCPV6 = new Column("LanEndDHCPV6","1.3.6.1.4.1.4115.1.20.1.1.2.2.1.32",4);
+LanSrvTable.LanLeaseTimeV6 = new Column("LanLeaseTimeV6","1.3.6.1.4.1.4115.1.20.1.1.2.2.1.33",66);
+LanSrvTable.LanParentalControlsEnable = new Column("LanParentalControlsEnable","1.3.6.1.4.1.4115.1.20.1.1.2.2.1.39",2);
+var arLanName=LanSrvTable.LanName;
+var arLanSubnetMask=LanSrvTable.LanSubnetMask;
+var arLanGatewayIp=LanSrvTable.LanGatewayIp;
+var arLanGatewayIp2=LanSrvTable.LanGatewayIp2;
+var arLanUseDHCP=LanSrvTable.LanUseDHCP;
+var arLanStartDHCP=LanSrvTable.LanStartDHCP;
+var arLanEndDHCP=LanSrvTable.LanEndDHCP;
+var arLanLeaseTime=LanSrvTable.LanLeaseTime;
+var arLanUPnPEnable=LanSrvTable.LanUPnPEnable;
+var arLanPrefixLengthV6=LanSrvTable.LanPrefixLengthV6;
+var arLanUseDHCPV6=LanSrvTable.LanUseDHCPV6;
+var arLanStartDHCPV6=LanSrvTable.LanStartDHCPV6;
+var arLanEndDHCPV6=LanSrvTable.LanEndDHCPV6;
+var arLanLeaseTimeV6=LanSrvTable.LanLeaseTimeV6;
+var arLanParentalControlsEnable=LanSrvTable.LanParentalControlsEnable;
+
+var RouterUPnPRuleTable = new Table("RouterUPnPRuleTable", "1.3.6.1.4.1.4115.1.20.1.1.4.53");
+RouterUPnPRuleTable.RouterUPnPProtoType=new Column("RouterUPnPProtoType","1.3.6.1.4.1.4115.1.20.1.1.4.53.1.2",2);
+RouterUPnPRuleTable.RouterUPnPIPAddr=new Column("RouterUPnPIPAddr","1.3.6.1.4.1.4115.1.20.1.1.4.53.1.3",4);
+RouterUPnPRuleTable.RouterUPnPExternalport=new Column("RouterUPnPExternalport","1.3.6.1.4.1.4115.1.20.1.1.4.53.1.4",66);
+RouterUPnPRuleTable.RouterUPnPInternalport=new Column("RouterUPnPInternalport","1.3.6.1.4.1.4115.1.20.1.1.4.53.1.5",66);
+var arRouterUPnPProtoType =RouterUPnPRuleTable.RouterUPnPProtoType;
+var arRouterUPnPIPAddr = RouterUPnPRuleTable.RouterUPnPIPAddr;
+var arRouterUPnPExternalport = RouterUPnPRuleTable.RouterUPnPExternalport;
+var arRouterUPnPInternalport= RouterUPnPRuleTable.RouterUPnPInternalport;
+
+var LanDNSTable = new Table("LanDNSTable", "1.3.6.1.4.1.4115.1.20.1.1.2.3");
+LanDNSTable.LanDNSRowStatus = new Column("LanDNSRowStatus","1.3.6.1.4.1.4115.1.20.1.1.2.3.1.4",2);
+var arLanDNSRowStatus=LanDNSTable.LanDNSRowStatus;
+
+var LanClientTable = new Table("LanClientTable", "1.3.6.1.4.1.4115.1.20.1.1.2.4.2");
+LanClientTable.LanClientIPAddr = new Column("LanClientIPAddr","1.3.6.1.4.1.4115.1.20.1.1.2.4.2.1.2",4);
+LanClientTable.LanClientHostName = new Column("LanClientHostName","1.3.6.1.4.1.4115.1.20.1.1.2.4.2.1.3",4);
+LanClientTable.LanClientMAC = new Column("LanClientMAC","1.3.6.1.4.1.4115.1.20.1.1.2.4.2.1.4",4);
+LanClientTable.LanClientAdapterType = new Column("LanClientAdapterType","1.3.6.1.4.1.4115.1.20.1.1.2.4.2.1.6",2);
+LanClientTable.LanClientType = new Column("LanClientType","1.3.6.1.4.1.4115.1.20.1.1.2.4.2.1.7",2);
+LanClientTable.LanClientLeaseEnd = new Column("LanClientLeaseEnd","1.3.6.1.4.1.4115.1.20.1.1.2.4.2.1.9",4);
+LanClientTable.LanClientRowStatus = new Column("LanClientRowStatus","1.3.6.1.4.1.4115.1.20.1.1.2.4.2.1.13",2);
+LanClientTable.LanClientOnline = new Column("LanClientOnline","1.3.6.1.4.1.4115.1.20.1.1.2.4.2.1.14",2);
+LanClientTable.LanClientComment = new Column("LanClientComment","1.3.6.1.4.1.4115.1.20.1.1.2.4.2.1.15",4);
+LanClientTable.LanClientDeviceName = new Column("LanClientDeviceName","1.3.6.1.4.1.4115.1.20.1.1.2.4.2.1.20",4);
+var arLanClientIPAddr=LanClientTable.LanClientIPAddr;
+var arLanClientHostName=LanClientTable.LanClientHostName;
+var arLanClientMAC=LanClientTable.LanClientMAC;
+var arLanClientAdapterType=LanClientTable.LanClientAdapterType;
+var arLanClientType=LanClientTable.LanClientType;
+var arLanClientLeaseEnd=LanClientTable.LanClientLeaseEnd;
+var arLanClientRowStatus=LanClientTable.LanClientRowStatus;
+var arLanClientOnline=LanClientTable.LanClientOnline;
+var arLanClientComment=LanClientTable.LanClientComment;
+var arLanClientDeviceName=LanClientTable.LanClientDeviceName;
+
+var DeviceUpDownTable = new Table("DeviceUpDownTable", "1.3.6.1.4.1.4115.1.20.1.1.2.4.3");
+DeviceUpDownTable.DeviceUpDownStatus = new Column("DeviceUpDownStatus","1.3.6.1.4.1.4115.1.20.1.1.2.4.3.1.7",2);
+var arDeviceUpDownStatus=DeviceUpDownTable.DeviceUpDownStatus;
+
+var LanCustomTable = new Table("LanCustomTable", "1.3.6.1.4.1.4115.1.20.1.1.2.4.5");
+LanCustomTable.LanCustomRowStatus = new Column("LanCustomRowStatus","1.3.6.1.4.1.4115.1.20.1.1.2.4.5.1.9",2);
+var arLanCustomRowStatus=LanCustomTable.LanCustomRowStatus;
+
+var LanStaticClientTable = new Table("LanStaticClientTable", "1.3.6.1.4.1.4115.1.20.1.1.2.4.7");
+LanStaticClientTable.LanStaticClientRowStatus = new Column("LanStaticClientRowStatus","1.3.6.1.4.1.4115.1.20.1.1.2.4.7.1.6",2);
+var arLanStaticClientRowStatus=LanStaticClientTable.LanStaticClientRowStatus;
+
+var LanEtherPortTable = new Table("LanEtherPortTable", "1.3.6.1.4.1.4115.1.20.1.1.2.8");
+LanEtherPortTable.LanEtherPortEnabled = new Column("LanEtherPortEnabled","1.3.6.1.4.1.4115.1.20.1.1.2.8.1.3",2);
+LanEtherPortTable.LanEtherPortSpeed = new Column("LanEtherPortSpeed","1.3.6.1.4.1.4115.1.20.1.1.2.8.1.5",2);
+var arLanEtherPortEnabled=LanEtherPortTable.LanEtherPortEnabled;
+var arLanEtherPortSpeed=LanEtherPortTable.LanEtherPortSpeed;
+
+var WirelessCfg = new Container("WirelessCfg", "1.3.6.1.4.1.4115.1.20.1.1.3");
+WirelessCfg.WiFiCountry= new Scalar("WiFiCountry","1.3.6.1.4.1.4115.1.20.1.1.3.1",4);
+WirelessCfg.WiFiChannel= new Scalar("WiFiChannel","1.3.6.1.4.1.4115.1.20.1.1.3.2",66);
+WirelessCfg.WiFiMode= new Scalar("WiFiMode","1.3.6.1.4.1.4115.1.20.1.1.3.3",2);
+WirelessCfg.WiFiEnableRadio= new Scalar("WiFiEnableRadio","1.3.6.1.4.1.4115.1.20.1.1.3.12",2);
+WirelessCfg.WiFiRadioControlMode= new Scalar("WiFiRadioControlMode","1.3.6.1.4.1.4115.1.20.1.1.3.37",2);
+WirelessCfg.WiFiPhysicalChannel= new Scalar("WiFiPhysicalChannel","1.3.6.1.4.1.4115.1.20.1.1.3.43",2);
+var arWiFiCountry=WirelessCfg.WiFiCountry;
+var arWiFiChannel=WirelessCfg.WiFiChannel;
+var arWiFiMode=WirelessCfg.WiFiMode;
+var arWiFiEnableRadio=WirelessCfg.WiFiEnableRadio;
+var arWiFiRadioControlMode=WirelessCfg.WiFiRadioControlMode;
+var arWiFiPhysicalChannel=WirelessCfg.WiFiPhysicalChannel;
+
+var WiFi80211NSettings = new Container("WiFi80211NSettings", "1.3.6.1.4.1.4115.1.20.1.1.3.21");
+WiFi80211NSettings.WiFiChannelBW= new Scalar("WiFiChannelBW","1.3.6.1.4.1.4115.1.20.1.1.3.21.3",2);
+WiFi80211NSettings.WiFiAllow40MHzOnlyOperation= new Scalar("WiFiAllow40MHzOnlyOperation","1.3.6.1.4.1.4115.1.20.1.1.3.21.11",2);
+var arWiFiChannelBW=WiFi80211NSettings.WiFiChannelBW;
+//UNIHAN MOD BEG
+var arWiFiAllow40MHz=WiFi80211NSettings.WiFiAllow40MHzOnlyOperation;
+//UNIHAN MOD END
+
+var BSSTable = new Table("BSSTable", "1.3.6.1.4.1.4115.1.20.1.1.3.22");
+BSSTable.BssID = new Column("BssID","1.3.6.1.4.1.4115.1.20.1.1.3.22.1.1",4);
+BSSTable.BssSSID = new Column("BssSSID","1.3.6.1.4.1.4115.1.20.1.1.3.22.1.2",4);
+BSSTable.BssActive = new Column("BssActive","1.3.6.1.4.1.4115.1.20.1.1.3.22.1.3",2);
+BSSTable.BssSSIDBroadcast = new Column("BssSSIDBroadcast","1.3.6.1.4.1.4115.1.20.1.1.3.22.1.4",2);
+BSSTable.BssSecurityMode = new Column("BssSecurityMode","1.3.6.1.4.1.4115.1.20.1.1.3.22.1.5",2);
+BSSTable.BssAccessMode = new Column("BssAccessMode","1.3.6.1.4.1.4115.1.20.1.1.3.22.1.6",2);
+BSSTable.BssActiveTimeout = new Column("BssActiveTimeout","1.3.6.1.4.1.4115.1.20.1.1.3.22.1.14",4);
+BSSTable.DefaultBssSSID = new Column("DefaultBssSSID","1.3.6.1.4.1.4115.1.20.1.1.3.22.1.15",4);
+var arBssID=BSSTable.BssID;
+var arBssSSID=BSSTable.BssSSID;
+var arBssActive=BSSTable.BssActive;
+var arBssSSIDBroadcast=BSSTable.BssSSIDBroadcast;
+var arBssSecurityMode=BSSTable.BssSecurityMode;
+var arBssAccessMode=BSSTable.BssAccessMode;
+var arBssActiveTimeout = BSSTable.BssActiveTimeout;
+var arDefaultBssSSID = BSSTable.DefaultBssSSID;
+
+var WEP64BitKeyTable = new Table("WEP64BitKeyTable", "1.3.6.1.4.1.4115.1.20.1.1.3.24");
+WEP64BitKeyTable.WEP64BitKeyStatus = new Column("WEP64BitKeyStatus","1.3.6.1.4.1.4115.1.20.1.1.3.24.1.3",2);
+var arWEP64BitKeyStatus=WEP64BitKeyTable.WEP64BitKeyStatus;
+
+var WEP128BitKeyTable = new Table("WEP128BitKeyTable", "1.3.6.1.4.1.4115.1.20.1.1.3.25");
+WEP128BitKeyTable.WEP128BitKeyStatus = new Column("WEP128BitKeyStatus","1.3.6.1.4.1.4115.1.20.1.1.3.25.1.3",2);
+var arWEP128BitKeyStatus=WEP128BitKeyTable.WEP128BitKeyStatus;
+
+var WPATable = new Table("WPATable", "1.3.6.1.4.1.4115.1.20.1.1.3.26");
+WPATable.WPAAlgorithm = new Column("WPAAlgorithm","1.3.6.1.4.1.4115.1.20.1.1.3.26.1.1",2);
+WPATable.WPAPreSharedKey = new Column("WPAPreSharedKey","1.3.6.1.4.1.4115.1.20.1.1.3.26.1.2",4);
+WPATable.DefaultWPAPreSharedKey = new Column("DefaultWPAPreSharedKey","1.3.6.1.4.1.4115.1.20.1.1.3.26.1.6",4);
+var arWPAAlgorithm=WPATable.WPAAlgorithm;
+var arWPAPreSharedKey=WPATable.WPAPreSharedKey;
+var arDefaultWPAPreSharedKey=WPATable.DefaultWPAPreSharedKey;
+
+var MACAccessTable = new Table("MACAccessTable", "1.3.6.1.4.1.4115.1.20.1.1.3.28");
+MACAccessTable.MACAccessAddr = new Column("MACAccessAddr","1.3.6.1.4.1.4115.1.20.1.1.3.28.1.2",4);
+MACAccessTable.MACAccessStatus = new Column("MACAccessStatus","1.3.6.1.4.1.4115.1.20.1.1.3.28.1.3",2);
+MACAccessTable.MACAccessDeviceName = new Column("MACAccessDeviceName","1.3.6.1.4.1.4115.1.20.1.1.3.28.1.4",4);
+var arMACAccessAddr=MACAccessTable.MACAccessAddr;
+var arMACAccessStatus=MACAccessTable.MACAccessStatus;
+var arMACAccessDeviceName=MACAccessTable.MACAccessDeviceName;
+
+var WPSCfg = new Container("WPSCfg", "1.3.6.1.4.1.4115.1.20.1.1.3.30");
+WPSCfg.WpsMode= new Scalar("WpsMode","1.3.6.1.4.1.4115.1.20.1.1.3.30.1",2);
+WPSCfg.WpsDevicePIN= new Scalar("WpsDevicePIN","1.3.6.1.4.1.4115.1.20.1.1.3.30.3",4);
+WPSCfg.WpsResultStatus= new Scalar("WpsResultStatus","1.3.6.1.4.1.4115.1.20.1.1.3.30.7",2);
+WPSCfg.WpsSTAPin= new Scalar("WpsSTAPin","1.3.6.1.4.1.4115.1.20.1.1.3.30.10",4);
+WPSCfg.WpsPushButton= new Scalar("WpsPushButton","1.3.6.1.4.1.4115.1.20.1.1.3.30.11",2);
+WPSCfg.WpsLockDownStatus = new Scalar("WpsLockDownStatus", "1.3.6.1.4.1.4115.1.20.1.1.3.30.16", 2);
+var arWpsMode=WPSCfg.WpsMode;
+var arWpsDevicePIN=WPSCfg.WpsDevicePIN;
+var arWpsResultStatus=WPSCfg.WpsResultStatus;
+var arWpsSTAPin=WPSCfg.WpsSTAPin;
+var arWpsPushButton=WPSCfg.WpsPushButton;
+var arWpsLockDownStatus = WPSCfg.WpsLockDownStatus;
+
+// UNIHAN ADD START
+var WPS50Cfg = new Container("WPS50Cfg", "1.3.6.1.4.1.4115.1.20.1.1.3.65");
+WPS50Cfg.WpsMode= new Scalar("WpsMode","1.3.6.1.4.1.4115.1.20.1.1.3.65.1",2);
+WPS50Cfg.WpsDevicePIN= new Scalar("WpsDevicePIN","1.3.6.1.4.1.4115.1.20.1.1.3.65.3",4);
+WPS50Cfg.WpsResultStatus= new Scalar("WpsResultStatus","1.3.6.1.4.1.4115.1.20.1.1.3.65.7",2);
+WPS50Cfg.WpsSTAPin= new Scalar("WpsSTAPin","1.3.6.1.4.1.4115.1.20.1.1.3.65.10",4);
+WPS50Cfg.WpsPushButton= new Scalar("WpsPushButton","1.3.6.1.4.1.4115.1.20.1.1.3.65.11",2);
+WPS50Cfg.WpsLockDownStatus = new Scalar("WpsLockDownStatus", "1.3.6.1.4.1.4115.1.20.1.1.3.65.16",2);
+var arWps50Mode=WPS50Cfg.WpsMode;
+var arWps50DevicePIN=WPS50Cfg.WpsDevicePIN;
+var arWps50ResultStatus=WPS50Cfg.WpsResultStatus;
+var arWps50STAPin=WPS50Cfg.WpsSTAPin;
+var arWps50PushButton=WPS50Cfg.WpsPushButton;
+var arWps50LockDownStatus = WPS50Cfg.WpsLockDownStatus;
+// UNIHAN ADD END
+
+var WpsMethod = new Container("WpsMethod", "1.3.6.1.4.1.4115.1.20.1.1.3.30.15");
+WpsMethod.WpsPinEnable= new Scalar("WpsPinEnable","1.3.6.1.4.1.4115.1.20.1.1.3.30.15.2",2);
+WpsMethod.WpsPbcEnable= new Scalar("WpsPbcEnable","1.3.6.1.4.1.4115.1.20.1.1.3.30.15.3",2);
+var arWpsPinEnable=WpsMethod.WpsPinEnable;
+var arWpsPbcEnable=WpsMethod.WpsPbcEnable;
+
+var WDSBridgeTable = new Table("WDSBridgeTable", "1.3.6.1.4.1.4115.1.20.1.1.3.31.3");
+WDSBridgeTable.WDSBridgeStatus = new Column("WDSBridgeStatus","1.3.6.1.4.1.4115.1.20.1.1.3.31.3.1.3",2);
+var arWDSBridgeStatus=WDSBridgeTable.WDSBridgeStatus;
+
+var WiFiClientInfoTable = new Table("WiFiClientInfoTable", "1.3.6.1.4.1.4115.1.20.1.1.3.42");
+WiFiClientInfoTable.WiFiClientInfoIPAddrTextual = new Column("WiFiClientInfoIPAddrTextual","1.3.6.1.4.1.4115.1.20.1.1.3.42.1.4",4);
+WiFiClientInfoTable.WiFiClientInfoHostName = new Column("WiFiClientInfoHostName","1.3.6.1.4.1.4115.1.20.1.1.3.42.1.5",4);
+WiFiClientInfoTable.WiFiClientInfoMAC = new Column("WiFiClientInfoMAC","1.3.6.1.4.1.4115.1.20.1.1.3.42.1.6",4);
+WiFiClientInfoTable.WiFiClientInfoLastRxPktRate = new Column("WiFiClientInfoLastRxPktRate","1.3.6.1.4.1.4115.1.20.1.1.3.42.1.20",2);
+WiFiClientInfoTable.WiFiClientInfoRSSI = new Column("WiFiClientInfoRSSI","1.3.6.1.4.1.4115.1.20.1.1.3.42.1.22",2);
+var arWiFiClientInfoIPAddrTextual=WiFiClientInfoTable.WiFiClientInfoIPAddrTextual;
+var arWiFiClientInfoHostName=WiFiClientInfoTable.WiFiClientInfoHostName;
+var arWiFiClientInfoMAC=WiFiClientInfoTable.WiFiClientInfoMAC;
+var arWiFiClientInfoLastRxPktRate=WiFiClientInfoTable.WiFiClientInfoLastRxPktRate;
+var arWiFiClientInfoRSSI=WiFiClientInfoTable.WiFiClientInfoRSSI;
+
+var WiFi50RadioSettings = new Container("WiFi50RadioSettings", "1.3.6.1.4.1.4115.1.20.1.1.3.50");
+WiFi50RadioSettings.WiFi50Channel= new Scalar("WiFi50Channel","1.3.6.1.4.1.4115.1.20.1.1.3.50.1",66);
+WiFi50RadioSettings.WiFi50Mode= new Scalar("WiFi50Mode","1.3.6.1.4.1.4115.1.20.1.1.3.50.2",2);
+WiFi50RadioSettings.WiFi50EnableRadio= new Scalar("WiFi50EnableRadio","1.3.6.1.4.1.4115.1.20.1.1.3.50.10",2);
+WiFi50RadioSettings.WiFi50PhysicalChannel= new Scalar("WiFi50PhysicalChannel","1.3.6.1.4.1.4115.1.20.1.1.3.50.16",2);
+var arWiFi50Channel=WiFi50RadioSettings.WiFi50Channel;
+var arWiFi50Mode=WiFi50RadioSettings.WiFi50Mode;
+var arWiFi50EnableRadio=WiFi50RadioSettings.WiFi50EnableRadio;
+var arWiFi50PhysicalChannel=WiFi50RadioSettings.WiFi50PhysicalChannel;
+
+var WiFi50NSettings = new Container("WiFi50NSettings", "1.3.6.1.4.1.4115.1.20.1.1.3.50.20");
+WiFi50NSettings.WiFi50ChannelBW= new Scalar("WiFi50ChannelBW","1.3.6.1.4.1.4115.1.20.1.1.3.50.20.2",2);
+var arWiFi50ChannelBW=WiFi50NSettings.WiFi50ChannelBW;
+
+var AirtimeCtrlClientAirtimeFairnessTable = new Table("AirtimeCtrlClientAirtimeFairnessTable", "1.3.6.1.4.1.4115.1.20.1.1.3.99.3");
+AirtimeCtrlClientAirtimeFairnessTable.AirtimeCtrlClientRowStatus = new Column("AirtimeCtrlClientRowStatus","1.3.6.1.4.1.4115.1.20.1.1.3.99.3.1.4",2);
+var arAirtimeCtrlClientRowStatus = AirtimeCtrlClientAirtimeFairnessTable.AirtimeCtrlClientRowStatus;
+
+var FWCfg = new Container("FWCfg", "1.3.6.1.4.1.4115.1.20.1.1.4");
+FWCfg.FWEnabled= new Scalar("FWEnabled","1.3.6.1.4.1.4115.1.20.1.1.4.1",2);
+FWCfg.FWEnableDMZ= new Scalar("FWEnableDMZ","1.3.6.1.4.1.4115.1.20.1.1.4.6",2);
+FWCfg.FWIPAddrDMZ= new Scalar("FWIPAddrDMZ","1.3.6.1.4.1.4115.1.20.1.1.4.8",4);
+var arFWEnabled=FWCfg.FWEnabled;
+var arFWEnableDMZ=FWCfg.FWEnableDMZ;
+var arFWIPAddrDMZ=FWCfg.FWIPAddrDMZ;
+
+var FWVirtSrvTable = new Table("FWVirtSrvTable", "1.3.6.1.4.1.4115.1.20.1.1.4.12");
+FWVirtSrvTable.FWVirtSrvDesc = new Column("FWVirtSrvDesc","1.3.6.1.4.1.4115.1.20.1.1.4.12.1.2",4);
+FWVirtSrvTable.FWVirtSrvPortStart = new Column("FWVirtSrvPortStart","1.3.6.1.4.1.4115.1.20.1.1.4.12.1.3",66);
+FWVirtSrvTable.FWVirtSrvPortEnd = new Column("FWVirtSrvPortEnd","1.3.6.1.4.1.4115.1.20.1.1.4.12.1.4",66);
+FWVirtSrvTable.FWVirtSrvProtoType = new Column("FWVirtSrvProtoType","1.3.6.1.4.1.4115.1.20.1.1.4.12.1.5",2);
+FWVirtSrvTable.FWVirtSrvIPAddrType = new Column("FWVirtSrvIPAddrType","1.3.6.1.4.1.4115.1.20.1.1.4.12.1.6",2);
+FWVirtSrvTable.FWVirtSrvIPAddr = new Column("FWVirtSrvIPAddr","1.3.6.1.4.1.4115.1.20.1.1.4.12.1.7",4);
+FWVirtSrvTable.FWVirtSrvLocalPortStart = new Column("FWVirtSrvLocalPortStart","1.3.6.1.4.1.4115.1.20.1.1.4.12.1.9",66);
+FWVirtSrvTable.FWVirtSrvLocalPortEnd = new Column("FWVirtSrvLocalPortEnd","1.3.6.1.4.1.4115.1.20.1.1.4.12.1.10",66);
+FWVirtSrvTable.FWVirtSrvRowStatus = new Column("FWVirtSrvRowStatus","1.3.6.1.4.1.4115.1.20.1.1.4.12.1.11",2);
+var arFWVirtSrvDesc=FWVirtSrvTable.FWVirtSrvDesc;
+var arFWVirtSrvPortStart=FWVirtSrvTable.FWVirtSrvPortStart;
+var arFWVirtSrvPortEnd=FWVirtSrvTable.FWVirtSrvPortEnd;
+var arFWVirtSrvProtoType=FWVirtSrvTable.FWVirtSrvProtoType;
+var arFWVirtSrvIPAddrType=FWVirtSrvTable.FWVirtSrvIPAddrType;
+var arFWVirtSrvIPAddr=FWVirtSrvTable.FWVirtSrvIPAddr;
+var arFWVirtSrvLocalPortStart=FWVirtSrvTable.FWVirtSrvLocalPortStart;
+var arFWVirtSrvLocalPortEnd=FWVirtSrvTable.FWVirtSrvLocalPortEnd;
+var arFWVirtSrvRowStatus=FWVirtSrvTable.FWVirtSrvRowStatus;
+
+var FWIPFilterTable = new Table("FWIPFilterTable", "1.3.6.1.4.1.4115.1.20.1.1.4.13");
+FWIPFilterTable.FWIPFilterRowStatus = new Column("FWIPFilterRowStatus","1.3.6.1.4.1.4115.1.20.1.1.4.13.1.11",2);
+var arFWIPFilterRowStatus=FWIPFilterTable.FWIPFilterRowStatus;
+
+var FWIPFilterExtend = new Container("FWIPFilterExtend", "1.3.6.1.4.1.4115.1.20.1.1.4.47");
+var FWIPFilterExtTable = new Table("FWIPFilterExtTable", "1.3.6.1.4.1.4115.1.20.1.1.4.47.1");
+FWIPFilterExtend.FWIPFilterExtIpVer = new Column("FWIPFilterExtIpVer","1.3.6.1.4.1.4115.1.20.1.1.4.47.1.1.2",2);
+FWIPFilterExtend.FWIPFilterExtDirection = new Column("FWIPFilterExtDirection","1.3.6.1.4.1.4115.1.20.1.1.4.47.1.1.3",2);
+FWIPFilterExtTable.FWIPFilterExtProtoType = new Column("FWIPFilterExtProtoType","1.3.6.1.4.1.4115.1.20.1.1.4.47.1.1.4",2);
+FWIPFilterExtTable.FWIPFilterExtSrcRange = new Column("FWIPFilterExtSrcRange","1.3.6.1.4.1.4115.1.20.1.1.4.47.1.1.5",2);
+FWIPFilterExtTable.FWIPFilterExtSrcStartAddr = new Column("FWIPFilterExtSrcStartAddr","1.3.6.1.4.1.4115.1.20.1.1.4.47.1.1.6",4);
+FWIPFilterExtTable.FWIPFilterExtSrcEndAddr = new Column("FWIPFilterExtSrcEndAddr","1.3.6.1.4.1.4115.1.20.1.1.4.47.1.1.7",4);
+FWIPFilterExtTable.FWIPFilterExtSrcPrefixLen = new Column("FWIPFilterExtSrcPrefixLen","1.3.6.1.4.1.4115.1.20.1.1.4.47.1.1.8",66);
+FWIPFilterExtTable.FWIPFilterExtDstRange = new Column("FWIPFilterExtDstRange","1.3.6.1.4.1.4115.1.20.1.1.4.47.1.1.9",2);
+FWIPFilterExtTable.FWIPFilterExtDstStartAddr = new Column("FWIPFilterExtDstStartAddr","1.3.6.1.4.1.4115.1.20.1.1.4.47.1.1.10",4);
+FWIPFilterExtTable.FWIPFilterExtDstEndAddr = new Column("FWIPFilterExtDstEndAddr","1.3.6.1.4.1.4115.1.20.1.1.4.47.1.1.11",4);
+FWIPFilterExtTable.FWIPFilterExtDstPrefixLen = new Column("FWIPFilterExtDstPrefixLen","1.3.6.1.4.1.4115.1.20.1.1.4.47.1.1.12",66);
+FWIPFilterExtTable.FWIPFilterExtSrcPortStart = new Column("FWIPFilterExtSrcPortStart","1.3.6.1.4.1.4115.1.20.1.1.4.47.1.1.13",66);
+FWIPFilterExtTable.FWIPFilterExtSrcPortEnd = new Column("FWIPFilterExtSrcPortEnd","1.3.6.1.4.1.4115.1.20.1.1.4.47.1.1.14",66);
+FWIPFilterExtTable.FWIPFilterExtDstPortStart = new Column("FWIPFilterExtDstPortStart","1.3.6.1.4.1.4115.1.20.1.1.4.47.1.1.15",66);
+FWIPFilterExtTable.FWIPFilterExtDstPortEnd = new Column("FWIPFilterExtDstPortEnd","1.3.6.1.4.1.4115.1.20.1.1.4.47.1.1.16",66);
+FWIPFilterExtTable.FWIPFilterExtAction = new Column("FWIPFilterExtAction","1.3.6.1.4.1.4115.1.20.1.1.4.47.1.1.17",2); 
+FWIPFilterExtTable.FWIPFilterExtRowStatus = new Column("FWIPFilterExtRowStatus","1.3.6.1.4.1.4115.1.20.1.1.4.47.1.1.18",2);
+
+var FWIPFilterTodExtTable = new Table("FWIPFilterTodExtTable", "1.3.6.1.4.1.4115.1.20.1.1.4.47.2");
+FWIPFilterTodExtTable.FWIPFilterTodExtType = new Column("FWIPFilterTodExtType","1.3.6.1.4.1.4115.1.20.1.1.4.47.2.1.2",2);
+FWIPFilterTodExtTable.FWIPFilterTodExtSetting = new Column("FWIPFilterTodExtSetting","1.3.6.1.4.1.4115.1.20.1.1.4.47.2.1.3",66);
+
+var arFWIPFilterExtIpVer=FWIPFilterExtend.FWIPFilterExtIpVer;
+var arFWIPFilterExtDirection=FWIPFilterExtend.FWIPFilterExtDirection;
+var arFWIPFilterExtRowStatus=FWIPFilterExtTable.FWIPFilterExtRowStatus;
+var arFWIPFilterExtProtoType=FWIPFilterExtTable.FWIPFilterExtProtoType;
+var arFWIPFilterExtSrcRange=FWIPFilterExtTable.FWIPFilterExtSrcRange;  
+var arFWIPFilterExtSrcStartAddr=FWIPFilterExtTable.FWIPFilterExtSrcStartAddr;
+var arFWIPFilterExtSrcEndAddr=FWIPFilterExtTable.FWIPFilterExtSrcEndAddr;
+var arFWIPFilterExtSrcPrefixLen=FWIPFilterExtTable.FWIPFilterExtSrcPrefixLen;
+var arFWIPFilterExtDstRange=FWIPFilterExtTable.FWIPFilterExtDstRange;
+var arFWIPFilterExtDstStartAddr=FWIPFilterExtTable.FWIPFilterExtDstStartAddr;
+var arFWIPFilterExtDstEndAddr=FWIPFilterExtTable.FWIPFilterExtDstEndAddr;
+var arFWIPFilterExtDstPrefixLen=FWIPFilterExtTable.FWIPFilterExtDstPrefixLen;
+var arFWIPFilterExtSrcPortStart=FWIPFilterExtTable.FWIPFilterExtSrcPortStart;
+var arFWIPFilterExtSrcPortEnd=FWIPFilterExtTable.FWIPFilterExtSrcPortEnd;
+var arFWIPFilterExtDstPortStart=FWIPFilterExtTable.FWIPFilterExtDstPortStart;
+var arFWIPFilterExtDstPortEnd=FWIPFilterExtTable.FWIPFilterExtDstPortEnd;
+var arFWIPFilterExtAction=FWIPFilterExtTable.FWIPFilterExtAction;
+var arFWIPFilterTodExtType=FWIPFilterTodExtTable.FWIPFilterTodExtType;
+var arFWIPFilterTodExtSetting=FWIPFilterTodExtTable.FWIPFilterTodExtSetting;
+
+//mac bridge
+var FWMACBridgeTable = new Table("FWMACBridgeTable", "1.3.6.1.4.1.4115.1.20.1.1.4.43");
+FWMACBridgeTable.FWMACBridgeRowStatus = new Column("FWMACBridgeRowStatus","1.3.6.1.4.1.4115.1.20.1.1.4.43.1.4",2);
+var arFWMACBridgeRowStatus=FWMACBridgeTable.FWMACBridgeRowStatus;
+//mac bridge
+
+var FWMACFilterTable = new Table("FWMACFilterTable", "1.3.6.1.4.1.4115.1.20.1.1.4.15");
+FWMACFilterTable.FWMACFilterAddr = new Column("FWMACFilterAddr","1.3.6.1.4.1.4115.1.20.1.1.4.15.1.2",4);
+FWMACFilterTable.FWMACFilterTOD = new Column("FWMACFilterTOD","1.3.6.1.4.1.4115.1.20.1.1.4.15.1.3",2);
+FWMACFilterTable.FWMACFilterRowStatus = new Column("FWMACFilterRowStatus","1.3.6.1.4.1.4115.1.20.1.1.4.15.1.4",2);
+FWMACFilterTable.FWMACFilterHostName = new Column("FWMACFilterHostName","1.3.6.1.4.1.4115.1.20.1.1.4.15.1.5",4);
+var arFWMACFilterAddr=FWMACFilterTable.FWMACFilterAddr;
+var arFWMACFilterTOD=FWMACFilterTable.FWMACFilterTOD;
+var arFWMACFilterRowStatus=FWMACFilterTable.FWMACFilterRowStatus;
+var arFWMACFilterHostName=FWMACFilterTable.FWMACFilterHostName;
+
+var FWMACFilterTODExt = new Container("FWMACFilterTODExt", "1.3.6.1.4.1.4115.1.20.1.1.4.48");
+FWMACFilterTODExt.FWMACFilterTODExtType = new Scalar("FWMACFilterTODExtType","1.3.6.1.4.1.4115.1.20.1.1.4.48.1",2);
+FWMACFilterTODExt.FWMACFilterTODExtSetting = new Scalar("FWMACFilterTODExtSetting","1.3.6.1.4.1.4115.1.20.1.1.4.48.2",4);
+
+var arFWMACFilterTODExtType=FWMACFilterTODExt.FWMACFilterTODExtType;
+var arFWMACFilterTODExtSetting=FWMACFilterTODExt.FWMACFilterTODExtSetting;
+
+var FWPortTrigTable = new Table("FWPortTrigTable", "1.3.6.1.4.1.4115.1.20.1.1.4.16");
+FWPortTrigTable.FWPortTrigDesc = new Column("FWPortTrigDesc","1.3.6.1.4.1.4115.1.20.1.1.4.16.1.2",4);
+FWPortTrigTable.FWPortTrigPortStart = new Column("FWPortTrigPortStart","1.3.6.1.4.1.4115.1.20.1.1.4.16.1.3",66);
+FWPortTrigTable.FWPortTrigPortEnd = new Column("FWPortTrigPortEnd","1.3.6.1.4.1.4115.1.20.1.1.4.16.1.4",66);
+FWPortTrigTable.FWPortTargPortStart = new Column("FWPortTargPortStart","1.3.6.1.4.1.4115.1.20.1.1.4.16.1.5",66);
+FWPortTrigTable.FWPortTargPortEnd = new Column("FWPortTargPortEnd","1.3.6.1.4.1.4115.1.20.1.1.4.16.1.6",66);
+FWPortTrigTable.FWPortTrigProtoType = new Column("FWPortTrigProtoType","1.3.6.1.4.1.4115.1.20.1.1.4.16.1.7",2);
+FWPortTrigTable.FWPortTrigRowStatus = new Column("FWPortTrigRowStatus","1.3.6.1.4.1.4115.1.20.1.1.4.16.1.9",2);
+var arFWPortTrigDesc=FWPortTrigTable.FWPortTrigDesc;
+var arFWPortTrigPortStart=FWPortTrigTable.FWPortTrigPortStart;
+var arFWPortTrigPortEnd=FWPortTrigTable.FWPortTrigPortEnd;
+var arFWPortTargPortStart=FWPortTrigTable.FWPortTargPortStart;
+var arFWPortTargPortEnd=FWPortTrigTable.FWPortTargPortEnd;
+var arFWPortTrigProtoType=FWPortTrigTable.FWPortTrigProtoType;
+var arFWPortTrigRowStatus=FWPortTrigTable.FWPortTrigRowStatus;
+
+var FWFilterRules = new Container("FWFilterRules", "1.3.6.1.4.1.4115.1.20.1.1.4.17");
+FWFilterRules.FWBlockFragIPPktsV4 =  new Scalar("FWBlockFragIPPktsV4","1.3.6.1.4.1.4115.1.20.1.1.4.17.9",2);
+FWFilterRules.FWPortScanProtectV4 =  new Scalar("FWPortScanProtectV4","1.3.6.1.4.1.4115.1.20.1.1.4.17.10",2);
+FWFilterRules.FWIPFloodDetectV4 =  new Scalar("FWIPFloodDetectV4","1.3.6.1.4.1.4115.1.20.1.1.4.17.11",2);
+FWFilterRules.FWBlockFragIPPktsV6 =  new Scalar("FWBlockFragIPPktsV6","1.3.6.1.4.1.4115.1.20.1.1.4.17.12",2);
+FWFilterRules.FWPortScanProtectV6 =  new Scalar("FWPortScanProtectV6","1.3.6.1.4.1.4115.1.20.1.1.4.17.13",2);
+FWFilterRules.FWIPFloodDetectV6 =  new Scalar("FWIPFloodDetectV6","1.3.6.1.4.1.4115.1.20.1.1.4.17.14",2);
+var arFWBlockFragIPPktsV4 = FWFilterRules.FWBlockFragIPPktsV4;
+var arFWPortScanProtectV4 = FWFilterRules.FWPortScanProtectV4;
+var arFWIPFloodDetectV4 = FWFilterRules.FWIPFloodDetectV4;
+var arFWBlockFragIPPktsV6 = FWFilterRules.FWBlockFragIPPktsV6;
+var arFWPortScanProtectV6 = FWFilterRules.FWPortScanProtectV6;
+var arFWIPFloodDetectV6 = FWFilterRules.FWIPFloodDetectV6;
+
+var FWRemoteMgmt = new Container("FWRemoteMgmt", "1.3.6.1.4.1.4115.1.20.1.1.4.19.12");
+FWRemoteMgmt.FWRemoteMgmtHttps= new Scalar("FWRemoteMgmtHttps","1.3.6.1.4.1.4115.1.20.1.1.4.19.12.2",2);
+FWRemoteMgmt.FWRemoteMgmtHttpsPort= new Scalar("FWRemoteMgmtHttpsPort","1.3.6.1.4.1.4115.1.20.1.1.4.19.12.4",2);
+var arFWRemoteMgmtHttps = FWRemoteMgmt.FWRemoteMgmtHttps;
+var arFWRemoteMgmtHttpsPort = FWRemoteMgmt.FWRemoteMgmtHttpsPort;
+
+var FWParentalControls = new Container("FWParentalControls", "1.3.6.1.4.1.4115.1.20.1.1.4.20");
+FWParentalControls.KeywordCount= new Scalar("KeywordCount","1.3.6.1.4.1.4115.1.20.1.1.4.20.1",2);
+FWParentalControls.BlackListCount= new Scalar("BlackListCount","1.3.6.1.4.1.4115.1.20.1.1.4.20.3",2);
+FWParentalControls.EnableParentalCont= new Scalar("EnableParentalCont","1.3.6.1.4.1.4115.1.20.1.1.4.20.17",2);
+FWParentalControls.ListActiveType= new Scalar("ListActiveType","1.3.6.1.4.1.4115.1.20.1.1.4.20.22",2);
+FWParentalControls.ExceptionCount= new Scalar("ExceptionCount","1.3.6.1.4.1.4115.1.20.1.1.4.20.24",2);
+var arKeywordCount=FWParentalControls.KeywordCount;
+var arBlackListCount=FWParentalControls.BlackListCount;
+var arEnableParentalCont=FWParentalControls.EnableParentalCont;
+var arListActiveType=FWParentalControls.ListActiveType;
+var arExceptionCount=FWParentalControls.ExceptionCount;
+
+var KeywordBlkTable = new Table("KeywordBlkTable", "1.3.6.1.4.1.4115.1.20.1.1.4.20.10");
+KeywordBlkTable.KeywordBlkWord = new Column("KeywordBlkWord","1.3.6.1.4.1.4115.1.20.1.1.4.20.10.1.2",4);
+KeywordBlkTable.KeywordBlkTOD = new Column("KeywordBlkTOD","1.3.6.1.4.1.4115.1.20.1.1.4.20.10.1.3",2);
+KeywordBlkTable.KeywordBlkStatus = new Column("KeywordBlkStatus","1.3.6.1.4.1.4115.1.20.1.1.4.20.10.1.4",2);
+var arKeywordBlkWord=KeywordBlkTable.KeywordBlkWord;
+var arKeywordBlkTOD=KeywordBlkTable.KeywordBlkTOD;
+var arKeywordBlkStatus=KeywordBlkTable.KeywordBlkStatus;
+
+var BlackListTable = new Table("BlackListTable", "1.3.6.1.4.1.4115.1.20.1.1.4.20.12");
+BlackListTable.BlackListDomain = new Column("BlackListDomain","1.3.6.1.4.1.4115.1.20.1.1.4.20.12.1.2",4);
+BlackListTable.BlackListTOD = new Column("BlackListTOD","1.3.6.1.4.1.4115.1.20.1.1.4.20.12.1.3",2);
+BlackListTable.BlackListStatus = new Column("BlackListStatus","1.3.6.1.4.1.4115.1.20.1.1.4.20.12.1.4",2);
+var arBlackListDomain=BlackListTable.BlackListDomain;
+var arBlackListTOD=BlackListTable.BlackListTOD;
+var arBlackListStatus=BlackListTable.BlackListStatus;
+
+var WhiteListTable = new Table("WhiteListTable", "1.3.6.1.4.1.4115.1.20.1.1.4.20.14");
+WhiteListTable.WhiteListStatus = new Column("WhiteListStatus","1.3.6.1.4.1.4115.1.20.1.1.4.20.14.1.4",2);
+var arWhiteListStatus=WhiteListTable.WhiteListStatus;
+
+var TrustedDeviceTable = new Table("TrustedDeviceTable", "1.3.6.1.4.1.4115.1.20.1.1.4.20.16");
+TrustedDeviceTable.TrustedDeviceStatus = new Column("TrustedDeviceStatus","1.3.6.1.4.1.4115.1.20.1.1.4.20.16.1.3",2);
+var arTrustedDeviceStatus=TrustedDeviceTable.TrustedDeviceStatus;
+
+var ExceptionListTable = new Table("ExceptionListTable", "1.3.6.1.4.1.4115.1.20.1.1.4.20.25");
+ExceptionListTable.ExceptionListDomain = new Column("ExceptionListDomain", "1.3.6.1.4.1.4115.1.20.1.1.4.20.25.1.2",4);
+ExceptionListTable.ExceptionListStatus = new Column("ExceptionListStatus", "1.3.6.1.4.1.4115.1.20.1.1.4.20.25.1.3",2);
+var arExceptionListDomain=ExceptionListTable.ExceptionListDomain;
+var arExceptionListStatus=ExceptionListTable.ExceptionListStatus;
+
+var FWIPv6Security = new Container("FWIPv6Security", "1.3.6.1.4.1.4115.1.20.1.1.4.40");
+FWIPv6Security.FWIPv6Enable =  new Scalar("FWIPv6Enable","1.3.6.1.4.1.4115.1.20.1.1.4.40.7",2);
+var arFWIPv6Enable = FWIPv6Security.FWIPv6Enable;
+
+var MtaDevParameters =  new Container("MtaDevParameters", "1.3.6.1.4.1.4115.1.3.3.1.1.1.3");
+MtaDevParameters.DevMaxCpeAllowed = new Scalar("DevMaxCpeAllowed", "1.3.6.1.4.1.4115.1.3.3.1.1.1.3.1", 2);
+MtaDevParameters.DevNetworkAccess = new Scalar("DevNetworkAccess", "1.3.6.1.4.1.4115.1.3.3.1.1.1.3.2", 2);
+var arDevMaxCpeAllowed = MtaDevParameters.DevMaxCpeAllowed;
+var arDevNetworkAccess = MtaDevParameters.DevNetworkAccess;
+
+var MtaDevSetup = new Table("MtaDevSetup", "1.3.6.1.4.1.4115.1.3.3.1.2.4.3");
+MtaDevSetup.MtaDevEndPntCallPState= new Column("MtaDevEndPntCallPState","1.3.6.1.4.1.4115.1.3.3.1.2.4.3.1.37",2);
+var arMtaDevEndPntCallPState=MtaDevSetup.MtaDevEndPntCallPState;
+
+var SysCfg = new Container("SysCfg", "1.3.6.1.4.1.4115.1.20.1.1.5");
+SysCfg.Reboot= new Scalar("Reboot","1.3.6.1.4.1.4115.1.20.1.1.5.4",2);
+SysCfg.Defaults= new Scalar("Defaults","1.3.6.1.4.1.4115.1.20.1.1.5.5",2);
+SysCfg.Language= new Scalar("Language","1.3.6.1.4.1.4115.1.20.1.1.5.6",4);
+SysCfg.SerialNumber= new Scalar("SerialNumber","1.3.6.1.4.1.4115.1.20.1.1.5.8",4);
+SysCfg.HardwareVersion= new Scalar("HardwareVersion","1.3.6.1.4.1.4115.1.20.1.1.5.10",4);
+SysCfg.FirmwareVersion= new Scalar("FirmwareVersion","1.3.6.1.4.1.4115.1.20.1.1.5.11",4);
+SysCfg.CustomSettings= new Scalar("CustomSettings","1.3.6.1.4.1.4115.1.20.1.1.5.13",4);
+SysCfg.CustomID= new Scalar("CustomID","1.3.6.1.4.1.4115.1.20.1.1.5.14",2);
+SysCfg.CurrentTime= new Scalar("CurrentTime","1.3.6.1.4.1.4115.1.20.1.1.5.15",4);
+SysCfg.WirelessBand= new Scalar("WirelessBand","1.3.6.1.4.1.4115.1.20.1.1.5.55",4);
+SysCfg.SaveCurrentConfigFile= new Scalar("SaveCurrentConfigFile","1.3.6.1.4.1.4115.1.20.1.1.5.57",2);
+SysCfg.FirstInstallWizardCompletionStatus= new Scalar("FirstInstallWizardCompletionStatus","1.3.6.1.4.1.4115.1.20.1.1.5.62",2);
+SysCfg.RestoreCurrentConfigFile= new Scalar("RestoreCurrentConfigFile","1.3.6.1.4.1.4115.1.20.1.1.5.58",2);
+var arReboot=SysCfg.Reboot;
+var arDefaults=SysCfg.Defaults;
+var arLanguage=SysCfg.Language;
+var arSerialNumber=SysCfg.SerialNumber;
+var arHardwareVersion=SysCfg.HardwareVersion;
+var arFirmwareVersion=SysCfg.FirmwareVersion;
+var arCustomSettings=SysCfg.CustomSettings;
+var arCustomID=SysCfg.CustomID;
+var arCurrentTime=SysCfg.CurrentTime;
+var arWirelessBand=SysCfg.WirelessBand;
+var arSaveCurrentConfigFile=SysCfg.SaveCurrentConfigFile;
+var arFirstInstallWizardCompletionStatus=SysCfg.FirstInstallWizardCompletionStatus;
+var arRestoreCurrentConfigFile=SysCfg.RestoreCurrentConfigFile;
+
+var AuthTable = new Table("AuthTable", "1.3.6.1.4.1.4115.1.20.1.1.5.16");
+AuthTable.AuthUserName = new Column("AuthUserName","1.3.6.1.4.1.4115.1.20.1.1.5.16.1.2",4);
+AuthTable.AuthAccountEnabled = new Column("AuthAccountEnabled","1.3.6.1.4.1.4115.1.20.1.1.5.16.1.6",2);
+AuthTable.AuthDefaultAdminPassword = new Column("AuthDefaultAdminPassword","1.3.6.1.4.1.4115.1.20.1.1.5.16.1.7",4);
+var arAuthUserName=AuthTable.AuthUserName;
+var arAuthAccountEnabled=AuthTable.AuthAccountEnabled;
+var arAuthDefaultAdminPassword=AuthTable.AuthDefaultAdminPassword;
+
+var SNTPSettings = new Container("SNTPSettings", "1.3.6.1.4.1.4115.1.20.1.1.5.17");
+SNTPSettings.ApplySNTPSettings= new Scalar("ApplySNTPSettings","1.3.6.1.4.1.4115.1.20.1.1.5.17.2",2);
+var arApplySNTPSettings=SNTPSettings.ApplySNTPSettings;
+
+var SNTPServerTable = new Table("SNTPServerTable", "1.3.6.1.4.1.4115.1.20.1.1.5.17.4");
+SNTPServerTable.SNTPServerStatus = new Column("SNTPServerStatus","1.3.6.1.4.1.4115.1.20.1.1.5.17.4.1.5",2);
+var arSNTPServerStatus=SNTPServerTable.SNTPServerStatus;
+
+var CmDoc30Software = new Container("CmDoc30Software", "1.3.6.1.4.1.4115.1.3.4.1.5");
+CmDoc30Software.CmDoc30SwRegistrationState = new Scalar("CmDoc30SwRegistrationState","1.3.6.1.4.1.4115.1.3.4.1.5.9",2);
+CmDoc30Software.CmDoc30SwOperStatus = new Scalar("CmDoc30SwOperStatus","1.3.6.1.4.1.4115.1.3.4.1.5.3",2);
+var arCmDoc30SwRegistrationState = CmDoc30Software.CmDoc30SwRegistrationState;
+var arCmDoc30SwOperStatus = CmDoc30Software.CmDoc30SwOperStatus;
+
+// ARRIS ADD START for PROD00203656
+var CmDoc30Setup = new Container("CmDoc30Setup", "1.3.6.1.4.1.4115.1.3.4.1.3");
+CmDoc30Setup.CmDoc30SetupSecDsLossReinitEnable = new Scalar("CmDoc30SetupSecDsLossReinitEnable","1.3.6.1.4.1.4115.1.3.4.1.3.4",2);  
+CmDoc30Setup.CmDoc30SetupPartServiceFallback20 = new Scalar("CmDoc30SetupPartServiceFallback20","1.3.6.1.4.1.4115.1.3.4.1.3.5",2);    
+var arCmDoc30SetupSecDsLossReinitEnable = CmDoc30Setup.CmDoc30SetupSecDsLossReinitEnable;
+var arCmDoc30SetupPartServiceFallback20 = CmDoc30Setup.CmDoc30SetupPartServiceFallback20;
+// ARRIS ADD END for PROD00203656
+
+var CmDoc30DhcpCmParameters = new Container("CmDoc30DhcpCmParameters", "1.3.6.1.4.1.4115.1.3.4.1.4.3");
+CmDoc30DhcpCmParameters.CmDoc30DhcpCmIpAddr = new Scalar("CmDoc30DhcpCmIpAddr", "1.3.6.1.4.1.4115.1.3.4.1.4.3.2",4);
+var arCmDoc30DhcpCmIpAddr = CmDoc30DhcpCmParameters.CmDoc30DhcpCmIpAddr;
+
+var EmailSettings = new Container("EmailSettings", "1.3.6.1.4.1.4115.1.20.1.1.5.18");
+EmailSettings.EmailAddress= new Scalar("EmailAddress","1.3.6.1.4.1.4115.1.20.1.1.5.18.4",4);
+EmailSettings.EmailApplySettings= new Scalar("EmailApplySettings","1.3.6.1.4.1.4115.1.20.1.1.5.18.6",2);
+EmailSettings.EmailSend = new Scalar("EmailSend","1.3.6.1.4.1.4115.1.20.1.1.5.18.9",2);
+var arEmailAddress=EmailSettings.EmailAddress;
+var arEmailApplySettings=EmailSettings.EmailApplySettings;
+var arEmailSend=EmailSettings.EmailSend;
+
+var LogSettings = new Container("LogSettings", "1.3.6.1.4.1.4115.1.20.1.1.5.19");
+LogSettings.ClearLogs= new Scalar("ClearLogs","1.3.6.1.4.1.4115.1.20.1.1.5.19.3",2);
+var arClearLogs=LogSettings.ClearLogs;
+
+
+var MSOLogs = new Container("MSOLogs", "1.3.6.1.4.1.4115.1.20.1.1.5.19.2");
+MSOLogs.ClearMSOLogs= new Scalar("ClearMSOLogs","1.3.6.1.4.1.4115.1.20.1.1.5.19.2.2",2);
+var arClearMSOLogs=MSOLogs.ClearMSOLogs;
+
+var WebAccessTable = new Table("WebAccessTable", "1.3.6.1.4.1.4115.1.20.1.1.6.7");
+WebAccessTable.WebAccessPage = new Column("WebAccessPage","1.3.6.1.4.1.4115.1.20.1.1.6.7.1.2",4);
+WebAccessTable.WebAccessLevel = new Column("WebAccessLevel","1.3.6.1.4.1.4115.1.20.1.1.6.7.1.3",2);
+WebAccessTable.WebAccessRowStatus = new Column("WebAccessRowStatus","1.3.6.1.4.1.4115.1.20.1.1.6.7.1.4",2);
+var arWebAccessPage=WebAccessTable.WebAccessPage;
+var arWebAccessLevel=WebAccessTable.WebAccessLevel;
+var arWebAccessRowStatus=WebAccessTable.WebAccessRowStatus;
+
+var PingMgmt = new Container("PingMgmt", "1.3.6.1.4.1.4115.1.20.1.1.7");
+PingMgmt.PingTargetAddrType= new Scalar("PingTargetAddrType","1.3.6.1.4.1.4115.1.20.1.1.7.1",2);
+PingMgmt.PingTargetAddress= new Scalar("PingTargetAddress","1.3.6.1.4.1.4115.1.20.1.1.7.2",4);
+PingMgmt.PingNumPkts= new Scalar("PingNumPkts","1.3.6.1.4.1.4115.1.20.1.1.7.3",66);
+PingMgmt.PingPktSize= new Scalar("PingPktSize","1.3.6.1.4.1.4115.1.20.1.1.7.4",66);
+PingMgmt.PingStartStop= new Scalar("PingStartStop","1.3.6.1.4.1.4115.1.20.1.1.7.9",2);
+PingMgmt.PingRepliesReceived= new Scalar("PingRepliesReceived","1.3.6.1.4.1.4115.1.20.1.1.7.11",65);
+PingMgmt.PingTargetDNSQueryIPAddrType= new Scalar("PingTargetDNSQueryIPAddrType","1.3.6.1.4.1.4115.1.20.1.1.7.20",2);
+PingMgmt.PingLog= new Scalar("PingLog","1.3.6.1.4.1.4115.1.20.1.1.7.21",4);
+var arPingTargetAddrType=PingMgmt.PingTargetAddrType;
+var arPingTargetAddress=PingMgmt.PingTargetAddress;
+var arPingNumPkts=PingMgmt.PingNumPkts;
+var arPingPktSize=PingMgmt.PingPktSize;
+var arPingStartStop=PingMgmt.PingStartStop;
+var arPingRepliesReceived=PingMgmt.PingRepliesReceived;
+var arPingTargetDNSQueryIPAddrType=PingMgmt.PingTargetDNSQueryIPAddrType;
+var arPingLog=PingMgmt.PingLog;
+
+var TraceRtMgmt = new Container("TraceRtMgmt", "1.3.6.1.4.1.4115.1.20.1.1.8");
+TraceRtMgmt.TraceRtTargAddrType= new Scalar("TraceRtTargAddrType","1.3.6.1.4.1.4115.1.20.1.1.8.1",2);
+TraceRtMgmt.TraceRtTargetAddr= new Scalar("TraceRtTargetAddr","1.3.6.1.4.1.4115.1.20.1.1.8.2",4);
+TraceRtMgmt.TraceRtMaxHops= new Scalar("TraceRtMaxHops","1.3.6.1.4.1.4115.1.20.1.1.8.3",2);
+TraceRtMgmt.TraceRtDataSize= new Scalar("TraceRtDataSize","1.3.6.1.4.1.4115.1.20.1.1.8.4",2);
+TraceRtMgmt.TraceRtBasePort= new Scalar("TraceRtBasePort","1.3.6.1.4.1.4115.1.20.1.1.8.6",2);
+TraceRtMgmt.TraceRtStart= new Scalar("TraceRtStart","1.3.6.1.4.1.4115.1.20.1.1.8.7",2);
+TraceRtMgmt.TraceRtLog= new Scalar("TraceRtLog","1.3.6.1.4.1.4115.1.20.1.1.8.8",4);
+var arTraceRtTargAddrType=TraceRtMgmt.TraceRtTargAddrType;
+var arTraceRtTargetAddr=TraceRtMgmt.TraceRtTargetAddr;
+var arTraceRtMaxHops=TraceRtMgmt.TraceRtMaxHops;
+var arTraceRtDataSize=TraceRtMgmt.TraceRtDataSize;
+var arTraceRtBasePort=TraceRtMgmt.TraceRtBasePort;
+var arTraceRtStart=TraceRtMgmt.TraceRtStart;
+var arTraceRtLog=TraceRtMgmt.TraceRtLog;
+
+// no need to load trigger
+MibObjects.loaded = true;
+
+var eSafeRouterConfig = new Container("eSafeRouterConfig", "1.3.6.1.4.1.4491.2.1.14.1.5");
+eSafeRouterConfig.esafeErouterInitModeCtrl= new Scalar("esafeErouterInitModeCtrl", "1.3.6.1.4.1.4491.2.1.14.1.5.4", 2);
+var eRouterInitMode = eSafeRouterConfig.esafeErouterInitModeCtrl;
+
+var docsDevSoftware = new Container("docsDevSoftware","1.3.6.1.2.1.69.1.3");
+docsDevSoftware.docsDevSwOperStatus = new Scalar("docsDevSwOperStatus","1.3.6.1.2.1.69.1.3.4",2);
+var swOperStatus = docsDevSoftware.docsDevSwOperStatus;
+
+var devPartnerPlume = new Container("devPartnerPlume", "1.3.6.1.4.1.4115.1.20.1.1.20.2");
+devPartnerPlume.DevPartnerPlumeSONAdminStatus = new Scalar("DevPartnerPlumeSONAdminStatus", "1.3.6.1.4.1.4115.1.20.1.1.20.2.3", 2);
+devPartnerPlume.DevPartnerPlumeSONOperationalStatus = new Scalar("DevPartnerPlumeSONOperationalStatus", "1.3.6.1.4.1.4115.1.20.1.1.20.2.4", 2);
+var arDevPartnerPlumeSONAdminStatus = devPartnerPlume.DevPartnerPlumeSONAdminStatus;
+var arDevPartnerPlumeSONOperationalStatus = devPartnerPlume.DevPartnerPlumeSONOperationalStatus;
+
+if (window["preWalk"]) {
+    var foo = [];
+    _.each(container, function(v) {
+        foo.push(window[v.name]);
+    });
+    _.each(table, function(v) {
+        foo.push(window[v.name]);
+    });
+    load.apply(this, foo);
+}
+
+
+function dumpInC() {
+    function dumpOneInC(o) {
+        $.log("\"" + o.oid + ".\",\"" + o.name + "\",");
+    }
+
+    _.each(container, function(v) {
+        _.each(v.children, function(v) {
+            dumpOneInC(v);
+        });
+    });
+    _.each(table, function(v) {
+        _.each(v.children, function(v) {
+            dumpOneInC(v);
+        });
+    });
+
+}
+
+var rowStatusCols = [
+    arWanStaticDNSRowStatus,
+    arLanDNSRowStatus,
+    arLanClientRowStatus,
+    arDeviceUpDownStatus,
+    arLanCustomRowStatus,
+    arWEP64BitKeyStatus,
+    arWEP128BitKeyStatus,
+    arMACAccessStatus,
+    arWDSBridgeStatus,
+    arFWVirtSrvRowStatus,
+    arFWIPFilterRowStatus,
+    arFWMACFilterRowStatus,
+    arFWPortTrigRowStatus,
+    arFWMACBridgeRowStatus,
+    arKeywordBlkStatus,
+    arBlackListStatus,
+    arWhiteListStatus,
+    arTrustedDeviceStatus,
+    arSNTPServerStatus,
+    arLanStaticClientRowStatus,
+    arAirtimeCtrlClientRowStatus
+    //, arWebAccessRowStatus not needed since we don't create and I have seen some problems
+    // arWebAccessRowStatus
+];
+
+function oidIsRowStatus(oid) {
+    for (var i=0; i<rowStatusCols.length; i++)
+        if (oid.startsWith(rowStatusCols[i].oid+"."))
+            return true;
+    return false;
+}
+
+var rowStatusLoaded = false;
+function loadRowStatus() {
+    if (rowStatusLoaded)
+        return;
+    rowStatusLoaded = true;
+_.each(rowStatusCols,
+        function(rs) {
+            rs.table.rowStatus = rs;
+        });
+}
+
+var lans = [ ];
+var lanNames = { };
+function getLan(index) {
+    // UNIHAN REMOVE START
+    /*  
+    if (index == 0)
+        return "12";
+    */
+    // UNIHAN REMOVE END 
+    if (lans.length === 0) {
+        if (!getSessionStorage("ar_lans")) {
+            var bl = bulkLoading;
+            bulkLoading = false;
+            setSessionStorage("ar_lans", LanSrvTable.getTable([arLanName], function(i, row, key) {
+                                                return key+"@"+row[0];
+                                            }).sort().join("&")); // todo: verify sort
+            bulkLoading = bl;
+        }
+
+        _.each(getSessionStorage("ar_lans").split("&"), function(v) {
+             v = v.split("@");
+            lans.push(v[0]);
+            lanNames[v[0]] = v[1];
+        });
+    }
+    return index === undefined ? lans : lans[index];
+}
+function getLanName(lan) {
+    return lan === undefined ? lanNames : (lanNames[lan] || "");
+}
+
+//UNIHAN REMOVE START
+//function getBssForLan(lan, radio) {
+    // todo:
+//    if (isDBC() && radio==2)
+//        return Primary5GIndex()+lan.asInt()-1;
+//    return lan;
+    
+//}
+//UNIHAN REMOVE END
+
+var bsss = [ ];
+var bssNames = { };
+// UNIHAN ADD START
+var bshc = [ ];
+function getHardCodeBss(index) {
+        if (bshc.length === 0) {
+        var bssString = "1@Bssid1&2@Bssid2&3@Bssid3&4@Bssid4&5@Bssid5&6@Bssid6&7@Bssid7&8@Bssid8&9@Bssid9&10@Bssid10&11@Bssid11&12@Bssid12&13@Bssid13&14@Bssid14&15@Bssid15&16@Bssid16";
+        setSessionStorage("ar_bsss", bssString);
+    }
+    _.each(getSessionStorage("ar_bsss").split("&"), function(v) {
+             v = v.split("@");
+            bshc.push(v[0]);
+            bssNames[v[0]] = v[1];
+    });
+    return index === undefined ? bshc : bshc[index];
+}
+
+function getEachBss(index) {
+    if (bsss.length === 0) {
+        if (!getSessionStorage("ar_bsss")) {
+            var bl = bulkLoading;
+            bulkLoading = false;
+            var bssString = "";
+            
+            for (var i=Primary24GIndex(); i<=TotalSSIDs(); i++) {
+                var name = arBssSSID.get(i);
+                if( name === undefined)
+                    name = "unknow";
+                if (bssString)
+                        bssString+="&";
+                bssString += ""+i+"@"+name;
+            }
+          
+            if (!bssString)
+                bssString = "disabled"; // in case no bss table
+
+            setSessionStorage("ar_bsss", bssString);
+            bulkLoading = bl;
+        }
+        _.each(getSessionStorage("ar_bsss").split("&"), function(v) {
+             v = v.split("@");
+            bsss.push(v[0]);
+            bssNames[v[0]] = v[1];
+        });
+    }
+    return index === undefined ? bsss : bsss[index];
+}
+// UNIHAN ADD END
+function getBss(index) {
+    // UNIHAN MOD START
+    //return getEachBss(index);
+    //if (index == 0)
+    //    return "12";
+    if (bsss.length === 0) {
+        if (!getSessionStorage("ar_bsss")) {
+            var bl = bulkLoading;
+            bulkLoading = false;
+
+            //var bss = {};
+            var numSSID = 8;
+            var bssString = BSSTable.getTable([arBssSSID], function(i, row, key) {
+                if( (key > Ifindex24G()) && (key <= (Ifindex24G()+numSSID)) )
+                {
+                    //var iIndex = i+1;
+                    return key+" @"+row[0];
+                }
+                if(isDBC())
+                {
+                    if( (key > Ifindex50G()) && (key <= (Ifindex50G()+numSSID)) )
+                    {
+                        //var iIndex = i+1;
+                        return key+" @"+row[0];    
+                    }
+                }
+                //return "";
+            }).sort().join(" &");
+                    
+          //  var bssString = BSSTable.getTable([arBssSSID], function(i, row, key) {
+          //                                                  return key+"@"+row[0];
+          //                                               }).sort().join("&");
+
+
+
+            if (!bssString)
+                bssString = "disabled"; // in case no bss table
+
+            setSessionStorage("ar_bsss", bssString);
+            bulkLoading = bl;
+        }
+        _.each(getSessionStorage("ar_bsss").split(" &"), function(v) {
+             v = v.split(" @");
+             var iIndex;
+            if( v[0] < Ifindex50G() )
+            {
+               iIndex = v[0]-10001+Primary24GIndex();
+            }
+            else
+            {
+                iIndex = v[0]-10101+Primary5GIndex();
+            }
+            bsss.push( iIndex + "" );
+            bssNames[iIndex] = v[1];
+        });
+    }
+    return index === undefined ? bsss : bsss[index];
+    // UNIHAN MOD END
+}
+function getBss2(index) {
+    return isSimulateDBC() ? getBss(index) : getBss(index+8);
+}
+function getBssName(bss) {
+    return bss === undefined ? bssNames : (bssNames[bss] || "");
+}
+
+function flushBss() {
+    setSessionStorage("ar_bsss","");
+    bsss = [];
+    bssNames = { };
+    BssSession.clearBSSTableSessionStorage();
+}
+
+// UNIHAN ADD START
+function exception_oid( oid )
+{
+    if( oid == wpspinoid )
+    {
+        return true;
+    }
+    else if( oid == wps50pinoid )
+    {
+        return true;
+    }
+
+    return false;
+}
+// UNIHAN ADD END 
+
+
+/**
+ * Clear MIB table data, so that we can reload this table by table.getTable.
+ * @param table
+ */
+function clearMibTableData(table){
+	_.each(walk, function(v, k) {
+        if (k.startsWith(table.oid)) {
+        	delete walk[k];
+        }
+    });
+	table.key = [];
+	table.children = [ ];
+	table.loaded = false;
+}
+
+function clearBulkSetList(){
+    bulkSetList = [];
+    bulkSetList.length = 0;
+}
+
