@@ -383,7 +383,7 @@ class Hub(object):
 
     @_snmpProperty("1.3.6.1.4.1.4115.1.20.1.1.1.13.0")
     def wanMACAddr(self, snmpValue):
-        "WAN Mac address"
+        "WAN Mac address - i.e. the mac address facing Virgin Media"
         return _extract_mac(snmpValue)
 
     @_snmpProperty("1.3.6.1.4.1.4115.1.20.1.1.5.6.0")
