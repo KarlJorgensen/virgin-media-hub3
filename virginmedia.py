@@ -7,6 +7,7 @@ import time
 import json
 import datetime
 from types import MethodType
+import sys
 
 class LoginFailed(IOError):
     def __init__(self, msg):
@@ -320,6 +321,18 @@ class Hub(object):
         r = json.loads(self._get('checkConnType').content)
         return r["conType"]
 
+    @property
+    @_listed_property
+    def lanIPAddress(self):
+        r = json.loads(self._get('getPreLoginData').content)
+        return r["gwaddr"]
+
+    @property
+    @_listed_property
+    def configFile(self):
+        r = json.loads(self._get('getRouterStatus').content)
+        return r["1.3.6.1.2.1.69.1.4.5.0"]
+
     def _snmpProperty(oid):
         """A function decorator to present an MIB value as an attribute.
 
@@ -336,6 +349,11 @@ class Hub(object):
             return property(wrapper)
         return real_wrapper
 
+    @_snmpProperty("1.3.6.1.4.1.4115.1.20.1.1.5.14.0")
+    def customerID(self, snmpValue):
+        "The value 8 appears to indicate Virgin Media"
+        return snmpValue
+
     @_snmpProperty("1.3.6.1.4.1.4115.1.20.1.1.1.7.1.3.1")
     def wanIPv4Address(self, snmpValue):
         """The current external IP address of the hub"""
@@ -350,12 +368,12 @@ class Hub(object):
         This will probably also be the DNS servers the hub hands out
         in DHCP responses.
 
-        For the virgin media Hub3 this always appears as a string with a
-        SINGLE dns server IP address in it, except when disconnected
-        from the internet, in which case it may be None.
+        For the virgin media Hub3 this always appears to be SINGLE dns
+        server IP address, except when disconnected from the internet,
+        in which case it may be None.
         """
         if snmpValue:
-            return _extract_ip(snmpValue)
+            return [ _extract_ip(snmpValue) ]
         else:
             return None
 
@@ -385,6 +403,99 @@ class Hub(object):
     def wanMACAddr(self, snmpValue):
         "WAN Mac address - i.e. the mac address facing Virgin Media"
         return _extract_mac(snmpValue)
+
+    @_snmpProperty("1.3.6.1.4.1.4115.1.20.1.1.1.4")
+    def wanMTUSize(self, snmpValue):
+        if snmpValue:
+            return int(snmpValue)
+        else:
+            return snmpValue
+
+    @_snmpProperty("1.3.6.1.4.1.4115.1.20.1.1.1.17")
+    def wanIPProvMode(self, snmpValue):
+        if snmpValue == 1:
+            return "Router"
+        return snmpValue
+
+    @_snmpProperty("1.3.6.1.4.1.4115.1.20.1.1.1.11.2.1.2")
+    def wanCurrentDNSIPAddrType(self, snmpValue):
+        return snmpValue
+
+    @_snmpProperty("1.3.6.1.4.1.4115.1.20.1.1.1.11.2.1.2")
+    def wanCurrentDNSIPAddrType(self, snmpValue):
+        return snmpValue
+
+    @_snmpProperty("1.3.6.1.4.1.4115.1.20.1.1.1.11.2.1.3")
+    def wanCurrentDNSIPAddr(self, snmpValue):
+        return snmpValue
+
+    @_snmpProperty("1.3.6.1.4.1.4115.1.20.1.1.1.12.3")
+    def wanDHCPDuration(self, snmpValue):
+        return snmpValue
+
+    @_snmpProperty("1.3.6.1.4.1.4115.1.20.1.1.1.12.4")
+    def wanDHCPExpire(self, snmpValue):
+        return snmpValue
+
+    @_snmpProperty("1.3.6.1.4.1.4115.1.20.1.1.1.12.7")
+    def wanDHCPDurationV6(self, snmpValue):
+        return snmpValue
+
+    @_snmpProperty("1.3.6.1.4.1.4115.1.20.1.1.1.12.8")
+    def wanDHCPExpireV6(self, snmpValue):
+        return snmpValue
+
+    @_snmpProperty("1.3.6.1.4.1.4115.1.20.1.1.2.2.1.3")
+    def lanSubnetMask(self, snmpValue):
+        return snmpValue
+
+    @_snmpProperty("1.3.6.1.4.1.4115.1.20.1.1.2.2.1.5")
+    def lanGatewayIp(self, snmpValue):
+        return snmpValue
+
+    @_snmpProperty("1.3.6.1.4.1.4115.1.20.1.1.2.2.1.7")
+    def lanGatewayIp2(self, snmpValue):
+        return snmpValue
+
+    @_snmpProperty("1.3.6.1.4.1.4115.1.20.1.1.2.2.1.9")
+    def lanUseDHCP(self, snmpValue):
+        return snmpValue
+
+    @_snmpProperty("1.3.6.1.4.1.4115.1.20.1.1.2.2.1.11")
+    def lanStartDHCP(self, snmpValue):
+        return snmpValue
+
+    @_snmpProperty("1.3.6.1.4.1.4115.1.20.1.1.2.2.1.13")
+    def lanEndDHCP(self, snmpValue):
+        return snmpValue
+
+    @_snmpProperty("1.3.6.1.4.1.4115.1.20.1.1.2.2.1.14")
+    def lanLeaseTime(self, snmpValue):
+        return snmpValue
+
+    @_snmpProperty("1.3.6.1.4.1.4115.1.20.1.1.2.2.1.29")
+    def lanPrefixLengthV6(self, snmpValue):
+        return snmpValue
+
+    @_snmpProperty("1.3.6.1.4.1.4115.1.20.1.1.2.2.1.31")
+    def lanStartDHCPV6(self, snmpValue):
+        return snmpValue
+
+    @_snmpProperty("1.3.6.1.4.1.4115.1.20.1.1.2.2.1.33")
+    def lanLeaseTimeV6(self, snmpValue):
+        return snmpValue
+
+    @_snmpProperty("1.3.6.1.4.1.4115.1.20.1.1.2.2.1.39")
+    def lanParentalControlsEnable(self, snmpValue):
+        return snmpValue
+
+    @_snmpProperty("1.3.6.1.4.1.4115.1.3.3.1.1.1.3.1")
+    def devMaxCpeAllowed(self, snmpValue):
+        return snmpValue
+
+    @_snmpProperty("1.3.6.1.4.1.4115.1.3.3.1.1.1.3.2")
+    def devNetworkAccess(self, snmpValue):
+        return snmpValue
 
     @_snmpProperty("1.3.6.1.4.1.4115.1.20.1.1.5.6.0")
     def language(self, snmpValue):
@@ -460,10 +571,8 @@ class Hub(object):
 snmpHelpers = [
     ("docsisBaseCapability",                "1.3.6.1.2.1.10.127.1.1.5"),
     ("docsBpi2CmPrivacyEnable",             "1.3.6.1.2.1.126.1.1.1.1.1"),
-    ("configFile",                          "1.3.6.1.2.1.69.1.4.5"),
     ("wanIPProvMode",                       "1.3.6.1.4.1.4115.1.20.1.1.1.17.0"),
     ("DSLiteWanEnable",                     "1.3.6.1.4.1.4115.1.20.1.1.1.18.1.0"),
-    ("customID",                            "1.3.6.1.4.1.4115.1.20.1.1.5.14.0"),
     ("authAccountEnabled",                  "1.3.6.1.4.1.4115.1.20.1.1.5.16.1.6.2"),
     ("esafeErouterInitModeCtrl",            "1.3.6.1.4.1.4491.2.1.14.1.5.4.0"),
 ]
@@ -538,40 +647,37 @@ class DeviceInfo(object):
     def __str__(self):
         return "DeviceInfo(ipv4_address=%s, mac_address=%s, connected=%s, name=%s)" % (self.ipv4_address, self.mac_address, self.connected, self.name)
 
-def _demo():
+def _demo(hub):
     global snmpHelpers
-    with Hub(hostname = '192.168.0.1') as hub:
-        print "Got", hub
 
-        hub.login(password='dssD04vy0z4t')
+    print 'Demo Properties:'
+    for name in sorted(_demo_properties):
+        try:
+            v = getattr(hub, name)
+            print '-', name, ":", v.__class__.__name__, ":", v
+        except Exception as e:
+            print "Problem with property", name
+            raise
 
-        print 'Demo Properties:'
-        for name in sorted(_demo_properties):
-            try:
-                print '- %s:' % name, '"%s"' % getattr(hub, name)
-            except Exception as e:
-                print "Problem with property", name
-                raise
+    print 'Old-style properties:'
+    for name,oid in snmpHelpers + _snmpWalks:
+        print '- %s:' % name,
+        print '"%s"' % getattr(hub, name)
 
-        print 'Old-style properties:'
-        for name,oid in snmpHelpers + _snmpWalks:
-            print '- %s:' % name,
-            print '"%s"' % getattr(hub, name)
+    print "Some device:", hub.getDevice("192.168.0.26")
+    print "Nonexistent device:", hub.getDevice("192.168.99.99")
 
-        print "Some device:", hub.getDevice("192.168.0.26")
-        print "Nonexistent device:", hub.getDevice("192.168.99.99")
+    print "Device List"
+    for dev in filter(lambda x: x.connected, hub.deviceList()):
+        print "-", dev
 
-        print "Device List"
-        for dev in filter(lambda x: x.connected, hub.deviceList()):
-            print "-", dev
+    print "Session counters:"
+    for c in sorted(hub.counters):
+        print '-', c, hub.counters[c]
 
-        print "Session counters:"
-        for c in sorted(hub.counters):
-            print '-', c, hub.counters[c]
 
-def _describe_oids():
-    with open('oid-list') as fp, Hub() as hub:
-        hub.login(password='dssD04vy0z4t')
+def _describe_oids(hub):
+    with open('oid-list') as fp:
         for oid in fp:
             oid = oid.rstrip('\n')
             try:
@@ -581,8 +687,15 @@ def _describe_oids():
                 print oid, ':', e
 
 if __name__ == '__main__':
-    #    _describe_oids()
-    _demo()
+    with Hub() as hub:
+        hub.login(password='dssD04vy0z4t')
+        print "Got", hub
+        #_describe_oids(hub)
+        _demo(hub)
+
+        # if len(sys.argv) > 1:
+        #     print "value of", sys.argv[1]
+        #     print hub.snmpGet(sys.argv[1])
 
 
 # Local Variables:
