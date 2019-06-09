@@ -7,7 +7,7 @@ import time
 import json
 import datetime
 from types import MethodType
-import sys
+import os
 
 class LoginFailed(IOError):
     def __init__(self, msg):
@@ -719,11 +719,6 @@ if __name__ == '__main__':
         print "Got", hub
         #_describe_oids(hub)
         _demo(hub)
-
-        # if len(sys.argv) > 1:
-        #     print "value of", sys.argv[1]
-        #     print hub.snmpGet(sys.argv[1])
-
 
 # Local Variables:
 # compile-command: "./virginmedia.py"
