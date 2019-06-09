@@ -330,6 +330,7 @@ class Hub(object):
     @property
     @_listed_property
     def configFile(self):
+        "Nobody knows what this is for..."
         r = json.loads(self._get('getRouterStatus').content)
         return r["1.3.6.1.2.1.69.1.4.5.0"]
 
@@ -445,47 +446,58 @@ class Hub(object):
     def wanDHCPExpireV6(self, snmpValue):
         return snmpValue
 
-    @_snmpProperty("1.3.6.1.4.1.4115.1.20.1.1.2.2.1.3")
+    @_snmpProperty("1.3.6.1.4.1.4115.1.20.1.1.2.2.1.3.200")
     def lanSubnetMask(self, snmpValue):
+        return _extract_ip(snmpValue)
+
+    @_snmpProperty("1.3.6.1.4.1.4115.1.20.1.1.2.2.1.5.200")
+    def lanGatewayIpv4(self, snmpValue):
+        return _extract_ip(snmpValue)
+
+    @_snmpProperty("1.3.6.1.4.1.4115.1.20.1.1.2.2.1.7.200")
+    def lanGatewayIp2v4(self, snmpValue):
+        ip = _extract_ip(snmpValue)
+        if ip == '0.0.0.0':
+            return None
+        return ip
+
+    @_snmpProperty("1.3.6.1.4.1.4115.1.20.1.1.2.2.1.9.200")
+    def lanDHCPEnabled(self, snmpValue):
+        return int(snmpValue)==1
+
+    @_snmpProperty("1.3.6.1.4.1.4115.1.20.1.1.2.2.1.11.200")
+    def lanDHCPv4Start(self, snmpValue):
+        return _extract_ip(snmpValue)
+
+    @_snmpProperty("1.3.6.1.4.1.4115.1.20.1.1.2.2.1.13.200")
+    def lanDHCPv4End(self, snmpValue):
+        return _extract_ip(snmpValue)
+
+    @_snmpProperty("1.3.6.1.4.1.4115.1.20.1.1.2.2.1.14.200")
+    def lanDHCPv4LeaseTimeSecs(self, snmpValue):
+        v = int(snmpValue)
+        if not v:
+            return None
+        return v
+
+    @_snmpProperty("1.3.6.1.4.1.4115.1.20.1.1.2.2.1.29.200")
+    def lanDHCPv6PrefixLength(self, snmpValue):
+        return int(snmpValue)
+
+    @_snmpProperty("1.3.6.1.4.1.4115.1.20.1.1.2.2.1.31.200")
+    def lantDHCPv6Start(self, snmpValue):
+        if snmpValue == "$00000000000000000000000000000000":
+            return None
         return snmpValue
 
-    @_snmpProperty("1.3.6.1.4.1.4115.1.20.1.1.2.2.1.5")
-    def lanGatewayIp(self, snmpValue):
-        return snmpValue
+    @_snmpProperty("1.3.6.1.4.1.4115.1.20.1.1.2.2.1.33.200")
+    def lanDHCPv6LeaseTime(self, snmpValue):
+        v = int(snmpValue)
+        if not v:
+            return None
+        return v
 
-    @_snmpProperty("1.3.6.1.4.1.4115.1.20.1.1.2.2.1.7")
-    def lanGatewayIp2(self, snmpValue):
-        return snmpValue
-
-    @_snmpProperty("1.3.6.1.4.1.4115.1.20.1.1.2.2.1.9")
-    def lanUseDHCP(self, snmpValue):
-        return snmpValue
-
-    @_snmpProperty("1.3.6.1.4.1.4115.1.20.1.1.2.2.1.11")
-    def lanStartDHCP(self, snmpValue):
-        return snmpValue
-
-    @_snmpProperty("1.3.6.1.4.1.4115.1.20.1.1.2.2.1.13")
-    def lanEndDHCP(self, snmpValue):
-        return snmpValue
-
-    @_snmpProperty("1.3.6.1.4.1.4115.1.20.1.1.2.2.1.14")
-    def lanLeaseTime(self, snmpValue):
-        return snmpValue
-
-    @_snmpProperty("1.3.6.1.4.1.4115.1.20.1.1.2.2.1.29")
-    def lanPrefixLengthV6(self, snmpValue):
-        return snmpValue
-
-    @_snmpProperty("1.3.6.1.4.1.4115.1.20.1.1.2.2.1.31")
-    def lanStartDHCPV6(self, snmpValue):
-        return snmpValue
-
-    @_snmpProperty("1.3.6.1.4.1.4115.1.20.1.1.2.2.1.33")
-    def lanLeaseTimeV6(self, snmpValue):
-        return snmpValue
-
-    @_snmpProperty("1.3.6.1.4.1.4115.1.20.1.1.2.2.1.39")
+    @_snmpProperty("1.3.6.1.4.1.4115.1.20.1.1.2.2.1.39.200")
     def lanParentalControlsEnable(self, snmpValue):
         return snmpValue
 
@@ -538,6 +550,10 @@ class Hub(object):
     @_snmpProperty("1.3.6.1.4.1.4115.1.20.1.1.5.16.1.2.1")
     def authUserName(self, snmpValue):
         """The name of the admin user"""
+        return snmpValue
+
+    @_snmpProperty("1.3.6.1.4.1.4115.1.20.1.1.3.22.1.2.10101")
+    def wifiESSID(self, snmpValue):
         return snmpValue
 
     @_collect_stats
