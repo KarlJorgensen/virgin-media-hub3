@@ -83,7 +83,7 @@ class Namespace(object):
                 print key, ':', getattr(self, key)
 
 
-_demo_properties = set()
+known_properties = set()
 
 def cache_result(function):
     """A function decorator to cache function results.
@@ -312,7 +312,7 @@ class Hub(object):
 
     def _listed_property(func):
         """A function decorator which adds the function to the list of known attributes"""
-        _demo_properties.add(func.__name__)
+        known_properties.add(func.__name__)
         return func
 
     @property
@@ -346,7 +346,7 @@ class Hub(object):
                 self = args[0]
                 kwargs["snmpValue"] = self.snmpGet(oid)
                 return function(*args, **kwargs)
-            _demo_properties.add(function.__name__)
+            known_properties.add(function.__name__)
             return property(wrapper)
         return real_wrapper
 
@@ -599,7 +599,6 @@ class Hub(object):
 snmpHelpers = [
     ("docsisBaseCapability",                "1.3.6.1.2.1.10.127.1.1.5"),
     ("docsBpi2CmPrivacyEnable",             "1.3.6.1.2.1.126.1.1.1.1.1"),
-    ("wanIPProvMode",                       "1.3.6.1.4.1.4115.1.20.1.1.1.17.0"),
     ("DSLiteWanEnable",                     "1.3.6.1.4.1.4115.1.20.1.1.1.18.1.0"),
     ("authAccountEnabled",                  "1.3.6.1.4.1.4115.1.20.1.1.5.16.1.6.2"),
     ("esafeErouterInitModeCtrl",            "1.3.6.1.4.1.4491.2.1.14.1.5.4.0"),
@@ -679,7 +678,7 @@ def _demo(hub):
     global snmpHelpers
 
     print 'Demo Properties:'
-    for name in sorted(_demo_properties):
+    for name in sorted(known_properties):
         try:
             v = getattr(hub, name)
             print '-', name, ":", v.__class__.__name__, ":", v

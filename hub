@@ -11,6 +11,27 @@ def subcommand(f):
     SUBCOMMANDS.append(f)
     return f
 
+class args(object):
+    """A function decorator that adds arguments to a subcommand.
+    It should be passed an array of (args, kwargs) - these will be used (eventually) call ArgumentParser.add_argument()
+    """
+    def __init__(self, args):
+        self._args = args
+
+    def __call__(self, f):
+        f.args = self._args
+        return f
+
+def nologin(f):
+    """A function decorator that flags the subcommand as not needing login"""
+    f.needs_login = False
+    return f
+
+def nohub(f):
+    """A function decorator that flags the subcommand as not needing a hub to talk to"""
+    f.needs_hub = False
+    return f
+
 def dump_properties(hub, props):
     for property in props:
         print property, ":", getattr(hub, property)
@@ -70,6 +91,36 @@ def demo(hub, args):
     #_describe_oids(hub)
     virginmedia._demo(hub)
 
+@subcommand
+@nohub
+def properties(args):
+    for d in sorted(virginmedia.known_properties):
+        print d
+
+@subcommand
+@args([
+    ( "property", { "nargs": "+", "help": "The property to retrieve", "choices": virginmedia.known_properties } )
+])
+def get(hub, args):
+    """Get a specific property"""
+    for p in args.property:
+        print getattr(hub, p)
+
+@subcommand
+@args([
+    ( "property",  { "help": "The name of the property to set",
+                     "choices": virginmedia.known_properties
+    } ),
+    ( "value", { "help": "Value to set the property to"})
+    ])
+def set(hub, args):
+    """Set a specific property.
+
+    Note that not all properties are settable."""
+    oldvalue = getattr(hub, args.property)
+    setattr(hub, args.property, args.value)
+    print "Changed", args.property, "from", oldvalue, "to", args.value
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--host", "-H",
@@ -86,14 +137,31 @@ def main():
     for subcommand in SUBCOMMANDS:
         cmd = subparsers.add_parser(subcommand.__name__,
                                     help=subcommand.__doc__)
+
+        if hasattr(subcommand, 'args'):
+            for a in subcommand.args:
+                cmd.add_argument(a[0], **a[1])
         cmd.set_defaults(func=subcommand)
 
     args = parser.parse_args()
-    with virginmedia.Hub() as hub:
-        if args.password:
-            hub.login(username=args.username,
-                      password=args.password)
-        args.func(hub, args)
+    try:
+        needs_login = args.func.needs_login
+    except AttributeError:
+        needs_login = True
+
+    try:
+        needs_hub = args.func.needs_hub
+    except AttributeError:
+        needs_hub = True
+
+    if needs_hub:
+        with virginmedia.Hub() as hub:
+            if needs_login and args.password:
+                hub.login(username=args.username,
+                          password=args.password)
+            args.func(hub, args)
+    else:
+        args.func(args)
 
 if __name__ == '__main__':
     main()
