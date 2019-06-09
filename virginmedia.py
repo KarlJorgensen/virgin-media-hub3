@@ -552,12 +552,20 @@ class Hub(object):
         """The name of the admin user"""
         return snmpValue
 
+    @_snmpProperty("1.3.6.1.4.1.4115.1.20.1.1.3.22.1.2.10001")
+    def wifi24GHzESSID(self, snmpValue):
+        return snmpValue
+
     @_snmpProperty("1.3.6.1.4.1.4115.1.20.1.1.3.22.1.2.10101")
-    def wifiESSID(self, snmpValue):
+    def wifi5GHzESSID(self, snmpValue):
+        return snmpValue
+
+    @_snmpProperty("1.3.6.1.4.1.4115.1.20.1.1.3.26.1.2.10001")
+    def wifi24GHzPassword(self, snmpValue):
         return snmpValue
 
     @_snmpProperty("1.3.6.1.4.1.4115.1.20.1.1.3.26.1.2.10101")
-    def wifiPassword(self, snmpValue):
+    def wifi5GHzPassword(self, snmpValue):
         return snmpValue
 
     @_collect_stats
