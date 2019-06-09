@@ -485,7 +485,7 @@ class Hub(object):
         return int(snmpValue)
 
     @_snmpProperty("1.3.6.1.4.1.4115.1.20.1.1.2.2.1.31.200")
-    def lantDHCPv6Start(self, snmpValue):
+    def lanDHCPv6Start(self, snmpValue):
         if snmpValue == "$00000000000000000000000000000000":
             return None
         return snmpValue
