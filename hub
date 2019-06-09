@@ -1,0 +1,99 @@
+#!/usr/bin/python
+
+import argparse
+import os
+import virginmedia
+
+SUBCOMMANDS = []
+
+def subcommand(f):
+    """A function decorator for subcommands"""
+    SUBCOMMANDS.append(f)
+    return f
+
+def dump_properties(hub, props):
+    for property in props:
+        print property, ":", getattr(hub, property)
+
+@subcommand
+def info(hub, args):
+    """Show General information about the hub"""
+    dump_properties(hub,
+                    [
+                        "firstInstallWizardCompleted",
+                        "hardwareVersion",
+                        "softwareVersion",
+                        "wanIPProvMode",
+                        "wanIPv4Address",
+                        "wanIPv4LeaseTimeSecsRemaining",
+                        "wanIPv6Addr",
+                        "dns_servers",
+                        "cmDoc30SetupPacketCableRegion"
+                    ])
+
+@subcommand
+def lansettings(hub, args):
+    """Show LAN settings"""
+    dump_properties(hub,
+                    [
+                        "lanIPAddress",
+                        "lanSubnetMask",
+                        "lanDHCPEnabled",
+                        "lanGatewayIpv4",
+                        "lanDHCPv4Start",
+                        "lanDHCPv4End",
+                        "lanDHCPv4LeaseTimeSecs",
+                        "lanDHCPv6PrefixLength",
+                        "lanDHCPv6Start",
+                        "lanDHCPv6LeaseTime"
+                    ])
+
+@subcommand
+def wansettings(hub, args):
+    """Show Wide Area Network settings"""
+    dump_properties(hub,
+                    [
+                        "wanIPv4Address",
+                        "dns_servers",
+                        "wanIPv4Gateway",
+                        "wanMACAddr",
+                        "wanMTUSize",
+                        "wanIPv6Addr",
+                        "wanIPv6Gateway",
+                        ])
+
+@subcommand
+def demo(hub, args):
+    """Run a demo of what properties we can extract from the hub. This command many be removed in the future."""
+    print "Doing demo"
+    print "Got", hub
+    #_describe_oids(hub)
+    virginmedia._demo(hub)
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--host", "-H",
+                        help="IP Address/dns name of the hub.  Uses the HUB environment variable as a default value - and 192.168.0.1 if that is not set",
+                        default=os.environ.get("HUB", "192.168.0.1"))
+    parser.add_argument("--username", "-u",
+                        help="User name to login as. Uses the HUB_USER environment variable as a default value - and 'admin' if that is not set",
+                        default=os.environ.get("HUB_USER", "admin"))
+    parser.add_argument("--password", "-p",
+                        help="Password to authenticate on the hub",
+                        default=os.environ.get("HUB_PASSWORD"))
+    subparsers = parser.add_subparsers(help="sub-command help")
+
+    for subcommand in SUBCOMMANDS:
+        cmd = subparsers.add_parser(subcommand.__name__,
+                                    help=subcommand.__doc__)
+        cmd.set_defaults(func=subcommand)
+
+    args = parser.parse_args()
+    with virginmedia.Hub() as hub:
+        if args.password:
+            hub.login(username=args.username,
+                      password=args.password)
+        args.func(hub, args)
+
+if __name__ == '__main__':
+    main()
