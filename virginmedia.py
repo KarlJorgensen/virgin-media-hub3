@@ -556,6 +556,10 @@ class Hub(object):
     def wifiESSID(self, snmpValue):
         return snmpValue
 
+    @_snmpProperty("1.3.6.1.4.1.4115.1.20.1.1.3.26.1.2.10101")
+    def wifiPassword(self, snmpValue):
+        return snmpValue
+
     @_collect_stats
     def deviceList(self):
         """Iterator which retrieves devices known to the hub.
