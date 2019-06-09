@@ -664,9 +664,6 @@ def _demo(hub):
         print '- %s:' % name,
         print '"%s"' % getattr(hub, name)
 
-    print "Some device:", hub.getDevice("192.168.0.26")
-    print "Nonexistent device:", hub.getDevice("192.168.99.99")
-
     print "Device List"
     for dev in filter(lambda x: x.connected, hub.deviceList()):
         print "-", dev
