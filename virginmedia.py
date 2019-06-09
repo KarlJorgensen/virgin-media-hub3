@@ -705,7 +705,9 @@ def _describe_oids(hub):
 
 if __name__ == '__main__':
     with Hub() as hub:
-        hub.login(password='dssD04vy0z4t')
+        password = os.environ.get('HUB_PASSWORD')
+        if password:
+            hub.login(password=password)
         print "Got", hub
         #_describe_oids(hub)
         _demo(hub)
