@@ -84,6 +84,12 @@ def wansettings(hub, args):
                         ])
 
 @subcommand
+def portforward_list(hub, args):
+    """List current port forwardings"""
+    for x in hub.portForwardings():
+        print str(x)
+
+@subcommand
 def demo(hub, args):
     """Run a demo of what properties we can extract from the hub. This command many be removed in the future."""
     print "Doing demo"
