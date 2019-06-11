@@ -461,6 +461,11 @@ class Hub:
         "The host name the hub presents to the ISP"
         return snmpValue
 
+    @_snmpProperty("1.3.6.1.4.1.4115.1.20.1.1.1.3.0")
+    def wanDomainname(self, snmpValue):
+        "The domain name given to the hub by the ISP"
+        return snmpValue
+
     @_snmpProperty("1.3.6.1.4.1.4115.1.20.1.1.5.8.0")
     def serialNo(self, snmpValue):
         "Serial number of the hub"
