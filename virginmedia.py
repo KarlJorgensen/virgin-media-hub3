@@ -486,7 +486,7 @@ class Hub:
         "WAN Mac address - i.e. the mac address facing Virgin Media"
         return _extract_mac(snmpValue)
 
-    @_snmpProperty("1.3.6.1.4.1.4115.1.20.1.1.1.4")
+    @_snmpProperty("1.3.6.1.4.1.4115.1.20.1.1.1.4.0")
     def wanMTUSize(self, snmpValue):
         if str(snmpValue) == "":
             return None
