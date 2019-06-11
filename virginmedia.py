@@ -451,9 +451,19 @@ class Hub:
         "Hardware version of the hub"
         return snmpValue
 
+    @_snmpProperty("1.3.6.1.4.1.4115.1.20.1.1.5.7.0")
+    def name(self, snmpValue):
+        "The name the hub calls itself"
+        return snmpValue
+
     @_snmpProperty("1.3.6.1.4.1.4115.1.20.1.1.5.8.0")
     def serialNo(self, snmpValue):
         "Serial number of the hub"
+        return snmpValue
+
+    @_snmpProperty("1.3.6.1.4.1.4115.1.20.1.1.5.9.0")
+    def bootCodeVersion(self, snmpValue):
+        "Presumably the IPL firmware version?"
         return snmpValue
 
     @_snmpProperty("1.3.6.1.4.1.4115.1.20.1.1.5.11.0")

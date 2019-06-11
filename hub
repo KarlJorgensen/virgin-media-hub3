@@ -50,8 +50,11 @@ def info(hub, args):
                     [
                         "modelname",
                         "family",
+                        "serialNo",
                         "hardwareVersion",
+                        "bootCodeVersion",
                         "softwareVersion",
+                        "name",
                         "firstInstallWizardCompleted",
                         "wanIPProvMode",
                         "wanIPv4Address",
