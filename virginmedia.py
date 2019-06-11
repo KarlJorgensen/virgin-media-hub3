@@ -244,17 +244,17 @@ class Hub(object):
         if not username:
             username = self.authUserName
 
-        r = self._get('login',
-                      retry401=0,
-                      params=self._params({"arg": base64.b64encode(username + ':' + password)}))
+        resp = self._get('login',
+                         retry401=0,
+                         params=self._params({"arg": base64.b64encode(username + ':' + password)}))
 
-        if not r.content:
-            raise LoginFailed("Unknown reason. Sorry. Headers were {h}".format(h=r.headers))
+        if not resp.content:
+            raise LoginFailed("Unknown reason. Sorry. Headers were {h}".format(h=resp.headers))
 
         try:
-            attrs = json.loads(base64.b64decode(r.content))
+            attrs = json.loads(base64.b64decode(resp.content))
         except Exception:
-            raise LoginFailed(r.content)
+            raise LoginFailed(resp.content)
 
         if attrs.get("gwWan") == "f" and attrs.get("conType") == "LAN":
             if attrs.get("muti") == "GW_WAN":
@@ -271,9 +271,21 @@ class Hub(object):
                 print "Warning: Other remote user has already logged in: " \
                     "Some things may fail with HTTP 401..."
 
-        self._credential = r.content
+        self._credential = resp.content
         self._username = username
         self._password = password
+        self._modelname = attrs.get("modelname")
+        self._family = attrs.get("family")
+
+    @property
+    @_listed_property
+    def modelname(self):
+        return self._modelname
+
+    @property
+    @_listed_property
+    def family(self):
+        return self._family
 
     @property
     def is_loggedin(self):
@@ -880,7 +892,8 @@ class DeviceInfo(object):
         the device, or possibly the mDNS name broadcasted by
         it.  Nobody knows for sure, but the hub knows somehow!
         """
-        thename = self._hub.snmpGet("1.3.6.1.4.1.4115.1.20.1.1.2.4.2.1.3.200.1.4.%s" % self._ipv4_address)
+        thename = self._hub.snmpGet("1.3.6.1.4.1.4115.1.20.1.1.2.4.2.1.3.200.1.4.%s" \
+                                    % self._ipv4_address)
         if thename == "unknown":
             return None
         return thename
@@ -894,8 +907,6 @@ class DeviceInfo(object):
             % (self.ipv4_address, self.mac_address, self.connected, self.name)
 
 def _demo(hub):
-    global snmpHelpers
-
     print 'Demo Properties:'
     for name in sorted(KNOWN_PROPERTIES):
         try:
@@ -929,13 +940,13 @@ def _describe_oids(hub):
                 print oid, ':', e
 
 if __name__ == '__main__':
-    with Hub() as hub:
+    with Hub() as thehub:
         password = os.environ.get('HUB_PASSWORD')
         if password:
-            hub.login(password=password)
-        print "Got", hub
-        #_describe_oids(hub)
-        _demo(hub)
+            thehub.login(password=password)
+        print "Got", thehub
+        #_describe_oids(thehub)
+        _demo(thehub)
 
 # Local Variables:
 # compile-command: "./virginmedia.py"

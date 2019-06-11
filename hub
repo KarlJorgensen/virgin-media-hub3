@@ -47,9 +47,11 @@ def info(hub, args):
     """Show General information about the hub"""
     dump_properties(hub,
                     [
-                        "firstInstallWizardCompleted",
+                        "modelname",
+                        "family",
                         "hardwareVersion",
                         "softwareVersion",
+                        "firstInstallWizardCompleted",
                         "wanIPProvMode",
                         "wanIPv4Address",
                         "wanIPv4LeaseTimeSecsRemaining",
