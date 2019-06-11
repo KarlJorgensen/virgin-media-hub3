@@ -817,8 +817,8 @@ class PortForward(object):
             if start == end:
                 return str(start)
             return "{0}-{1}".format(start, end)
-        return ("PortForward: [{idx}] : {ext_port} "
-                + "=> {local_ip}:{local_port} {protocol}") \
+        return ("PortForward: [{idx}] : {protocol}/{ext_port} "
+                + "=> {local_ip}:{local_port}") \
             .format(idx=self.idx,
                     ext_port=portsummary(self.ext_port_start, self.ext_port_end),
                     local_port=portsummary(self.local_port_start, self.local_port_end),
