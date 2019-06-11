@@ -125,7 +125,10 @@ def set_property(hub, args):
 
     Note that not all properties are settable."""
     oldvalue = getattr(hub, args.property)
-    setattr(hub, args.property, args.value)
+    try:
+        setattr(hub, args.property, args.value)
+    except AttributeError:
+        raise SystemExit("Property {0} is not settable".format(args.property))
     print("Changed", args.property, "from", oldvalue, "to", args.value)
 
 def main():
