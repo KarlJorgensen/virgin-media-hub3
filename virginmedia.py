@@ -423,20 +423,20 @@ class Hub:
             return None
         return x
 
-    @_snmpProperty("1.3.6.1.4.1.4115.1.20.1.1.1.11.2.1.3.1")
-    def dns_servers(self, snmpValue):
+    @property
+    @_listed_property
+    def dns_servers(self):
         """DNS servers used by the hub.
 
         This will probably also be the DNS servers the hub hands out
         in DHCP responses.
 
-        For the virgin media Hub3 this always appears to be SINGLE dns
-        server IP address, except when disconnected from the internet,
-        in which case it may be None.
+        The return value will be a list of strings - each string
+        representing an IP address.
+
         """
-        if snmpValue:
-            return [_extract_ip(snmpValue)]
-        return None
+        res = self.snmpWalk("1.3.6.1.4.1.4115.1.20.1.1.1.11.2.1.3")
+        return list(map(_extract_ip, res.values()))
 
     @_snmpProperty("1.3.6.1.4.1.4115.1.20.1.1.1.7.1.6.1")
     def wanIPv4Gateway(self, snmpValue):
