@@ -50,22 +50,21 @@ def info(hub, args):
                     [
                         "modelname",
                         "family",
-                        "serialNo",
-                        "hardwareVersion",
-                        "bootCodeVersion",
-                        "softwareVersion",
+                        "hardware_version",
+                        "serial_number",
+                        "bootcode_version",
+                        "firmware_version",
                         "name",
                         "firstInstallWizardCompleted",
-                        "wanIPProvMode",
-                        "wanIPv4Address",
-                        "wanIPv4LeaseTimeSecsRemaining",
-                        "wanIPv6Addr",
+                        "wan_ip_prov_mode",
+                        "wan_current_ipaddr_ipv4",
+                        "wan_current_ipaddr_ipv6",
                         "dns_servers",
                         "cmDoc30SetupPacketCableRegion"
                     ])
 
 @subcommand
-def lansettings(hub, args):
+def lanstatus(hub, args):
     """Show LAN settings"""
     dump_properties(hub,
                     [
@@ -82,19 +81,24 @@ def lansettings(hub, args):
                     ])
 
 @subcommand
-def wansettings(hub, args):
+def wanstatus(hub, args):
     """Show Wide Area Network settings"""
     dump_properties(hub,
                     [
-                        "wanIPv4Address",
-                        "wanIPv4NetMask",
-                        "wanIPv4Gateway",
-                        "wanMACAddr",
-                        "wanMTUSize",
-                        "wanIPv6Addr",
-                        "wanIPv6Gateway",
-                        "wanHostname",
-                        "wanDomainname",
+                        "wan_if_macaddr",
+                        "wan_mtu_size",
+
+                        "wan_current_ipaddr_ipv4",
+                        "wan_current_netmask",
+                        "wan_current_gw_ipv4",
+                        "wan_dhcp_duration_ipv4",
+
+                        "wan_current_ipaddr_ipv6",
+                        "wan_dhcp_duration_ipv6",
+                        "wan_current_gw_ipv6",
+
+                        "wan_conn_hostname",
+                        "wan_conn_domainname",
                         "dns_servers"
                         ])
 

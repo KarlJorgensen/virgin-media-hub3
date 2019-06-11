@@ -3,19 +3,24 @@
 
 all : selftest pylints
 
+.PHONY: clean
+
 .PHONY: selftest
 selftest: pylints
 	./virginmedia.py
 	./hub properties
 	./hub info
-	./hub lansettings
-	./hub wansettings
+	./hub lanstatus
+	./hub wanstatus
 	./hub portforward_list
-	./hub get_property hardwareVersion softwareVersion serialNo
-	! ./hub set_property hardwareVersion "This should fail. Do not worry."
+	./hub get_property hardware_version firmware_version serial_number
+	! ./hub set_property hardware_version "This should fail. Do not worry."
 
 .PHONY: pylints
 pylints: .hub.lint .virginmedia.py.lint
+
+clean ::
+	rm -f .hub.lint .virginmedia.py.lint
 
 # pylint exit code is a bitmask - we are only interested in fatal/error here
 .%.lint : %

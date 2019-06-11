@@ -41,16 +41,34 @@ class AccessDenied(IOError):
     def __init__(self, msg):
         IOError.__init__(self, msg)
 
+def extract_int(strvalue, zero_is_none=True):
+    """Extract an integer from a string.
+
+    This is almost like the int() function - except that this one
+    knows how to handle input values of None or the empty string.
+
+    For convenience, it can also convert zero-valued results into None
+    """
+    if strvalue is None or strvalue == "":
+        return None
+    ival = int(strvalue)
+    if zero_is_none and ival == 0:
+        return None
+    return ival
+
 def extract_ip(hexvalue):
     """Extract an IP address to a sensible format.
 
     The router encodes IPv4 addresses in hex, prefixed by a dollar
     sign, e.g. "$c2a80464" => 192.168.4.100
     """
-    return (str(int(hexvalue[1:3], base=16))
-            + '.' + str(int(hexvalue[3:5], base=16))
-            + '.' + str(int(hexvalue[5:7], base=16))
-            + '.' + str(int(hexvalue[7:9], base=16)))
+    ipaddr = (str(int(hexvalue[1:3], base=16))
+              + '.' + str(int(hexvalue[3:5], base=16))
+              + '.' + str(int(hexvalue[5:7], base=16))
+              + '.' + str(int(hexvalue[7:9], base=16)))
+    if ipaddr == "0.0.0.0":
+        return None
+    return ipaddr
 
 def extract_ipv6(hexvalue):
     """Extract an IPv6 address to a sensible format
@@ -64,7 +82,7 @@ def extract_ipv6(hexvalue):
         res += ':' + hexvalue[chunk:chunk+4]
     return res
 
-def extract_map(mac):
+def extract_mac(mac):
     """Extract a mac address from the hub response.
 
     The hub represents mac addresses as e.g. "$787b8a6413f5" - i.e. a
@@ -77,18 +95,22 @@ def extract_map(mac):
         res += ':' + mac[idx:idx+2]
     return res
 
-def _extract_date(vmdate):
-    # Dates (such as the DHCP lease expiry time) are encoded somewhat stranger
-    # than even IP addresses:
-    #
-    # E.g. "$07e2030e10071100" is:
-    #      0x07e2 : year = 2018
-    #          0x03 : month = March
-    #            0x0e : day-of-month = 14
-    #              0x10 : hour = 16 (seems to at least use 24hr clock!)
-    #                0x07 : minute = 07
-    #                  0x11 : second = 17
-    #                    0x00 : junk
+def extract_date(vmdate):
+    """
+    Dates (such as the DHCP lease expiry time) are encoded somewhat stranger
+    than even IP addresses:
+
+    E.g. "$07e2030e10071100" is:
+         0x07e2 : year = 2018
+             0x03 : month = March
+               0x0e : day-of-month = 14
+                 0x10 : hour = 16 (seems to at least use 24hr clock!)
+                   0x07 : minute = 07
+                     0x11 : second = 17
+                       0x00 : junk
+    """
+    if vmdate is None or vmdate in ["", "$0000000000000000"]:
+        return None
     year = int(vmdate[1:5], base=16)
     month = int(vmdate[5:7], base=16)
     dom = int(vmdate[7:9], base=16)
@@ -320,7 +342,6 @@ class Hub:
         return False
 
     @collect_stats
-    @functools.lru_cache(maxsize=250)
     def snmp_get(self, oid):
         """Retrieves a single SNMP value from the hub"""
         resp = self.snmp_gets(oids=[oid])
@@ -385,11 +406,6 @@ class Hub:
 
     @property
     @listed_property
-    def connectionType(self):
-        return json.loads(self._get('checkConnType').content)["conType"]
-
-    @property
-    @listed_property
     def lanIPAddress(self):
         return json.loads(self._get('getPreLoginData').content)["gwaddr"]
 
@@ -399,26 +415,118 @@ class Hub:
         "Nobody knows what this is for..."
         return json.loads(self._get('getRouterStatus').content)["1.3.6.1.2.1.69.1.4.5.0"]
 
-    @snmp_property("1.3.6.1.4.1.4115.1.20.1.1.5.14.0")
-    def customerID(self, snmp_value):
-        "The value 8 appears to indicate Virgin Media"
+
+    #
+    # Functions that just deal with SNMP values
+    #
+    # People: Try to keep these in the SNMP mib order...
+    #
+    @snmp_property("1.3.6.1.4.1.4115.1.3.3.1.1.1.3.1.0")
+    def max_cpe_allowed(self, snmp_value):
+        """The value of MaxCpeAllowed in the CM config file.
+
+        ... whatever THAT means...
+
+        """
+    @snmp_property("1.3.6.1.4.1.4115.1.3.3.1.1.1.3.2.0")
+    def network_access(self, snmp_value):
+        """Whether the hub has got network access."""
+        return snmp_value == "1"
+
+    @snmp_property("1.3.6.1.4.1.4115.1.3.4.1.3.8.0")
+    def cmDoc30SetupPacketCableRegion(self, snmp_value):
+        "TODO: Figure out what this is..."
+        return int(snmp_value)
+
+    @snmp_property("1.3.6.1.4.1.4115.1.20.1.1.1.1.0")
+    def wan_conn_type(self, snmp_value):
+        "The type of WAN connection"
         return snmp_value
 
+    @snmp_property("1.3.6.1.4.1.4115.1.20.1.1.1.2.0")
+    def wan_conn_hostname(self, snmp_value):
+        "The host name the hub presents to the ISP"
+        return snmp_value
+
+    @snmp_property("1.3.6.1.4.1.4115.1.20.1.1.1.3.0")
+    def wan_conn_domainname(self, snmp_value):
+        "The domain name given to the hub by the ISP"
+        return snmp_value
+
+    @snmp_property("1.3.6.1.4.1.4115.1.20.1.1.1.4.0")
+    def wan_mtu_size(self, snmp_value):
+        """The MTU on the WAN"""
+        return extract_int(snmp_value)
+
     @snmp_property("1.3.6.1.4.1.4115.1.20.1.1.1.7.1.3.1")
-    def wanIPv4Address(self, snmp_value):
+    def wan_current_ipaddr_ipv4(self, snmp_value):
         """The current external IP address of the hub"""
-        x = extract_ip(snmp_value)
-        if x == "0.0.0.0":
-            return None
-        return x
+        return extract_ip(snmp_value)
+
+    @snmp_property("1.3.6.1.4.1.4115.1.20.1.1.1.7.1.3.2")
+    def wan_current_ipaddr_ipv6(self, snmp_value):
+        "Current external IPv6 address of hub"
+        return  extract_ipv6(snmp_value)
 
     @snmp_property("1.3.6.1.4.1.4115.1.20.1.1.1.7.1.8.1")
-    def wanIPv4NetMask(self, snmp_value):
+    def wan_current_netmask(self, snmp_value):
         """The WAN network mask - e.g. '255.255.248.0'"""
-        x = extract_ip(snmp_value)
-        if x == "0.0.0.0":
+        return extract_ip(snmp_value)
+
+    @snmp_property("1.3.6.1.4.1.4115.1.20.1.1.1.7.1.6.1")
+    def wan_current_gw_ipv4(self, snmp_value):
+        """Default gateway of the hub"""
+        return extract_ip(snmp_value)
+
+    @snmp_property("1.3.6.1.4.1.4115.1.20.1.1.1.7.1.6.2")
+    def wan_current_gw_ipv6(self, snmp_value):
+        "Default IPv6 gateway"
+        return  extract_ipv6(snmp_value)
+
+    @snmp_property("1.3.6.1.4.1.4115.1.20.1.1.1.10.1.0")
+    def wan_user_name(self, snmp_value):
+        """WAN L2TP user name"""
+        return snmp_value
+
+    @snmp_property("1.3.6.1.4.1.4115.1.20.1.1.1.10.2.0")
+    def wan_password(self, snmp_value):
+        """WAN L2TP password"""
+        return snmp_value
+
+    @snmp_property("1.3.6.1.4.1.4115.1.20.1.1.1.10.3.0")
+    def wan_enable_idle_timeout(self, snmp_value):
+        """enable/disable WAN L2TP idle timeout"""
+        return snmp_value == "1"
+
+    @snmp_property("1.3.6.1.4.1.4115.1.20.1.1.1.10.4.0")
+    def wan_idle_timeout(self, snmp_value):
+        """WAN L2TP idle timeout in seconds.
+
+        Presumably, this only has effect when wan_enable_idle_timeout
+        is True
+
+        """
+        return extract_int(snmp_value)
+
+    @property
+    @listed_property
+    def wan_tunnel_addr(self):
+        addrtype = self.snmp_get("1.3.6.1.4.1.4115.1.20.1.1.1.10.5.0")
+        if addrtype == "0":
             return None
-        return x
+        return extract_ip(self.snmp_get("1.3.6.1.4.1.4115.1.20.1.1.1.10.6.0"))
+
+    @snmp_property("1.3.6.1.4.1.4115.1.20.1.1.1.10.8.0")
+    def wan_keepalive_enabled(self, snmp_value):
+        return snmp_value == "1"
+
+    @snmp_property("1.3.6.1.4.1.4115.1.20.1.1.1.10.9.0")
+    def wan_keepalive_timeout(self, snmp_value):
+        return extract_int(snmp_value)
+
+    @snmp_property("1.3.6.1.4.1.4115.1.20.1.1.1.11.1.0")
+    def wan_use_auto_dns(self, snmp_value):
+        return snmp_value == "1"
 
     @property
     @listed_property
@@ -432,91 +540,62 @@ class Hub:
         representing an IP address.
 
         """
+        # TODO: This assumes ipv4 addresses, although the hub also supports ipv6...
+        # TODO: This should be replaced by smtp_walk - together with wanCurrentDNSIPAddrType
         res = self.snmp_walk("1.3.6.1.4.1.4115.1.20.1.1.1.11.2.1.3")
         return list(map(extract_ip, res.values()))
 
-    @snmp_property("1.3.6.1.4.1.4115.1.20.1.1.1.7.1.6.1")
-    def wanIPv4Gateway(self, snmp_value):
-        """Default gateway of the hub"""
-        the_ip = extract_ip(snmp_value)
-        if the_ip == "0.0.0.0":
-            return None
-        return the_ip
-
-    @snmp_property("1.3.6.1.4.1.4115.1.20.1.1.5.10.0")
-    def hardwareVersion(self, snmp_value):
-        "Hardware version of the hub"
-        return snmp_value
-
-    @snmp_property("1.3.6.1.4.1.4115.1.20.1.1.5.7.0")
-    def name(self, snmp_value):
-        "The name the hub calls itself"
-        return snmp_value
-
-    @snmp_property("1.3.6.1.4.1.4115.1.20.1.1.1.2.0")
-    def wanHostname(self, snmp_value):
-        "The host name the hub presents to the ISP"
-        return snmp_value
-
-    @snmp_property("1.3.6.1.4.1.4115.1.20.1.1.1.3.0")
-    def wanDomainname(self, snmp_value):
-        "The domain name given to the hub by the ISP"
-        return snmp_value
-
-    @snmp_property("1.3.6.1.4.1.4115.1.20.1.1.5.8.0")
-    def serialNo(self, snmp_value):
-        "Serial number of the hub"
-        return snmp_value
-
-    @snmp_property("1.3.6.1.4.1.4115.1.20.1.1.5.9.0")
-    def bootCodeVersion(self, snmp_value):
-        "Presumably the IPL firmware version?"
-        return snmp_value
-
-    @snmp_property("1.3.6.1.4.1.4115.1.20.1.1.5.11.0")
-    def softwareVersion(self, snmp_value):
-        """Software version of the hub."""
-        return snmp_value
-
     @snmp_property("1.3.6.1.4.1.4115.1.20.1.1.1.13.0")
-    def wanMACAddr(self, snmp_value):
-        "WAN Mac address - i.e. the mac address facing Virgin Media"
-        return extract_map(snmp_value)
+    def wan_if_macaddr(self, snmp_value):
+        """MAC address on the WAN interface.
 
-    @snmp_property("1.3.6.1.4.1.4115.1.20.1.1.1.4.0")
-    def wanMTUSize(self, snmp_value):
-        if str(snmp_value) == "":
-            return None
-        return int(snmp_value)
+        This is the mac address your ISP will see
 
-    @snmp_property("1.3.6.1.4.1.4115.1.20.1.1.1.17")
-    def wanIPProvMode(self, snmp_value):
-        if snmp_value == 1:
-            return "Router"
-        return snmp_value
+        """
+        return extract_mac(snmp_value)
 
     @snmp_property("1.3.6.1.4.1.4115.1.20.1.1.1.11.2.1.2")
     def wanCurrentDNSIPAddrType(self, snmp_value):
+        # TODO: This should be replaced by an snmp_walk - together with dns_servers
         return snmp_value
 
-    @snmp_property("1.3.6.1.4.1.4115.1.20.1.1.1.11.2.1.3")
-    def wanCurrentDNSIPAddr(self, snmp_value):
-        return snmp_value
+    @snmp_property("1.3.6.1.4.1.4115.1.20.1.1.1.12.3.0")
+    def wan_dhcp_duration_ipv4(self, snmp_value):
+        """The number of seconds the current WAN DHCP ipv4 lease will remain valid.
 
-    @snmp_property("1.3.6.1.4.1.4115.1.20.1.1.1.12.3")
-    def wanDHCPDuration(self, snmp_value):
-        return snmp_value
+        Since this gives 'seconds remaining', this will be counting down...
 
-    @snmp_property("1.3.6.1.4.1.4115.1.20.1.1.1.12.4")
-    def wanDHCPExpire(self, snmp_value):
-        return snmp_value
+        """
+        return extract_int(snmp_value)
 
-    @snmp_property("1.3.6.1.4.1.4115.1.20.1.1.1.12.7")
-    def wanDHCPDurationV6(self, snmp_value):
-        return snmp_value
+    @snmp_property("1.3.6.1.4.1.4115.1.20.1.1.1.12.4.0")
+    def wan_dhcp_expire_ipv4(self, snmp_value):
+        """The date/time the current WAN DHCP lease will expire.
 
-    @snmp_property("1.3.6.1.4.1.4115.1.20.1.1.1.12.8")
-    def wanDHCPExpireV6(self, snmp_value):
+        """
+        return extract_date(snmp_value)
+
+    @snmp_property("1.3.6.1.4.1.4115.1.20.1.1.1.12.7.0")
+    def wan_dhcp_duration_ipv6(self, snmp_value):
+        """The number of seconds the current WAN DHCP ipv6 lease will remain valid.
+
+        Since this gives 'seconds remaining', this will be counting down...
+
+        """
+        return extract_int(snmp_value)
+
+    @snmp_property("1.3.6.1.4.1.4115.1.20.1.1.1.12.8.0")
+    def wan_dhcp_expire_ipv6(self, snmp_value):
+        """The date/time the current WAN DHCP lease will expire.
+
+        """
+        return extract_date(snmp_value)
+
+    @snmp_property("1.3.6.1.4.1.4115.1.20.1.1.1.17")
+    def wan_ip_prov_mode(self, snmp_value):
+        """eRouter initialization mode"""
+        if snmp_value == 1:
+            return "Router"
         return snmp_value
 
     @snmp_property("1.3.6.1.4.1.4115.1.20.1.1.2.2.1.3.200")
@@ -529,10 +608,7 @@ class Hub:
 
     @snmp_property("1.3.6.1.4.1.4115.1.20.1.1.2.2.1.7.200")
     def lanGatewayIp2v4(self, snmp_value):
-        ip = extract_ip(snmp_value)
-        if ip == '0.0.0.0':
-            return None
-        return ip
+        return extract_ip(snmp_value)
 
     @snmp_property("1.3.6.1.4.1.4115.1.20.1.1.2.2.1.9.200")
     def lanDHCPEnabled(self, snmp_value):
@@ -548,14 +624,11 @@ class Hub:
 
     @snmp_property("1.3.6.1.4.1.4115.1.20.1.1.2.2.1.14.200")
     def lanDHCPv4LeaseTimeSecs(self, snmp_value):
-        val = int(snmp_value)
-        if not val:
-            return None
-        return val
+        return extract_int(snmp_value)
 
     @snmp_property("1.3.6.1.4.1.4115.1.20.1.1.2.2.1.29.200")
     def lanDHCPv6PrefixLength(self, snmp_value):
-        return int(snmp_value)
+        return extract_int(snmp_value)
 
     @snmp_property("1.3.6.1.4.1.4115.1.20.1.1.2.2.1.31.200")
     def lanDHCPv6Start(self, snmp_value):
@@ -565,65 +638,10 @@ class Hub:
 
     @snmp_property("1.3.6.1.4.1.4115.1.20.1.1.2.2.1.33.200")
     def lanDHCPv6LeaseTime(self, snmp_value):
-        val = int(snmp_value)
-        if not val:
-            return None
-        return val
+        return extract_int(snmp_value)
 
     @snmp_property("1.3.6.1.4.1.4115.1.20.1.1.2.2.1.39.200")
     def lanParentalControlsEnable(self, snmp_value):
-        return snmp_value
-
-    @snmp_property("1.3.6.1.4.1.4115.1.3.3.1.1.1.3.1")
-    def devMaxCpeAllowed(self, snmp_value):
-        return snmp_value
-
-    @snmp_property("1.3.6.1.4.1.4115.1.3.3.1.1.1.3.2")
-    def devNetworkAccess(self, snmp_value):
-        return snmp_value
-
-    @snmp_property("1.3.6.1.4.1.4115.1.20.1.1.5.6.0")
-    def language(self, snmp_value):
-        return snmp_value
-
-    @snmp_property("1.3.6.1.4.1.4115.1.20.1.1.5.62.0")
-    def firstInstallWizardCompleted(self, snmp_value):
-        return snmp_value == "1"
-
-    @snmp_property("1.3.6.1.4.1.4115.1.20.1.1.1.12.4.0")
-    def wanIPv4LeaseExpiryDate(self, snmp_value):
-        if snmp_value == '$0000000000000000':
-            return None
-        return _extract_date(snmp_value)
-
-    @snmp_property("1.3.6.1.4.1.4115.1.20.1.1.1.12.3.0")
-    def wanIPv4LeaseTimeSecsRemaining(self, snmp_value):
-        "No of seconds remaining of the DHCP lease of the WAN IP address"
-        return int(snmp_value)
-
-    @snmp_property("1.3.6.1.4.1.4115.1.20.1.1.1.7.1.3.2")
-    def wanIPv6Addr(self, snmp_value):
-        "Current external IPv6 address of hub"
-        return  extract_ipv6(snmp_value)
-
-    @snmp_property("1.3.6.1.4.1.4115.1.20.1.1.1.7.1.6.2")
-    def wanIPv6Gateway(self, snmp_value):
-        "Default IPv6 gateway"
-        return  extract_ipv6(snmp_value)
-
-    @snmp_property("1.3.6.1.4.1.4115.1.3.4.1.3.8.0")
-    def cmDoc30SetupPacketCableRegion(self, snmp_value):
-        "TODO: Figure out what this is..."
-        return int(snmp_value)
-
-    @snmp_property("1.3.6.1.4.1.4491.2.1.14.1.5.4.0")
-    def esafeErouterInitModeCtrl(self, snmp_value):
-        "TODO: Figure out what this is..."
-        return int(snmp_value)
-
-    @snmp_property("1.3.6.1.4.1.4115.1.20.1.1.5.16.1.2.1")
-    def authUserName(self, snmp_value):
-        """The name of the admin user"""
         return snmp_value
 
     @snmp_property("1.3.6.1.4.1.4115.1.20.1.1.3.22.1.2.10001")
@@ -642,6 +660,54 @@ class Hub:
     def wifi5GHzPassword(self, snmp_value):
         return snmp_value
 
+    @snmp_property("1.3.6.1.4.1.4115.1.20.1.1.5.6.0")
+    def language(self, snmp_value):
+        return snmp_value
+
+    @snmp_property("1.3.6.1.4.1.4115.1.20.1.1.5.7.0")
+    def name(self, snmp_value):
+        "The name the hub calls itself"
+        return snmp_value
+
+    @snmp_property("1.3.6.1.4.1.4115.1.20.1.1.5.8.0")
+    def serial_number(self, snmp_value):
+        "Serial number of the hub"
+        return snmp_value
+
+    @snmp_property("1.3.6.1.4.1.4115.1.20.1.1.5.9.0")
+    def bootcode_version(self, snmp_value):
+        "Presumably the IPL firmware version?"
+        return snmp_value
+
+    @snmp_property("1.3.6.1.4.1.4115.1.20.1.1.5.10.0")
+    def hardware_version(self, snmp_value):
+        "Hardware version of the hub"
+        return snmp_value
+
+    @snmp_property("1.3.6.1.4.1.4115.1.20.1.1.5.11.0")
+    def firmware_version(self, snmp_value):
+        """Software version of the hub."""
+        return snmp_value
+
+    @snmp_property("1.3.6.1.4.1.4115.1.20.1.1.5.14.0")
+    def customer_id(self, snmp_value):
+        "The value 8 appears to indicate Virgin Media"
+        return snmp_value
+
+    @snmp_property("1.3.6.1.4.1.4115.1.20.1.1.5.16.1.2.1")
+    def authUserName(self, snmp_value):
+        """The name of the admin user"""
+        return snmp_value
+
+    @snmp_property("1.3.6.1.4.1.4115.1.20.1.1.5.62.0")
+    def firstInstallWizardCompleted(self, snmp_value):
+        return snmp_value == "1"
+
+    @snmp_property("1.3.6.1.4.1.4491.2.1.14.1.5.4.0")
+    def esafeErouterInitModeCtrl(self, snmp_value):
+        "TODO: Figure out what this is..."
+        return int(snmp_value)
+
     @collect_stats
     def deviceList(self):
         """Iterator which retrieves devices known to the hub.
@@ -655,7 +721,7 @@ class Hub:
         """
         mac_prefix = "1.3.6.1.4.1.4115.1.20.1.1.2.4.2.1.4.200.1.4"
         for iod, mac in list(self.snmp_walk(mac_prefix).items()):
-            yield DeviceInfo(self, iod[len(mac_prefix)+1:], extract_map(mac))
+            yield DeviceInfo(self, iod[len(mac_prefix)+1:], extract_mac(mac))
 
     def getDevice(self, ipv4_address):
         """Get information for the given device
@@ -669,7 +735,7 @@ class Hub:
         mac = self.snmp_get("1.3.6.1.4.1.4115.1.20.1.1.2.4.2.1.4.200.1.4.%s" % ipv4_address)
         if not mac:
             return None
-        return DeviceInfo(self, ipv4_address, extract_map(mac))
+        return DeviceInfo(self, ipv4_address, extract_mac(mac))
 
     @collect_stats
     def portForwardings(self):
@@ -697,9 +763,9 @@ class Hub:
             if column == 2:
                 pf_list[seq-1].desc = value
             elif column == 3:
-                pf_list[seq-1].ext_port_start = int(value)
+                pf_list[seq-1].ext_port_start = extract_int(value)
             elif column == 4:
-                pf_list[seq-1].ext_port_end = int(value)
+                pf_list[seq-1].ext_port_end = extract_int(value)
             elif column == 5:
                 if value == "0":
                     pf_list[seq-1].protocol = 'UDP'
@@ -712,9 +778,9 @@ class Hub:
                 pf_list[seq-1].local_ip = extract_ip(value)
             # Column 8 does not exist
             elif column == 9:
-                pf_list[seq-1].local_port_start = int(value)
+                pf_list[seq-1].local_port_start = extract_int(value)
             elif column == 10:
-                pf_list[seq-1].local_port_end = int(value)
+                pf_list[seq-1].local_port_end = extract_int(value)
             elif column == 11:
                 pf_list[seq-1].enabled = (value == "1")
             # Column 12 does not exist
@@ -725,100 +791,6 @@ class Hub:
             # !??
 
         return pf_list
-        # sample response from snmpwalk:
-        # {
-        #     "1.3.6.1.4.1.4115.1.20.1.1.4.12.1.2.1":"",
-        #     "1.3.6.1.4.1.4115.1.20.1.1.4.12.1.2.2":"",
-        #     "1.3.6.1.4.1.4115.1.20.1.1.4.12.1.2.3":"",
-        #     "1.3.6.1.4.1.4115.1.20.1.1.4.12.1.2.4":"",
-        #     "1.3.6.1.4.1.4115.1.20.1.1.4.12.1.2.5":"",
-        #     "1.3.6.1.4.1.4115.1.20.1.1.4.12.1.2.6":"",
-        #     "1.3.6.1.4.1.4115.1.20.1.1.4.12.1.2.7":"",
-        #     "1.3.6.1.4.1.4115.1.20.1.1.4.12.1.2.8":"",
-        #     "1.3.6.1.4.1.4115.1.20.1.1.4.12.1.2.9":"",
-        #     "1.3.6.1.4.1.4115.1.20.1.1.4.12.1.3.1":"22",
-        #     "1.3.6.1.4.1.4115.1.20.1.1.4.12.1.3.2":"25",
-        #     "1.3.6.1.4.1.4115.1.20.1.1.4.12.1.3.3":"53",
-        #     "1.3.6.1.4.1.4115.1.20.1.1.4.12.1.3.4":"143",
-        #     "1.3.6.1.4.1.4115.1.20.1.1.4.12.1.3.5":"465",
-        #     "1.3.6.1.4.1.4115.1.20.1.1.4.12.1.3.6":"587",
-        #     "1.3.6.1.4.1.4115.1.20.1.1.4.12.1.3.7":"993",
-        #     "1.3.6.1.4.1.4115.1.20.1.1.4.12.1.3.8":"1194",
-        #     "1.3.6.1.4.1.4115.1.20.1.1.4.12.1.3.9":"27",
-        #     "1.3.6.1.4.1.4115.1.20.1.1.4.12.1.4.1":"22",
-        #     "1.3.6.1.4.1.4115.1.20.1.1.4.12.1.4.2":"25",
-        #     "1.3.6.1.4.1.4115.1.20.1.1.4.12.1.4.3":"53",
-        #     "1.3.6.1.4.1.4115.1.20.1.1.4.12.1.4.4":"143",
-        #     "1.3.6.1.4.1.4115.1.20.1.1.4.12.1.4.5":"465",
-        #     "1.3.6.1.4.1.4115.1.20.1.1.4.12.1.4.6":"587",
-        #     "1.3.6.1.4.1.4115.1.20.1.1.4.12.1.4.7":"993",
-        #     "1.3.6.1.4.1.4115.1.20.1.1.4.12.1.4.8":"1194",
-        #     "1.3.6.1.4.1.4115.1.20.1.1.4.12.1.4.9":"28",
-        #     "1.3.6.1.4.1.4115.1.20.1.1.4.12.1.5.1":"1",
-        #     "1.3.6.1.4.1.4115.1.20.1.1.4.12.1.5.2":"1",
-        #     "1.3.6.1.4.1.4115.1.20.1.1.4.12.1.5.3":"2",
-        #     "1.3.6.1.4.1.4115.1.20.1.1.4.12.1.5.4":"1",
-        #     "1.3.6.1.4.1.4115.1.20.1.1.4.12.1.5.5":"1",
-        #     "1.3.6.1.4.1.4115.1.20.1.1.4.12.1.5.6":"1",
-        #     "1.3.6.1.4.1.4115.1.20.1.1.4.12.1.5.7":"1",
-        #     "1.3.6.1.4.1.4115.1.20.1.1.4.12.1.5.8":"0",
-        #     "1.3.6.1.4.1.4115.1.20.1.1.4.12.1.5.9":"0",
-        #     "1.3.6.1.4.1.4115.1.20.1.1.4.12.1.6.1":"1",
-        #     "1.3.6.1.4.1.4115.1.20.1.1.4.12.1.6.2":"1",
-        #     "1.3.6.1.4.1.4115.1.20.1.1.4.12.1.6.3":"1",
-        #     "1.3.6.1.4.1.4115.1.20.1.1.4.12.1.6.4":"1",
-        #     "1.3.6.1.4.1.4115.1.20.1.1.4.12.1.6.5":"1",
-        #     "1.3.6.1.4.1.4115.1.20.1.1.4.12.1.6.6":"1",
-        #     "1.3.6.1.4.1.4115.1.20.1.1.4.12.1.6.7":"1",
-        #     "1.3.6.1.4.1.4115.1.20.1.1.4.12.1.6.8":"1",
-        #     "1.3.6.1.4.1.4115.1.20.1.1.4.12.1.6.9":"1",
-        #     "1.3.6.1.4.1.4115.1.20.1.1.4.12.1.7.1":"$c0a80020",
-        #     "1.3.6.1.4.1.4115.1.20.1.1.4.12.1.7.2":"$c0a80020",
-        #     "1.3.6.1.4.1.4115.1.20.1.1.4.12.1.7.3":"$c0a80020",
-        #     "1.3.6.1.4.1.4115.1.20.1.1.4.12.1.7.4":"$c0a80020",
-        #     "1.3.6.1.4.1.4115.1.20.1.1.4.12.1.7.5":"$c0a80020",
-        #     "1.3.6.1.4.1.4115.1.20.1.1.4.12.1.7.6":"$c0a80020",
-        #     "1.3.6.1.4.1.4115.1.20.1.1.4.12.1.7.7":"$c0a80020",
-        #     "1.3.6.1.4.1.4115.1.20.1.1.4.12.1.7.8":"$c0a80020",
-        #     "1.3.6.1.4.1.4115.1.20.1.1.4.12.1.7.9":"$c0a80004",
-        #     "1.3.6.1.4.1.4115.1.20.1.1.4.12.1.9.1":"22",
-        #     "1.3.6.1.4.1.4115.1.20.1.1.4.12.1.9.2":"25",
-        #     "1.3.6.1.4.1.4115.1.20.1.1.4.12.1.9.3":"53",
-        #     "1.3.6.1.4.1.4115.1.20.1.1.4.12.1.9.4":"143",
-        #     "1.3.6.1.4.1.4115.1.20.1.1.4.12.1.9.5":"465",
-        #     "1.3.6.1.4.1.4115.1.20.1.1.4.12.1.9.6":"587",
-        #     "1.3.6.1.4.1.4115.1.20.1.1.4.12.1.9.7":"993",
-        #     "1.3.6.1.4.1.4115.1.20.1.1.4.12.1.9.8":"1194",
-        #     "1.3.6.1.4.1.4115.1.20.1.1.4.12.1.9.9":"25",
-        #     "1.3.6.1.4.1.4115.1.20.1.1.4.12.1.10.1":"22",
-        #     "1.3.6.1.4.1.4115.1.20.1.1.4.12.1.10.2":"25",
-        #     "1.3.6.1.4.1.4115.1.20.1.1.4.12.1.10.3":"53",
-        #     "1.3.6.1.4.1.4115.1.20.1.1.4.12.1.10.4":"143",
-        #     "1.3.6.1.4.1.4115.1.20.1.1.4.12.1.10.5":"465",
-        #     "1.3.6.1.4.1.4115.1.20.1.1.4.12.1.10.6":"587",
-        #     "1.3.6.1.4.1.4115.1.20.1.1.4.12.1.10.7":"993",
-        #     "1.3.6.1.4.1.4115.1.20.1.1.4.12.1.10.8":"1194",
-        #     "1.3.6.1.4.1.4115.1.20.1.1.4.12.1.10.9":"26",
-        #     "1.3.6.1.4.1.4115.1.20.1.1.4.12.1.11.1":"1",
-        #     "1.3.6.1.4.1.4115.1.20.1.1.4.12.1.11.2":"1",
-        #     "1.3.6.1.4.1.4115.1.20.1.1.4.12.1.11.3":"1",
-        #     "1.3.6.1.4.1.4115.1.20.1.1.4.12.1.11.4":"1",
-        #     "1.3.6.1.4.1.4115.1.20.1.1.4.12.1.11.5":"1",
-        #     "1.3.6.1.4.1.4115.1.20.1.1.4.12.1.11.6":"1",
-        #     "1.3.6.1.4.1.4115.1.20.1.1.4.12.1.11.7":"1",
-        #     "1.3.6.1.4.1.4115.1.20.1.1.4.12.1.11.8":"1",
-        #     "1.3.6.1.4.1.4115.1.20.1.1.4.12.1.11.9":"1",
-        #     "1.3.6.1.4.1.4115.1.20.1.1.4.12.1.14.1":"0",
-        #     "1.3.6.1.4.1.4115.1.20.1.1.4.12.1.14.2":"0",
-        #     "1.3.6.1.4.1.4115.1.20.1.1.4.12.1.14.3":"0",
-        #     "1.3.6.1.4.1.4115.1.20.1.1.4.12.1.14.4":"0",
-        #     "1.3.6.1.4.1.4115.1.20.1.1.4.12.1.14.5":"0",
-        #     "1.3.6.1.4.1.4115.1.20.1.1.4.12.1.14.6":"0",
-        #     "1.3.6.1.4.1.4115.1.20.1.1.4.12.1.14.7":"0",
-        #     "1.3.6.1.4.1.4115.1.20.1.1.4.12.1.14.8":"0",
-        #     "1.3.6.1.4.1.4115.1.20.1.1.4.12.1.14.9":"0",
-        #     "1":"Finish"
-        # }
 
 class PortForward(object):
     """Object to represent a port forwarding rule.
@@ -939,7 +911,7 @@ def _demo():
             try:
                 val = getattr(hub, name)
                 print('-', name, ":", val.__class__.__name__, ":", val)
-            except Exception as e:
+            except Exception:
                 print("Problem with property", name)
                 raise
 
@@ -948,8 +920,8 @@ def _demo():
             print("-", dev)
 
         print("Session counters:")
-        for c in sorted(hub.counters):
-            print('-', c, hub.counters[c])
+        for counter in sorted(hub.counters):
+            print('-', counter, hub.counters[counter])
 
 if __name__ == '__main__':
     _demo()
