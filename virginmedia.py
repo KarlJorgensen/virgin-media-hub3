@@ -795,13 +795,21 @@ class PortForward(object):
         self.enabled = enabled
 
     def __str__(self):
-        return ("PortForward: [{idx}] : {ext_port_start}-{ext_port_end} "
-                + "=> {local_ip}:{local_port_start}-{local_port_end} {protocol}") \
+        def portsummary(start, end):
+            """Summarise a port range.
+
+            If the start and end are the same, then we only want to show
+            the single port number
+
+            """
+            if start == end:
+                return str(start)
+            return "{0}-{1}".format(start, end)
+        return ("PortForward: [{idx}] : {ext_port} "
+                + "=> {local_ip}:{local_port} {protocol}") \
             .format(idx=self.idx,
-                    ext_port_start=self.ext_port_start,
-                    ext_port_end=self.ext_port_end,
-                    local_port_start=self.local_port_start,
-                    local_port_end=self.local_port_end,
+                    ext_port=portsummary(self.ext_port_start, self.ext_port_end),
+                    local_port=portsummary(self.local_port_start, self.local_port_end),
                     protocol=self.protocol,
                     local_ip=self.local_ip)
 
