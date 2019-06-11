@@ -677,8 +677,9 @@ class Hub:
             column = int(oid.split('.')[0])
 
             # Odd: no column 1 !?
-            # TODO: Figure out what column 2 is - always ""
-            if column == 3:
+            if column == 2:
+                pf_list[seq-1].desc = value
+            elif column == 3:
                 pf_list[seq-1].ext_port_start = int(value)
             elif column == 4:
                 pf_list[seq-1].ext_port_end = int(value)
@@ -689,18 +690,22 @@ class Hub:
                     pf_list[seq-1].protocol = 'TCP'
                 else:
                     pf_list[seq-1].protocol = 'BOTH'
-            # TODO: Figure out what column 6 is - always set to "1" ??
-            # Odd: There is no column 8!
+            # Column 6: arrisRouterFWVirtSrvIPAddrType : "1" seems to mean IPV4
             elif column == 7:
                 pf_list[seq-1].local_ip = _extract_ip(value)
+            # Column 8 does not exist
             elif column == 9:
                 pf_list[seq-1].local_port_start = int(value)
             elif column == 10:
                 pf_list[seq-1].local_port_end = int(value)
-            # TODO: Figure out what column 11 is - always set to "1" ??
-            # Odd: There is no column 12!
-            # Odd: There is no column 13!
-            # TODO: Figure out what column 14 is - always set to "0" ??
+            elif column == 11:
+                pf_list[seq-1].enabled = (value == "1")
+            # Column 12 does not exist
+            # Column 13 does not exist
+            #
+            # Column 14: arrisRouterFWSrvTr69InstanceID - some unique
+            # ID of the table according to dox, but always set to "0"
+            # !??
 
         return pf_list
         # sample response from snmpwalk:
@@ -805,6 +810,7 @@ class PortForward(object):
     """
     def __init__(self,
                  idx=None,
+                 desc=None,
                  local_ip=None,
                  local_port_start=None,
                  local_port_end=None,
@@ -813,6 +819,7 @@ class PortForward(object):
                  protocol='TCP',
                  enabled=True):
         self.idx = idx
+        self.desc = desc
         self.local_ip = local_ip
         self.local_port_start = local_port_start
         self.local_port_end = local_port_end
@@ -833,12 +840,14 @@ class PortForward(object):
                 return str(start)
             return "{0}-{1}".format(start, end)
         return ("PortForward: [{idx}] : {protocol}/{ext_port} "
-                + "=> {local_ip}:{local_port}") \
-            .format(idx=self.idx,
-                    ext_port=portsummary(self.ext_port_start, self.ext_port_end),
-                    local_port=portsummary(self.local_port_start, self.local_port_end),
-                    protocol=self.protocol,
-                    local_ip=self.local_ip)
+                + "=> {local_ip}:{local_port} {enabled}") \
+                .format(idx=self.idx,
+                        ext_port=portsummary(self.ext_port_start, self.ext_port_end),
+                        local_port=portsummary(self.local_port_start, self.local_port_end),
+                        protocol=self.protocol,
+                        local_ip=self.local_ip,
+                        enabled="Enabled" if self.enabled else "Disabled",
+                        desc="" if not self.desc else '- ' + self.desc)
 
 # Some properties cannot be snmpGet()'ed - they have to be snmpWalk()'ed instead??
 _snmpWalks = [
