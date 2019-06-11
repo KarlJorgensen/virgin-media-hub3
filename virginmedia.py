@@ -14,6 +14,7 @@ import datetime
 from types import MethodType
 import os
 import functools
+import itertools
 import textwrap
 import requests
 
@@ -81,6 +82,19 @@ def extract_ipv6(hexvalue):
     for chunk in range(5, 30, 4):
         res += ':' + hexvalue[chunk:chunk+4]
     return res
+
+def extract_ip_generic(hexvalue, addrtype):
+    """Transform a hex value into an ip address.
+
+    The address type controls the conversion made
+
+    """
+    if addrtype == "1":
+        return extract_ip(hexvalue)
+    if addrtype == "2":
+        return extract_ipv6(hexvalue)
+
+    return "Unknown:{hexvalue=%s, addrtype=%s}" % (hexvalue, addrtype)
 
 def extract_mac(mac):
     """Extract a mac address from the hub response.
@@ -158,6 +172,59 @@ def snmp_property(oid):
             return function(*args, **kwargs)
         KNOWN_PROPERTIES.add(function.__name__)
         return property(wrapper)
+    return real_wrapper
+
+def snmp_table(top_oid, columns):
+    """A function decorator which does a walk of an snmp table
+
+    The function gets passed an extra keyword argument: table_rows,
+    which is an array of namespace objects, where the columns can be
+    referenced by name.
+
+    The "columns" parameter to the decorator describes the columns: It
+    is expected to be a dicts, where the key is the (partial) OID
+    number of the column, and the value indicates the column name.
+
+    columns = {"1": "columnname1"
+               "2": "columnname2"}
+
+    if the SNMP walk returns columns not listed in the dict, they will
+    be ignored.
+
+    """
+    def real_wrapper(func):
+        def col_num(walked_oid):
+            return walked_oid[len(top_oid)+1:].split('.')[0]
+
+        def row_num(walked_oid):
+            return int(walked_oid[len(top_oid)+1:].split('.')[1])
+
+        class Row:
+            """A class that creates attributes dynamically"""
+            def __init__(self, col_values):
+                for colname in columns.values():
+                    setattr(self, colname, None)
+                for ccc in col_values:
+                    if col_num(ccc[0]) in columns.keys():
+                        setattr(self, columns[col_num(ccc[0])], ccc[1])
+
+            def __str__(self):
+                res = "Row(" + \
+                    ", ".join(["%s=%s" %(colname, getattr(self, colname))
+                               for colname in columns.values()]) + ")"
+                return res
+
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs):
+            self = args[0]
+            results = list(self.snmp_walk(top_oid).items())
+            results.sort(key=lambda x: (row_num(x[0]), col_num(x[0])))
+
+            kwargs['table_rows'] = [Row(val)
+                                    for (dummy, val) in itertools.groupby(results,
+                                                                          lambda x: row_num(x[0]))]
+            return func(*args, **kwargs)
+        return listed_property(wrapper)
     return real_wrapper
 
 class Hub:
@@ -530,7 +597,10 @@ class Hub:
 
     @property
     @listed_property
-    def dns_servers(self):
+    @snmp_table("1.3.6.1.4.1.4115.1.20.1.1.1.11.2.1",
+                {"2": "addrtype",
+                 "3": "address"})
+    def dns_servers(self, table_rows):
         """DNS servers used by the hub.
 
         This will probably also be the DNS servers the hub hands out
@@ -540,10 +610,8 @@ class Hub:
         representing an IP address.
 
         """
-        # TODO: This assumes ipv4 addresses, although the hub also supports ipv6...
-        # TODO: This should be replaced by smtp_walk - together with wanCurrentDNSIPAddrType
-        res = self.snmp_walk("1.3.6.1.4.1.4115.1.20.1.1.1.11.2.1.3")
-        return list(map(extract_ip, res.values()))
+        return [extract_ip_generic(x.address, x.addrtype)
+                for x in table_rows]
 
     @snmp_property("1.3.6.1.4.1.4115.1.20.1.1.1.13.0")
     def wan_if_macaddr(self, snmp_value):
@@ -553,11 +621,6 @@ class Hub:
 
         """
         return extract_mac(snmp_value)
-
-    @snmp_property("1.3.6.1.4.1.4115.1.20.1.1.1.11.2.1.2")
-    def wanCurrentDNSIPAddrType(self, snmp_value):
-        # TODO: This should be replaced by an snmp_walk - together with dns_servers
-        return snmp_value
 
     @snmp_property("1.3.6.1.4.1.4115.1.20.1.1.1.12.3.0")
     def wan_dhcp_duration_ipv4(self, snmp_value):
