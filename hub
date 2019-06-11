@@ -93,6 +93,7 @@ def wansettings(hub, args):
                         "wanMTUSize",
                         "wanIPv6Addr",
                         "wanIPv6Gateway",
+                        "wanHostname",
                         "dns_servers"
                         ])
 
