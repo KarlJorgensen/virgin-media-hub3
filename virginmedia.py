@@ -174,6 +174,8 @@ class Hub:
             }
         self._nonce_str = "_n=%s&_=%s" % (self._nonce["_n"], self._nonce["_"])
         self.counters = {}
+        self._modelname = None
+        self._family = None
         if kwargs:
             self.login(**kwargs)
 
