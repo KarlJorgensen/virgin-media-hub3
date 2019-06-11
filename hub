@@ -162,6 +162,10 @@ def main():
         cmd_parser.set_defaults(func=cmd)
 
     args = parser.parse_args()
+    if not hasattr(args, "func"):
+        parser.print_usage()
+        raise SystemExit()
+
     try:
         needs_login = args.func.needs_login
     except AttributeError:
