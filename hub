@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/python3
 """General command-line interface to the Virgin Media Hub3
 
 """
@@ -13,7 +13,7 @@ def subcommand(func):
     SUBCOMMANDS.append(func)
     return func
 
-class Args(object):
+class Args:
     """A function decorator that adds arguments to a subcommand.
 
     It should be passed an array of (args, kwargs) - these will be
@@ -40,7 +40,7 @@ def nohub(func):
 def dump_properties(hub, props):
     """Print the listed properties on stdout, nicely formatted"""
     for prop in props:
-        print prop, ":", getattr(hub, prop)
+        print(prop, ":", getattr(hub, prop))
 
 @subcommand
 def info(hub, args):
@@ -95,14 +95,14 @@ def wansettings(hub, args):
 def portforward_list(hub, args):
     """List current port forwardings"""
     for pfentry in hub.portForwardings():
-        print str(pfentry)
+        print(str(pfentry))
 
 @subcommand
 @nohub
 def properties(args):
     """Get a list of the known property names. Not all properties will be settable"""
     for prop in sorted(virginmedia.KNOWN_PROPERTIES):
-        print prop
+        print(prop)
 
 @subcommand
 @Args([
@@ -113,7 +113,7 @@ def properties(args):
 def get_property(hub, args):
     """Get one or more properties"""
     for prop in args.property:
-        print getattr(hub, prop)
+        print(getattr(hub, prop))
 
 @subcommand
 @Args([
@@ -126,7 +126,7 @@ def set_property(hub, args):
     Note that not all properties are settable."""
     oldvalue = getattr(hub, args.property)
     setattr(hub, args.property, args.value)
-    print "Changed", args.property, "from", oldvalue, "to", args.value
+    print("Changed", args.property, "from", oldvalue, "to", args.value)
 
 def main():
     """Main function. Obviously!"""

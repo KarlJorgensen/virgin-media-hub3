@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/python3
 """Python API for the Virgin Media Hub 3
 
 The Virgin Media Hub 3 is a re-badged Arris router - this module may
@@ -150,7 +150,7 @@ def _snmpProperty(oid):
         return property(wrapper)
     return real_wrapper
 
-class Hub(object):
+class Hub:
     """A Virgin Media Hub3.
 
     This class provides a pythonic interface to the Virgin Media Hub3.
@@ -203,16 +203,16 @@ class Hub(object):
             if resp.status_code == 401:
                 retry401 -= 1
                 if retry401 > 0 and self.is_loggedin:
-                    print "Got http status %s - Retrying after logging in again" \
-                        %(resp.status_code)
+                    print("Got http status %s - Retrying after logging in again" \
+                        %(resp.status_code))
                     self.login(username=self._username, password=self._password)
                     self._increment_counter('_get_retries_401')
                     continue
             if resp.status_code == 500:
                 retry500 -= 1
                 if retry500 > 0:
-                    print "Got http status %s - retrying after %s seconds" \
-                        % (resp.status_code, sleep)
+                    print("Got http status %s - retrying after %s seconds" \
+                        % (resp.status_code, sleep))
                     time.sleep(sleep)
                     sleep *= 2
                     self._increment_counter('_get_retries_500')
@@ -246,10 +246,10 @@ class Hub(object):
 
         resp = self._get('login',
                          retry401=0,
-                         params=self._params({"arg": base64.b64encode(username + ':' + password)}))
+                         params=self._params({"arg": base64.b64encode((username + ':' + password).encode('ascii'))}))
 
         if not resp.content:
-            raise LoginFailed("Unknown reason. Sorry. Headers were {h}".format(h=resp.headers))
+            raise LoginFailed("Unknown reason. Nothing in the response. Headers were {h}".format(h=resp.headers))
 
         try:
             attrs = json.loads(base64.b64decode(resp.content))
@@ -258,20 +258,20 @@ class Hub(object):
 
         if attrs.get("gwWan") == "f" and attrs.get("conType") == "LAN":
             if attrs.get("muti") == "GW_WAN":
-                print "Warning: Remote user has already logged in: " \
-                    "Some things may fail with HTTP 401..."
+                print("Warning: Remote user has already logged in: " \
+                    "Some things may fail with HTTP 401...")
             elif attrs.get("muti") == "LAN":
-                print "Warning: Other local user has already logged in: " \
-                    "Some things may fail with HTTP 401..."
+                print("Warning: Other local user has already logged in: " \
+                    "Some things may fail with HTTP 401...")
         elif attrs.get("gwWan") == "t":
             if attrs.get("muti") == "LAN":
-                print "Warning: Local user has already logged in: " \
-                    "Some things may fail with HTTP 401..."
+                print("Warning: Local user has already logged in: " \
+                    "Some things may fail with HTTP 401...")
             elif attrs.get("muti") == "GW_WAN":
-                print "Warning: Other remote user has already logged in: " \
-                    "Some things may fail with HTTP 401..."
+                print("Warning: Other remote user has already logged in: " \
+                    "Some things may fail with HTTP 401...")
 
-        self._credential = resp.content
+        self._credential = resp.text
         self._username = username
         self._password = password
         self._modelname = attrs.get("modelname")
@@ -338,14 +338,14 @@ class Hub(object):
         try:
             resp = json.loads(cont)
         except ValueError as e:
-            print 'Response content:', cont
+            print('Response content:', cont)
             raise
         return resp
 
     def __str__(self):
         return "Hub(hostname=%s, username=%s)" % (self._hostname, self._username)
 
-    def __nonzero__(self):
+    def __bool__(self):
         return self._credential != None
 
     @_collect_stats
@@ -354,7 +354,7 @@ class Hub(object):
 
     @_collect_stats
     def snmpWalk(self, oid):
-        jsondata = self._get('walk?oids=%s;%s' % (oid, self._nonce_str)).content
+        jsondata = self._get('walk?oids=%s;%s' % (oid, self._nonce_str)).text
 
         # The hub has an ANNOYING bug: Sometimes the json result
         # include the single line
@@ -366,8 +366,7 @@ class Hub(object):
         # data, our only recourse is to remove such lines before
         # attempting to interpret it as JSON... (sigh).
         #
-        jsondata = "\n".join(filter(lambda x: x != "Error in OID formatting!",
-                                    jsondata.split("\n")))
+        jsondata = "\n".join([x for x in jsondata.split("\n") if x != "Error in OID formatting!"])
 
         # print "snmpWalk of %s:" % oid
         # print jsondata
@@ -620,10 +619,8 @@ class Hub(object):
 
         """
         mac_prefix = "1.3.6.1.4.1.4115.1.20.1.1.2.4.2.1.4.200.1.4"
-        for iod, mac in self.snmpWalk(mac_prefix).items():
+        for iod, mac in list(self.snmpWalk(mac_prefix).items()):
             yield DeviceInfo(self, iod[len(mac_prefix)+1:], _extract_mac(mac))
-
-        raise StopIteration()
 
     def getDevice(self, ipv4_address):
         """Get information for the given device
@@ -648,7 +645,7 @@ class Hub(object):
         top_oid = "1.3.6.1.4.1.4115.1.20.1.1.4.12.1"
 
         data = [(iod[len(top_oid)+1:], info)
-                for (iod, info) in self.snmpWalk(top_oid).items()]
+                for (iod, info) in list(self.snmpWalk(top_oid).items())]
         data.sort(key=lambda e: [int(e[0].split('.')[1]),
                                  int(e[0].split('.')[0])])
 
@@ -825,23 +822,6 @@ class PortForward(object):
                     protocol=self.protocol,
                     local_ip=self.local_ip)
 
-snmpHelpers = [
-    ("docsisBaseCapability",                "1.3.6.1.2.1.10.127.1.1.5"),
-    ("docsBpi2CmPrivacyEnable",             "1.3.6.1.2.1.126.1.1.1.1.1"),
-    ("DSLiteWanEnable",                     "1.3.6.1.4.1.4115.1.20.1.1.1.18.1.0"),
-    ("authAccountEnabled",                  "1.3.6.1.4.1.4115.1.20.1.1.5.16.1.6.2"),
-    ("esafeErouterInitModeCtrl",            "1.3.6.1.4.1.4491.2.1.14.1.5.4.0"),
-]
-
-for the_name, the_oid in snmpHelpers:
-    def newGetter(name, oid):
-        def getter(self):
-            res = self.snmpGets(oids=[oid])
-            return res[oid]
-
-        return property(MethodType(getter, None, Hub), None, None, name)
-    setattr(Hub, the_name, newGetter(the_name, the_oid))
-
 # Some properties cannot be snmpGet()'ed - they have to be snmpWalk()'ed instead??
 _snmpWalks = [
     ("webAccessTable", "1.3.6.1.4.1.4115.1.20.1.1.6.7")
@@ -851,7 +831,7 @@ for the_name, the_oid in _snmpWalks:
     def newGetters(name, oid):
         def getter(self):
             return self.snmpWalk(oid)
-        return property(MethodType(getter, None, Hub), None, None, name)
+        return property(MethodType(getter, Hub), None, None, name)
     setattr(Hub, the_name, newGetters(the_name, the_oid))
 
 class DeviceInfo(object):
@@ -907,27 +887,22 @@ class DeviceInfo(object):
             % (self.ipv4_address, self.mac_address, self.connected, self.name)
 
 def _demo(hub):
-    print 'Demo Properties:'
+    print('Demo Properties:')
     for name in sorted(KNOWN_PROPERTIES):
         try:
             val = getattr(hub, name)
-            print '-', name, ":", val.__class__.__name__, ":", val
+            print('-', name, ":", val.__class__.__name__, ":", val)
         except Exception as e:
-            print "Problem with property", name
+            print("Problem with property", name)
             raise
 
-    print 'Old-style properties:'
-    for name, dummy in snmpHelpers + _snmpWalks:
-        print '- %s:' % name,
-        print '"%s"' % getattr(hub, name)
+    print("Device List")
+    for dev in [x for x in hub.deviceList() if x.connected]:
+        print("-", dev)
 
-    print "Device List"
-    for dev in filter(lambda x: x.connected, hub.deviceList()):
-        print "-", dev
-
-    print "Session counters:"
+    print("Session counters:")
     for c in sorted(hub.counters):
-        print '-', c, hub.counters[c]
+        print('-', c, hub.counters[c])
 
 
 def _describe_oids(hub):
@@ -935,16 +910,16 @@ def _describe_oids(hub):
         for oid in fp:
             oid = oid.rstrip('\n')
             try:
-                print oid, '=', hub.snmpGet(oid)
+                print(oid, '=', hub.snmpGet(oid))
             except Exception as e:
-                print oid, ':', e
+                print(oid, ':', e)
 
 if __name__ == '__main__':
     with Hub() as thehub:
         password = os.environ.get('HUB_PASSWORD')
         if password:
             thehub.login(password=password)
-        print "Got", thehub
+        print("Got", thehub)
         #_describe_oids(thehub)
         _demo(thehub)
 

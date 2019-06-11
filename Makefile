@@ -19,7 +19,7 @@ pylints: .hub.lint .virginmedia.py.lint
 
 # pylint exit code is a bitmask - we are only interested in fatal/error here
 .%.lint : %
-	pylint --reports=n --output-format=parseable $< ; test $$(( $$? & 3 )) -eq 0
+	pylint3 --reports=n --output-format=parseable $< ; test $$(( $$? & 3 )) -eq 0
 	touch $@
 
 router.dat : perms
