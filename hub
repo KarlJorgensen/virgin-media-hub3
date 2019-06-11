@@ -146,7 +146,9 @@ def main():
                         " - and 'admin' if that is not set",
                         default=os.environ.get("HUB_USER", "admin"))
     parser.add_argument("--password", "-p",
-                        help="Password to authenticate on the hub",
+                        help="Password to authenticate on the hub. "
+                        "Uses the HUB_PASSWORD environment variable if not specified. "
+                        "If not password is given, no login will be attempted",
                         default=os.environ.get("HUB_PASSWORD"))
     subparsers = parser.add_subparsers(help="sub-command help")
 
