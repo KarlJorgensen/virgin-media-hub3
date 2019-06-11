@@ -1,40 +1,46 @@
 #!/usr/bin/python
+"""General command-line interface to the Virgin Media Hub3
 
+"""
 import argparse
 import os
 import virginmedia
 
 SUBCOMMANDS = []
 
-def subcommand(f):
+def subcommand(func):
     """A function decorator for subcommands"""
-    SUBCOMMANDS.append(f)
-    return f
+    SUBCOMMANDS.append(func)
+    return func
 
-class args(object):
+class Args(object):
     """A function decorator that adds arguments to a subcommand.
-    It should be passed an array of (args, kwargs) - these will be used (eventually) call ArgumentParser.add_argument()
+
+    It should be passed an array of (args, kwargs) - these will be
+    used (eventually) call ArgumentParser.add_argument()
+
     """
     def __init__(self, args):
         self._args = args
 
-    def __call__(self, f):
-        f.args = self._args
-        return f
+    def __call__(self, func):
+        func.args = self._args
+        return func
 
-def nologin(f):
+def nologin(func):
     """A function decorator that flags the subcommand as not needing login"""
-    f.needs_login = False
-    return f
+    func.needs_login = False
+    return func
 
-def nohub(f):
+def nohub(func):
     """A function decorator that flags the subcommand as not needing a hub to talk to"""
-    f.needs_hub = False
-    return f
+    func.needs_hub = False
+    return func
 
 def dump_properties(hub, props):
-    for property in props:
-        print property, ":", getattr(hub, property)
+    """Print the listed properties on stdout, nicely formatted"""
+    for prop in props:
+        print prop, ":", getattr(hub, prop)
 
 @subcommand
 def info(hub, args):
@@ -86,40 +92,33 @@ def wansettings(hub, args):
 @subcommand
 def portforward_list(hub, args):
     """List current port forwardings"""
-    for x in hub.portForwardings():
-        print str(x)
-
-@subcommand
-def demo(hub, args):
-    """Run a demo of what properties we can extract from the hub. This command many be removed in the future."""
-    print "Doing demo"
-    print "Got", hub
-    #_describe_oids(hub)
-    virginmedia._demo(hub)
+    for pfentry in hub.portForwardings():
+        print str(pfentry)
 
 @subcommand
 @nohub
 def properties(args):
-    for d in sorted(virginmedia.known_properties):
-        print d
+    """Get a list of the known property names. Not all properties will be settable"""
+    for prop in sorted(virginmedia.KNOWN_PROPERTIES):
+        print prop
 
 @subcommand
-@args([
-    ( "property", { "nargs": "+", "help": "The property to retrieve", "choices": virginmedia.known_properties } )
+@Args([
+    ("property", {"nargs": "+",
+                  "help": "The property to retrieve",
+                  "choices": virginmedia.KNOWN_PROPERTIES})
 ])
-def get(hub, args):
-    """Get a specific property"""
-    for p in args.property:
-        print getattr(hub, p)
+def get_property(hub, args):
+    """Get one or more properties"""
+    for prop in args.property:
+        print getattr(hub, prop)
 
 @subcommand
-@args([
-    ( "property",  { "help": "The name of the property to set",
-                     "choices": virginmedia.known_properties
-    } ),
-    ( "value", { "help": "Value to set the property to"})
-    ])
-def set(hub, args):
+@Args([
+    ("property", {"help": "The name of the property to set",
+                  "choices": virginmedia.KNOWN_PROPERTIES}),
+    ("value", {"help": "Value to set the property to"})])
+def set_property(hub, args):
     """Set a specific property.
 
     Note that not all properties are settable."""
@@ -128,26 +127,32 @@ def set(hub, args):
     print "Changed", args.property, "from", oldvalue, "to", args.value
 
 def main():
+    """Main function. Obviously!"""
+
     parser = argparse.ArgumentParser()
     parser.add_argument("--host", "-H",
-                        help="IP Address/dns name of the hub.  Uses the HUB environment variable as a default value - and 192.168.0.1 if that is not set",
+                        help="IP Address/dns name of the hub. "
+                        "Uses the HUB environment variable as a default value"
+                        "- and 192.168.0.1 if that is not set",
                         default=os.environ.get("HUB", "192.168.0.1"))
     parser.add_argument("--username", "-u",
-                        help="User name to login as. Uses the HUB_USER environment variable as a default value - and 'admin' if that is not set",
+                        help="User name to login as. "
+                        "Uses the HUB_USER environment variable as a default value"
+                        " - and 'admin' if that is not set",
                         default=os.environ.get("HUB_USER", "admin"))
     parser.add_argument("--password", "-p",
                         help="Password to authenticate on the hub",
                         default=os.environ.get("HUB_PASSWORD"))
     subparsers = parser.add_subparsers(help="sub-command help")
 
-    for subcommand in SUBCOMMANDS:
-        cmd = subparsers.add_parser(subcommand.__name__,
-                                    help=subcommand.__doc__)
+    for cmd in SUBCOMMANDS:
+        cmd_parser = subparsers.add_parser(cmd.__name__,
+                                           help=cmd.__doc__)
 
-        if hasattr(subcommand, 'args'):
-            for a in subcommand.args:
-                cmd.add_argument(a[0], **a[1])
-        cmd.set_defaults(func=subcommand)
+        if hasattr(cmd, 'args'):
+            for arg in cmd.args:
+                cmd_parser.add_argument(arg[0], **arg[1])
+        cmd_parser.set_defaults(func=cmd)
 
     args = parser.parse_args()
     try:

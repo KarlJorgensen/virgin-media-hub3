@@ -1,6 +1,11 @@
 #!/usr/bin/python
+"""Python API for the Virgin Media Hub 3
 
-import requests
+The Virgin Media Hub 3 is a re-badged Arris router - this module may
+work for other varieties too.
+
+"""
+
 import base64
 import random
 import time
@@ -8,42 +13,63 @@ import json
 import datetime
 from types import MethodType
 import os
+import functools
+import requests
 
 class LoginFailed(IOError):
+    """Exception that indicates that logging in failed.
+
+    This usually indicates that traffic could not reach the router or
+    the router is dead... Unfortunately, it is very easy to overload
+    these routers...
+
+    """
     def __init__(self, msg):
         IOError.__init__(self, msg)
 
 class AccessDenied(IOError):
+    """The router denied the login.
+
+    Time to check username + password.
+
+    """
     def __init__(self, msg):
         IOError.__init__(self, msg)
 
-def _extract_ip(ip):
+def _extract_ip(hexvalue):
     """Extract an IP address to a sensible format.
 
     The router encodes IPv4 addresses in hex, prefixed by a dollar
     sign, e.g. "$c2a80464" => 192.168.4.100
     """
-    return (       str(int(ip[1:3],base=16))
-           + '.' + str(int(ip[3:5],base=16))
-           + '.' + str(int(ip[5:7],base=16))
-           + '.' + str(int(ip[7:9],base=16)) )
+    return (str(int(hexvalue[1:3], base=16))
+            + '.' + str(int(hexvalue[3:5], base=16))
+            + '.' + str(int(hexvalue[5:7], base=16))
+            + '.' + str(int(hexvalue[7:9], base=16)))
 
-def _extract_ipv6(ip):
+def _extract_ipv6(hexvalue):
     """Extract an IPv6 address to a sensible format
 
     The router encodes IPv6 address in hex, prefixed by a dollar sign
     """
-    if ip == "$00000000000000000000000000000000":
+    if hexvalue == "$00000000000000000000000000000000":
         return None
-    res = ip[1:5]
-    for x in range(5, 30, 4):
-        res += ':' + ip[x:x+4]
+    res = hexvalue[1:5]
+    for chunk in range(5, 30, 4):
+        res += ':' + hexvalue[chunk:chunk+4]
     return res
 
 def _extract_mac(mac):
+    """Extract a mac address from the hub response.
+
+    The hub represents mac addresses as e.g. "$787b8a6413f5" - i.e. a
+    dollar sign followed by 12 hex digits, which we need to transform
+    to the traditional mac address representation.
+
+    """
     res = mac[1:3]
-    for x in range(3,13,2):
-        res += ':' + mac[x:x+2]
+    for idx in range(3, 13, 2):
+        res += ':' + mac[idx:idx+2]
     return res
 
 def _extract_date(vmdate):
@@ -66,29 +92,14 @@ def _extract_date(vmdate):
     second = int(vmdate[13:15], base=16)
     return datetime.datetime(year, month, dom, hour, minute, second)
 
-class Namespace(object):
-    def __init__(self, keyvals):
-        self._keyvals = keyvals
-        for key in keyvals:
-            setattr(self, key, keyvals[key])
-
-    def __str__(self):
-        return "NameSpace(" + str(self._keyvals) + ")"
-
-    def prettyPrint(self, prefix=None):
-        for key in sorted(self._keyvals):
-            if prefix:
-                print prefix, key, ':', getattr(self, key)
-            else:
-                print key, ':', getattr(self, key)
-
-
-known_properties = set()
+KNOWN_PROPERTIES = set()
 
 def cache_result(function):
     """A function decorator to cache function results.
 
     This will only work for instance methods"""
+
+    @functools.wraps(function)
     def wrapper(*args, **kwargs):
         self = args[0]
         if not hasattr(self, '__result_cache'):
@@ -100,6 +111,44 @@ def cache_result(function):
         return result
     return wrapper
 
+
+def _collect_stats(func):
+    """A function decorator to count how many calls are done to the func.
+
+    it also collects timing information
+    """
+    @functools.wraps(func)
+    def wrapper(*args, **kwargs):
+        self = args[0]
+        self._increment_counter(func.__name__ + ':calls')
+        start = time.time()
+        result = func(*args, **kwargs)
+        self._increment_counter(func.__name__ + ':secs',
+                                increment=time.time()-start)
+        return result
+    return wrapper
+
+def _listed_property(func):
+    """A function decorator which adds the function to the list of known attributes"""
+    KNOWN_PROPERTIES.add(func.__name__)
+    return func
+
+def _snmpProperty(oid):
+    """A function decorator to present an MIB value as an attribute.
+
+    The function will receive an extra parameter: "snmpValue" in
+    which it gets passed the value of the oid as retrieved from
+    the hub.
+    """
+    def real_wrapper(function):
+        @functools.wraps(function)
+        def wrapper(*args, **kwargs):
+            self = args[0]
+            kwargs["snmpValue"] = self.snmpGet(oid)
+            return function(*args, **kwargs)
+        KNOWN_PROPERTIES.add(function.__name__)
+        return property(wrapper)
+    return real_wrapper
 
 class Hub(object):
     """A Virgin Media Hub3.
@@ -116,35 +165,18 @@ class Hub(object):
         self._password = None
         self._nonce = {
             "_": int(round(time.time() * 1000)),
-            "_n": "%05d" % random.randint(10000,99999)
+            "_n": "%05d" % random.randint(10000, 99999)
             }
         self._nonce_str = "_n=%s&_=%s" % (self._nonce["_n"], self._nonce["_"])
-        self.counters = { }
+        self.counters = {}
         if kwargs:
             self.login(**kwargs)
 
-    def _bump_counter(self, name, by=1):
-        """Increase a counter by (usually) 1.
+    def _increment_counter(self, name, increment=1):
+        """Increase a counter increment (usually) 1.
 
         If the counter does not exist yet, it will be created"""
-        if name in self.counters:
-            self.counters[name] += by
-        else:
-            self.counters[name] = by
-
-    def _collect_stats(function):
-        """A function decorator to count how many calls are done to the function.
-
-        it also collects timing information
-        """
-        def wrapper(*args, **kwargs):
-            self = args[0]
-            self._bump_counter(function.__name__ + ':calls')
-            start = time.time()
-            result = function(*args, **kwargs)
-            self._bump_counter(function.__name__ + ':secs', by=time.time()-start)
-            return result
-        return wrapper
+        self.counters[name] = self.counters.get(name, 0) + increment
 
     @_collect_stats
     def _get(self, url, retry401=5, retry500=3, **kwargs):
@@ -161,35 +193,41 @@ class Hub(object):
         sleep = 1
         while True:
             if self._credential:
-                r = requests.get(self._url + '/' + url, cookies={"credential": self._credential}, timeout=10, **kwargs)
+                resp = requests.get(self._url + '/' + url,
+                                    cookies={"credential": self._credential},
+                                    timeout=10,
+                                    **kwargs)
             else:
-                r = requests.get(self._url + '/' + url, timeout=10, **kwargs)
-            self._bump_counter('received_http_' + str(r.status_code))
-            if r.status_code == 401:
+                resp = requests.get(self._url + '/' + url, timeout=10, **kwargs)
+            self._increment_counter('received_http_' + str(resp.status_code))
+            if resp.status_code == 401:
                 retry401 -= 1
                 if retry401 > 0 and self.is_loggedin:
-                    print "Got http status %s - Retrying after logging in again" % (r.status_code)
+                    print "Got http status %s - Retrying after logging in again" \
+                        %(resp.status_code)
                     self.login(username=self._username, password=self._password)
-                    self._bump_counter('_get_retries_401')
+                    self._increment_counter('_get_retries_401')
                     continue
-            if r.status_code == 500:
+            if resp.status_code == 500:
                 retry500 -= 1
                 if retry500 > 0:
-                    print "Got http status %s - retrying after %s seconds" % (r.status_code, sleep)
+                    print "Got http status %s - retrying after %s seconds" \
+                        % (resp.status_code, sleep)
                     time.sleep(sleep)
                     sleep *= 2
-                    self._bump_counter('_get_retries_500')
-                    self._bump_counter('_get_retries_500_sleep_secs', by=sleep)
+                    self._increment_counter('_get_retries_500')
+                    self._increment_counter('_get_retries_500_sleep_secs',
+                                            increment=sleep)
                     continue
             break
-        r.raise_for_status()
-        if r.status_code == 401:
+        resp.raise_for_status()
+        if resp.status_code == 401:
             raise AccessDenied(url)
-        return r
+        return resp
 
     @_collect_stats
     def _params(self, keyvalues):
-        res = { }
+        res = {}
         res.update(self._nonce)
         res.update(keyvalues)
         return res
@@ -206,7 +244,9 @@ class Hub(object):
         if not username:
             username = self.authUserName
 
-        r = self._get('login', retry401=0, params = self._params( { "arg": base64.b64encode(username + ':' + password) } ) )
+        r = self._get('login',
+                      retry401=0,
+                      params=self._params({"arg": base64.b64encode(username + ':' + password)}))
 
         if not r.content:
             raise LoginFailed("Unknown reason. Sorry. Headers were {h}".format(h=r.headers))
@@ -218,14 +258,18 @@ class Hub(object):
 
         if attrs.get("gwWan") == "f" and attrs.get("conType") == "LAN":
             if attrs.get("muti") == "GW_WAN":
-                print "Warning: Remote user has already logged in: Some things may fail with HTTP 401..."
+                print "Warning: Remote user has already logged in: " \
+                    "Some things may fail with HTTP 401..."
             elif attrs.get("muti") == "LAN":
-                print "Warning: Other local user has already logged in: Some things may fail with HTTP 401..."
+                print "Warning: Other local user has already logged in: " \
+                    "Some things may fail with HTTP 401..."
         elif attrs.get("gwWan") == "t":
             if attrs.get("muti") == "LAN":
-                print "Warning: Local user has already logged in: Some things may fail with HTTP 401..."
+                print "Warning: Local user has already logged in: " \
+                    "Some things may fail with HTTP 401..."
             elif attrs.get("muti") == "GW_WAN":
-                print "Warning: Other remote user has already logged in: Some things may fail with HTTP 401..."
+                print "Warning: Other remote user has already logged in: " \
+                    "Some things may fail with HTTP 401..."
 
         self._credential = r.content
         self._username = username
@@ -233,13 +277,15 @@ class Hub(object):
 
     @property
     def is_loggedin(self):
+        """True if we have authenticated to the hub"""
         return self._credential != None
 
     @_collect_stats
     def logout(self):
+        """Logs out from the hub"""
         if self.is_loggedin:
             try:
-                self._get('logout', retry401=0, retry500=0, params= self._nonce )
+                self._get('logout', retry401=0, params=self._nonce)
             finally:
                 self._credential = None
                 self._username = None
@@ -263,25 +309,32 @@ class Hub(object):
 
     @_collect_stats
     def snmpGet(self, oid):
-        r = self.snmpGets(oids = [ oid ])
-        return r[oid]
+        """Retrieves a single SNMP value from the hub"""
+        resp = self.snmpGets(oids=[oid])
+        return resp[oid]
 
     @_collect_stats
     def snmpGets(self, oids):
-        r = self._get("snmpGet?oids=" + ';'.join(oids) + ';&' + self._nonce_str )
-        c = r.content
+        """Retrieves multiple OIDs from the hub.
+
+        oids is expected to be an iterable of OIDs.
+
+        This will return a dict, with the keys being the OIDs
+        """
+        resp = self._get("snmpGet?oids=" + ';'.join(oids) + ';&' + self._nonce_str)
+        cont = resp.content
         try:
-            r = json.loads(c)
+            resp = json.loads(cont)
         except ValueError as e:
-            print 'Response content:', c
+            print 'Response content:', cont
             raise
-        return r
+        return resp
 
     def __str__(self):
         return "Hub(hostname=%s, username=%s)" % (self._hostname, self._username)
 
     def __nonzero__(self):
-        return (self._credential != None)
+        return self._credential != None
 
     @_collect_stats
     def __del__(self):
@@ -291,7 +344,8 @@ class Hub(object):
     def snmpWalk(self, oid):
         jsondata = self._get('walk?oids=%s;%s' % (oid, self._nonce_str)).content
 
-        # The hub has an ANNOYING bug: Sometimes the json result include the single line
+        # The hub has an ANNOYING bug: Sometimes the json result
+        # include the single line
         #
         #    "Error in OID formatting!"
         #
@@ -300,7 +354,8 @@ class Hub(object):
         # data, our only recourse is to remove such lines before
         # attempting to interpret it as JSON... (sigh).
         #
-        jsondata = "\n".join(filter(lambda x:x != "Error in OID formatting!", jsondata.split("\n")))
+        jsondata = "\n".join(filter(lambda x: x != "Error in OID formatting!",
+                                    jsondata.split("\n")))
 
         # print "snmpWalk of %s:" % oid
         # print jsondata
@@ -310,45 +365,21 @@ class Hub(object):
             del result["1"]
         return result
 
-    def _listed_property(func):
-        """A function decorator which adds the function to the list of known attributes"""
-        known_properties.add(func.__name__)
-        return func
-
     @property
     @_listed_property
     def connectionType(self):
-        r = json.loads(self._get('checkConnType').content)
-        return r["conType"]
+        return json.loads(self._get('checkConnType').content)["conType"]
 
     @property
     @_listed_property
     def lanIPAddress(self):
-        r = json.loads(self._get('getPreLoginData').content)
-        return r["gwaddr"]
+        return json.loads(self._get('getPreLoginData').content)["gwaddr"]
 
     @property
     @_listed_property
     def configFile(self):
         "Nobody knows what this is for..."
-        r = json.loads(self._get('getRouterStatus').content)
-        return r["1.3.6.1.2.1.69.1.4.5.0"]
-
-    def _snmpProperty(oid):
-        """A function decorator to present an MIB value as an attribute.
-
-        The function will receive an extra parameter: "snmpValue" in
-        which it gets passed the value of the oid as retrieved from
-        the hub.
-        """
-        def real_wrapper(function):
-            def wrapper(*args, **kwargs):
-                self = args[0]
-                kwargs["snmpValue"] = self.snmpGet(oid)
-                return function(*args, **kwargs)
-            known_properties.add(function.__name__)
-            return property(wrapper)
-        return real_wrapper
+        return json.loads(self._get('getRouterStatus').content)["1.3.6.1.2.1.69.1.4.5.0"]
 
     @_snmpProperty("1.3.6.1.4.1.4115.1.20.1.1.5.14.0")
     def customerID(self, snmpValue):
@@ -359,8 +390,9 @@ class Hub(object):
     def wanIPv4Address(self, snmpValue):
         """The current external IP address of the hub"""
         x = _extract_ip(snmpValue)
-        if x == "0.0.0.0": return None
-        else: return x
+        if x == "0.0.0.0":
+            return None
+        return x
 
     @_snmpProperty("1.3.6.1.4.1.4115.1.20.1.1.1.11.2.1.3.1")
     def dns_servers(self, snmpValue):
@@ -374,16 +406,16 @@ class Hub(object):
         in which case it may be None.
         """
         if snmpValue:
-            return [ _extract_ip(snmpValue) ]
-        else:
-            return None
+            return [_extract_ip(snmpValue)]
+        return None
 
     @_snmpProperty("1.3.6.1.4.1.4115.1.20.1.1.1.7.1.6.1")
     def wanIPv4Gateway(self, snmpValue):
         """Default gateway of the hub"""
-        x = _extract_ip(snmpValue)
-        if x == "0.0.0.0": return None
-        else: return x
+        the_ip = _extract_ip(snmpValue)
+        if the_ip == "0.0.0.0":
+            return None
+        return the_ip
 
     @_snmpProperty("1.3.6.1.4.1.4115.1.20.1.1.5.10.0")
     def hardwareVersion(self, snmpValue):
@@ -407,19 +439,14 @@ class Hub(object):
 
     @_snmpProperty("1.3.6.1.4.1.4115.1.20.1.1.1.4")
     def wanMTUSize(self, snmpValue):
-        if snmpValue:
-            return int(snmpValue)
-        else:
-            return snmpValue
+        if str(snmpValue) == "":
+            return None
+        return int(snmpValue)
 
     @_snmpProperty("1.3.6.1.4.1.4115.1.20.1.1.1.17")
     def wanIPProvMode(self, snmpValue):
         if snmpValue == 1:
             return "Router"
-        return snmpValue
-
-    @_snmpProperty("1.3.6.1.4.1.4115.1.20.1.1.1.11.2.1.2")
-    def wanCurrentDNSIPAddrType(self, snmpValue):
         return snmpValue
 
     @_snmpProperty("1.3.6.1.4.1.4115.1.20.1.1.1.11.2.1.2")
@@ -463,7 +490,7 @@ class Hub(object):
 
     @_snmpProperty("1.3.6.1.4.1.4115.1.20.1.1.2.2.1.9.200")
     def lanDHCPEnabled(self, snmpValue):
-        return int(snmpValue)==1
+        return int(snmpValue) == 1
 
     @_snmpProperty("1.3.6.1.4.1.4115.1.20.1.1.2.2.1.11.200")
     def lanDHCPv4Start(self, snmpValue):
@@ -475,10 +502,10 @@ class Hub(object):
 
     @_snmpProperty("1.3.6.1.4.1.4115.1.20.1.1.2.2.1.14.200")
     def lanDHCPv4LeaseTimeSecs(self, snmpValue):
-        v = int(snmpValue)
-        if not v:
+        val = int(snmpValue)
+        if not val:
             return None
-        return v
+        return val
 
     @_snmpProperty("1.3.6.1.4.1.4115.1.20.1.1.2.2.1.29.200")
     def lanDHCPv6PrefixLength(self, snmpValue):
@@ -492,10 +519,10 @@ class Hub(object):
 
     @_snmpProperty("1.3.6.1.4.1.4115.1.20.1.1.2.2.1.33.200")
     def lanDHCPv6LeaseTime(self, snmpValue):
-        v = int(snmpValue)
-        if not v:
+        val = int(snmpValue)
+        if not val:
             return None
-        return v
+        return val
 
     @_snmpProperty("1.3.6.1.4.1.4115.1.20.1.1.2.2.1.39.200")
     def lanParentalControlsEnable(self, snmpValue):
@@ -519,8 +546,9 @@ class Hub(object):
 
     @_snmpProperty("1.3.6.1.4.1.4115.1.20.1.1.1.12.4.0")
     def wanIPv4LeaseExpiryDate(self, snmpValue):
-        if snmpValue == '$0000000000000000': return None
-        else: return _extract_date(snmpValue)
+        if snmpValue == '$0000000000000000':
+            return None
+        return _extract_date(snmpValue)
 
     @_snmpProperty("1.3.6.1.4.1.4115.1.20.1.1.1.12.3.0")
     def wanIPv4LeaseTimeSecsRemaining(self, snmpValue):
@@ -574,11 +602,14 @@ class Hub(object):
 
         This will return successive DeviceInfo instances, which can be
         queried for each device.
+
+        Beware that since the Virgin Media hub is underpowered,
+        retrieving this list will take some time...
+
         """
         mac_prefix = "1.3.6.1.4.1.4115.1.20.1.1.2.4.2.1.4.200.1.4"
         for iod, mac in self.snmpWalk(mac_prefix).items():
-            ip = iod[ len(mac_prefix)+1 : ]
-            yield DeviceInfo(self, ip, _extract_mac(mac))
+            yield DeviceInfo(self, iod[len(mac_prefix)+1:], _extract_mac(mac))
 
         raise StopIteration()
 
@@ -598,11 +629,16 @@ class Hub(object):
 
     @_collect_stats
     def portForwardings(self):
-        """Get a list of port forwardings from the hub"""
+        """Get a list of port forwardings from the hub.
+
+        This is not a lightweight operations due to the speed of the hub...
+        """
         top_oid = "1.3.6.1.4.1.4115.1.20.1.1.4.12.1"
 
-        data = [ (iod[len(top_oid)+1:], info) for (iod,info) in self.snmpWalk(top_oid).items()]
-        data.sort(key= lambda e: [int(e[0].split('.')[1]), int(e[0].split('.')[0])])
+        data = [(iod[len(top_oid)+1:], info)
+                for (iod, info) in self.snmpWalk(top_oid).items()]
+        data.sort(key=lambda e: [int(e[0].split('.')[1]),
+                                 int(e[0].split('.')[0])])
 
         pf_list = []
         for (oid, value) in data:
@@ -759,7 +795,8 @@ class PortForward(object):
         self.enabled = enabled
 
     def __str__(self):
-        return "PortForward: [{idx}] : {ext_port_start}-{ext_port_end} => {local_ip}:{local_port_start}-{local_port_end} {protocol}" \
+        return ("PortForward: [{idx}] : {ext_port_start}-{ext_port_end} "
+                + "=> {local_ip}:{local_port_start}-{local_port_end} {protocol}") \
             .format(idx=self.idx,
                     ext_port_start=self.ext_port_start,
                     ext_port_end=self.ext_port_end,
@@ -776,26 +813,26 @@ snmpHelpers = [
     ("esafeErouterInitModeCtrl",            "1.3.6.1.4.1.4491.2.1.14.1.5.4.0"),
 ]
 
-for name,oid in snmpHelpers:
+for the_name, the_oid in snmpHelpers:
     def newGetter(name, oid):
         def getter(self):
             res = self.snmpGets(oids=[oid])
             return res[oid]
 
         return property(MethodType(getter, None, Hub), None, None, name)
-    setattr(Hub, name, newGetter(name, oid))
+    setattr(Hub, the_name, newGetter(the_name, the_oid))
 
 # Some properties cannot be snmpGet()'ed - they have to be snmpWalk()'ed instead??
 _snmpWalks = [
     ("webAccessTable", "1.3.6.1.4.1.4115.1.20.1.1.6.7")
 ]
 
-for name, oid in _snmpWalks:
-    def newGetter(name, oid):
+for the_name, the_oid in _snmpWalks:
+    def newGetters(name, oid):
         def getter(self):
             return self.snmpWalk(oid)
         return property(MethodType(getter, None, Hub), None, None, name)
-    setattr(Hub, name, newGetter(name, oid))
+    setattr(Hub, the_name, newGetters(the_name, the_oid))
 
 class DeviceInfo(object):
     """Information about a device known to a hub
@@ -823,7 +860,8 @@ class DeviceInfo(object):
         For some reason, the hub "remembers" recently connected
         devices - which is useful.
         """
-        return self._hub.snmpGet("1.3.6.1.4.1.4115.1.20.1.1.2.4.2.1.14.200.1.4.%s" % self._ipv4_address) == "1"
+        return self._hub.snmpGet("1.3.6.1.4.1.4115.1.20.1.1.2.4.2.1.14.200.1.4.%s"
+                                 % self._ipv4_address) == "1"
 
     @property
     @cache_result
@@ -834,32 +872,33 @@ class DeviceInfo(object):
         the device, or possibly the mDNS name broadcasted by
         it.  Nobody knows for sure, but the hub knows somehow!
         """
-        n = self._hub.snmpGet("1.3.6.1.4.1.4115.1.20.1.1.2.4.2.1.3.200.1.4.%s" % self._ipv4_address)
-        if n == "unknown":
-            n = None
-        return n
+        thename = self._hub.snmpGet("1.3.6.1.4.1.4115.1.20.1.1.2.4.2.1.3.200.1.4.%s" % self._ipv4_address)
+        if thename == "unknown":
+            return None
+        return thename
 
     @property
     def mac_address(self):
         return self._mac_address
 
     def __str__(self):
-        return "DeviceInfo(ipv4_address=%s, mac_address=%s, connected=%s, name=%s)" % (self.ipv4_address, self.mac_address, self.connected, self.name)
+        return "DeviceInfo(ipv4_address=%s, mac_address=%s, connected=%s, name=%s)" \
+            % (self.ipv4_address, self.mac_address, self.connected, self.name)
 
 def _demo(hub):
     global snmpHelpers
 
     print 'Demo Properties:'
-    for name in sorted(known_properties):
+    for name in sorted(KNOWN_PROPERTIES):
         try:
-            v = getattr(hub, name)
-            print '-', name, ":", v.__class__.__name__, ":", v
+            val = getattr(hub, name)
+            print '-', name, ":", val.__class__.__name__, ":", val
         except Exception as e:
             print "Problem with property", name
             raise
 
     print 'Old-style properties:'
-    for name,oid in snmpHelpers + _snmpWalks:
+    for name, dummy in snmpHelpers + _snmpWalks:
         print '- %s:' % name,
         print '"%s"' % getattr(hub, name)
 
@@ -877,7 +916,6 @@ def _describe_oids(hub):
         for oid in fp:
             oid = oid.rstrip('\n')
             try:
-                r = hub.snmpGet(oid)
                 print oid, '=', hub.snmpGet(oid)
             except Exception as e:
                 print oid, ':', e
