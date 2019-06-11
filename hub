@@ -4,6 +4,7 @@
 """
 import argparse
 import os
+import json
 import virginmedia
 
 SUBCOMMANDS = []
@@ -144,6 +145,20 @@ def snmp_get(hub, args):
     """
     args.oid = args.oid.strip('.')
     print("{o} = {v}".format(o=args.oid, v=hub.snmpGet(args.oid)))
+
+@subcommand
+@Args([
+    ("oid", {"help": "OID of the SNMP property walk"})])
+def snmp_walk(hub, args):
+    """Do an SNMP walk on the hub.
+
+    The property name should be give as the OID - i.e. dot-separated
+    numbers, e.g. '1.3.6.1.4.1.4115.1.20.1.1.5.10.0'
+
+    """
+    args.oid = args.oid.strip('.')
+    res = hub.snmpWalk(args.oid)
+    print(json.dumps(res, sort_keys=True, indent=2))
 
 def main():
     """Main function. Obviously!"""
