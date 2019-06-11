@@ -14,6 +14,7 @@ import datetime
 from types import MethodType
 import os
 import functools
+import textwrap
 import requests
 
 class LoginFailed(IOError):
@@ -24,7 +25,11 @@ class LoginFailed(IOError):
     these routers...
 
     """
-    def __init__(self, msg):
+    def __init__(self, msg, resp):
+        msg = "{m}\nHTTP Status code: {s}\nResponse Headers: {h}".format(
+            m=msg,
+            s=resp.status_code,
+            h=resp.headers)
         IOError.__init__(self, msg)
 
 class AccessDenied(IOError):
@@ -249,12 +254,16 @@ class Hub:
                          params=self._params({"arg": base64.b64encode((username + ':' + password).encode('ascii'))}))
 
         if not resp.content:
-            raise LoginFailed("Unknown reason. Nothing in the response. Headers were {h}".format(h=resp.headers))
+            raise LoginFailed(textwrap.dedent(
+                """
+                No credential cookie in the response.
+                Arris is bad like that.
+                Most likely bad username/password"""), resp)
 
         try:
             attrs = json.loads(base64.b64decode(resp.content))
         except Exception:
-            raise LoginFailed(resp.content)
+            raise LoginFailed("Cannot decode json response:\n" + resp.content, resp)
 
         if attrs.get("gwWan") == "f" and attrs.get("conType") == "LAN":
             if attrs.get("muti") == "GW_WAN":
