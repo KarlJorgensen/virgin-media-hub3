@@ -149,7 +149,7 @@ def snmp_get(hub, args):
 
     """
     args.oid = args.oid.strip('.')
-    print("{o} = {v}".format(o=args.oid, v=hub.snmpGet(args.oid)))
+    print("{o} = {v}".format(o=args.oid, v=hub.snmp_get(args.oid)))
 
 @subcommand
 @Args([
@@ -162,7 +162,7 @@ def snmp_walk(hub, args):
 
     """
     args.oid = args.oid.strip('.')
-    res = hub.snmpWalk(args.oid)
+    res = hub.snmp_walk(args.oid)
     print(json.dumps(res, sort_keys=True, indent=2))
 
 def main():

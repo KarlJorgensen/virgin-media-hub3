@@ -41,7 +41,7 @@ class AccessDenied(IOError):
     def __init__(self, msg):
         IOError.__init__(self, msg)
 
-def _extract_ip(hexvalue):
+def extract_ip(hexvalue):
     """Extract an IP address to a sensible format.
 
     The router encodes IPv4 addresses in hex, prefixed by a dollar
@@ -52,7 +52,7 @@ def _extract_ip(hexvalue):
             + '.' + str(int(hexvalue[5:7], base=16))
             + '.' + str(int(hexvalue[7:9], base=16)))
 
-def _extract_ipv6(hexvalue):
+def extract_ipv6(hexvalue):
     """Extract an IPv6 address to a sensible format
 
     The router encodes IPv6 address in hex, prefixed by a dollar sign
@@ -64,7 +64,7 @@ def _extract_ipv6(hexvalue):
         res += ':' + hexvalue[chunk:chunk+4]
     return res
 
-def _extract_mac(mac):
+def extract_map(mac):
     """Extract a mac address from the hub response.
 
     The hub represents mac addresses as e.g. "$787b8a6413f5" - i.e. a
@@ -99,25 +99,7 @@ def _extract_date(vmdate):
 
 KNOWN_PROPERTIES = set()
 
-def cache_result(function):
-    """A function decorator to cache function results.
-
-    This will only work for instance methods"""
-
-    @functools.wraps(function)
-    def wrapper(*args, **kwargs):
-        self = args[0]
-        if not hasattr(self, '__result_cache'):
-            setattr(self, '__result_cache', {})
-        if function.__name__ in self.__result_cache:
-            return self.__result_cache[function.__name__]
-
-        result = self.__result_cache[function.__name__] = function(*args, **kwargs)
-        return result
-    return wrapper
-
-
-def _collect_stats(func):
+def collect_stats(func):
     """A function decorator to count how many calls are done to the func.
 
     it also collects timing information
@@ -133,23 +115,24 @@ def _collect_stats(func):
         return result
     return wrapper
 
-def _listed_property(func):
+def listed_property(func):
     """A function decorator which adds the function to the list of known attributes"""
     KNOWN_PROPERTIES.add(func.__name__)
     return func
 
-def _snmpProperty(oid):
+def snmp_property(oid):
     """A function decorator to present an MIB value as an attribute.
 
-    The function will receive an extra parameter: "snmp_value" in
-    which it gets passed the value of the oid as retrieved from
-    the hub.
+    The function will receive an extra keyword argument: "snmp_value"
+    in which it gets passed the value of the oid as retrieved from the
+    hub.
+
     """
     def real_wrapper(function):
         @functools.wraps(function)
         def wrapper(*args, **kwargs):
             self = args[0]
-            kwargs["snmp_value"] = self.snmpGet(oid)
+            kwargs["snmp_value"] = self.snmp_get(oid)
             return function(*args, **kwargs)
         KNOWN_PROPERTIES.add(function.__name__)
         return property(wrapper)
@@ -161,13 +144,14 @@ class Hub:
     This class provides a pythonic interface to the Virgin Media Hub3.
 
     """
-    def __init__(self, hostname='192.168.0.1', **kwargs):
+    def __init__(self, hostname='192.168.0.1', client_timeout=30, **kwargs):
 
         self._credential = None
         self._url = 'http://' + hostname
         self._hostname = hostname
         self._username = None
         self._password = None
+        self.client_timeout = client_timeout
         self._nonce = {
             "_": int(round(time.time() * 1000)),
             "_n": "%05d" % random.randint(10000, 99999)
@@ -185,7 +169,7 @@ class Hub:
         If the counter does not exist yet, it will be created"""
         self.counters[name] = self.counters.get(name, 0) + increment
 
-    @_collect_stats
+    @collect_stats
     def _get(self, url, retry401=5, retry500=3, **kwargs):
         """Shorthand for requests.get.
 
@@ -202,10 +186,12 @@ class Hub:
             if self._credential:
                 resp = requests.get(self._url + '/' + url,
                                     cookies={"credential": self._credential},
-                                    timeout=10,
+                                    timeout=self.client_timeout,
                                     **kwargs)
             else:
-                resp = requests.get(self._url + '/' + url, timeout=10, **kwargs)
+                resp = requests.get(self._url + '/' + url,
+                                    timeout=self.client_timeout,
+                                    **kwargs)
             self._increment_counter('received_http_' + str(resp.status_code))
             if resp.status_code == 401:
                 retry401 -= 1
@@ -232,14 +218,14 @@ class Hub:
             raise AccessDenied(url)
         return resp
 
-    @_collect_stats
+    @collect_stats
     def _params(self, keyvalues):
         res = {}
         res.update(self._nonce)
         res.update(keyvalues)
         return res
 
-    @_collect_stats
+    @collect_stats
     def login(self, username=None, password="admin"):
         """Log into the router.
 
@@ -290,13 +276,15 @@ class Hub:
         self._family = attrs.get("family")
 
     @property
-    @_listed_property
+    @listed_property
     def modelname(self):
+        """The model name of the hub"""
         return self._modelname
 
     @property
-    @_listed_property
+    @listed_property
     def family(self):
+        """The hardware family of he hub"""
         return self._family
 
     @property
@@ -304,7 +292,7 @@ class Hub:
         """True if we have authenticated to the hub"""
         return self._credential is not None
 
-    @_collect_stats
+    @collect_stats
     def logout(self):
         """Logs out from the hub"""
         if self.is_loggedin:
@@ -315,30 +303,31 @@ class Hub:
                 self._username = None
                 self._password = None
 
-    @_collect_stats
+    @collect_stats
     def __enter__(self):
         """Context manager support: Called on the way in"""
         return self
 
-    @_collect_stats
+    @collect_stats
     def __exit__(self, exc_type, exc_value, traceback):
         """Context manager support: Called on the way out"""
         try:
             self.logout()
-        except requests.exceptions.HTTPError as err:
+        except requests.exceptions.HTTPError:
             # Avoid raising exceptions on the way out if our app had a problem
             if not exc_type:
                 raise
         return False
 
-    @_collect_stats
-    def snmpGet(self, oid):
+    @collect_stats
+    @functools.lru_cache(maxsize=250)
+    def snmp_get(self, oid):
         """Retrieves a single SNMP value from the hub"""
-        resp = self.snmpGets(oids=[oid])
+        resp = self.snmp_gets(oids=[oid])
         return resp[oid]
 
-    @_collect_stats
-    def snmpGets(self, oids):
+    @collect_stats
+    def snmp_gets(self, oids):
         """Retrieves multiple OIDs from the hub.
 
         oids is expected to be an iterable of OIDs.
@@ -349,7 +338,7 @@ class Hub:
         cont = resp.content
         try:
             resp = json.loads(cont)
-        except ValueError as e:
+        except ValueError:
             print('Response content:', cont)
             raise
         return resp
@@ -360,12 +349,12 @@ class Hub:
     def __bool__(self):
         return self._credential is not None
 
-    @_collect_stats
+    @collect_stats
     def __del__(self):
         self.logout()
 
-    @_collect_stats
-    def snmpWalk(self, oid):
+    @collect_stats
+    def snmp_walk(self, oid):
         """Perfor an SNMP Walk from the given OID.
 
         The resulting data will be returned as a dict, where the keys
@@ -386,7 +375,7 @@ class Hub:
         #
         jsondata = "\n".join([x for x in jsondata.split("\n") if x != "Error in OID formatting!"])
 
-        # print "snmpWalk of %s:" % oid
+        # print "snmp_walk of %s:" % oid
         # print jsondata
         result = json.loads(jsondata)
         # Strip off the final ANNOYING "1" entry!
@@ -395,44 +384,44 @@ class Hub:
         return result
 
     @property
-    @_listed_property
+    @listed_property
     def connectionType(self):
         return json.loads(self._get('checkConnType').content)["conType"]
 
     @property
-    @_listed_property
+    @listed_property
     def lanIPAddress(self):
         return json.loads(self._get('getPreLoginData').content)["gwaddr"]
 
     @property
-    @_listed_property
+    @listed_property
     def configFile(self):
         "Nobody knows what this is for..."
         return json.loads(self._get('getRouterStatus').content)["1.3.6.1.2.1.69.1.4.5.0"]
 
-    @_snmpProperty("1.3.6.1.4.1.4115.1.20.1.1.5.14.0")
+    @snmp_property("1.3.6.1.4.1.4115.1.20.1.1.5.14.0")
     def customerID(self, snmp_value):
         "The value 8 appears to indicate Virgin Media"
         return snmp_value
 
-    @_snmpProperty("1.3.6.1.4.1.4115.1.20.1.1.1.7.1.3.1")
+    @snmp_property("1.3.6.1.4.1.4115.1.20.1.1.1.7.1.3.1")
     def wanIPv4Address(self, snmp_value):
         """The current external IP address of the hub"""
-        x = _extract_ip(snmp_value)
+        x = extract_ip(snmp_value)
         if x == "0.0.0.0":
             return None
         return x
 
-    @_snmpProperty("1.3.6.1.4.1.4115.1.20.1.1.1.7.1.8.1")
+    @snmp_property("1.3.6.1.4.1.4115.1.20.1.1.1.7.1.8.1")
     def wanIPv4NetMask(self, snmp_value):
         """The WAN network mask - e.g. '255.255.248.0'"""
-        x = _extract_ip(snmp_value)
+        x = extract_ip(snmp_value)
         if x == "0.0.0.0":
             return None
         return x
 
     @property
-    @_listed_property
+    @listed_property
     def dns_servers(self):
         """DNS servers used by the hub.
 
@@ -443,217 +432,217 @@ class Hub:
         representing an IP address.
 
         """
-        res = self.snmpWalk("1.3.6.1.4.1.4115.1.20.1.1.1.11.2.1.3")
-        return list(map(_extract_ip, res.values()))
+        res = self.snmp_walk("1.3.6.1.4.1.4115.1.20.1.1.1.11.2.1.3")
+        return list(map(extract_ip, res.values()))
 
-    @_snmpProperty("1.3.6.1.4.1.4115.1.20.1.1.1.7.1.6.1")
+    @snmp_property("1.3.6.1.4.1.4115.1.20.1.1.1.7.1.6.1")
     def wanIPv4Gateway(self, snmp_value):
         """Default gateway of the hub"""
-        the_ip = _extract_ip(snmp_value)
+        the_ip = extract_ip(snmp_value)
         if the_ip == "0.0.0.0":
             return None
         return the_ip
 
-    @_snmpProperty("1.3.6.1.4.1.4115.1.20.1.1.5.10.0")
+    @snmp_property("1.3.6.1.4.1.4115.1.20.1.1.5.10.0")
     def hardwareVersion(self, snmp_value):
         "Hardware version of the hub"
         return snmp_value
 
-    @_snmpProperty("1.3.6.1.4.1.4115.1.20.1.1.5.7.0")
+    @snmp_property("1.3.6.1.4.1.4115.1.20.1.1.5.7.0")
     def name(self, snmp_value):
         "The name the hub calls itself"
         return snmp_value
 
-    @_snmpProperty("1.3.6.1.4.1.4115.1.20.1.1.1.2.0")
+    @snmp_property("1.3.6.1.4.1.4115.1.20.1.1.1.2.0")
     def wanHostname(self, snmp_value):
         "The host name the hub presents to the ISP"
         return snmp_value
 
-    @_snmpProperty("1.3.6.1.4.1.4115.1.20.1.1.1.3.0")
+    @snmp_property("1.3.6.1.4.1.4115.1.20.1.1.1.3.0")
     def wanDomainname(self, snmp_value):
         "The domain name given to the hub by the ISP"
         return snmp_value
 
-    @_snmpProperty("1.3.6.1.4.1.4115.1.20.1.1.5.8.0")
+    @snmp_property("1.3.6.1.4.1.4115.1.20.1.1.5.8.0")
     def serialNo(self, snmp_value):
         "Serial number of the hub"
         return snmp_value
 
-    @_snmpProperty("1.3.6.1.4.1.4115.1.20.1.1.5.9.0")
+    @snmp_property("1.3.6.1.4.1.4115.1.20.1.1.5.9.0")
     def bootCodeVersion(self, snmp_value):
         "Presumably the IPL firmware version?"
         return snmp_value
 
-    @_snmpProperty("1.3.6.1.4.1.4115.1.20.1.1.5.11.0")
+    @snmp_property("1.3.6.1.4.1.4115.1.20.1.1.5.11.0")
     def softwareVersion(self, snmp_value):
         """Software version of the hub."""
         return snmp_value
 
-    @_snmpProperty("1.3.6.1.4.1.4115.1.20.1.1.1.13.0")
+    @snmp_property("1.3.6.1.4.1.4115.1.20.1.1.1.13.0")
     def wanMACAddr(self, snmp_value):
         "WAN Mac address - i.e. the mac address facing Virgin Media"
-        return _extract_mac(snmp_value)
+        return extract_map(snmp_value)
 
-    @_snmpProperty("1.3.6.1.4.1.4115.1.20.1.1.1.4.0")
+    @snmp_property("1.3.6.1.4.1.4115.1.20.1.1.1.4.0")
     def wanMTUSize(self, snmp_value):
         if str(snmp_value) == "":
             return None
         return int(snmp_value)
 
-    @_snmpProperty("1.3.6.1.4.1.4115.1.20.1.1.1.17")
+    @snmp_property("1.3.6.1.4.1.4115.1.20.1.1.1.17")
     def wanIPProvMode(self, snmp_value):
         if snmp_value == 1:
             return "Router"
         return snmp_value
 
-    @_snmpProperty("1.3.6.1.4.1.4115.1.20.1.1.1.11.2.1.2")
+    @snmp_property("1.3.6.1.4.1.4115.1.20.1.1.1.11.2.1.2")
     def wanCurrentDNSIPAddrType(self, snmp_value):
         return snmp_value
 
-    @_snmpProperty("1.3.6.1.4.1.4115.1.20.1.1.1.11.2.1.3")
+    @snmp_property("1.3.6.1.4.1.4115.1.20.1.1.1.11.2.1.3")
     def wanCurrentDNSIPAddr(self, snmp_value):
         return snmp_value
 
-    @_snmpProperty("1.3.6.1.4.1.4115.1.20.1.1.1.12.3")
+    @snmp_property("1.3.6.1.4.1.4115.1.20.1.1.1.12.3")
     def wanDHCPDuration(self, snmp_value):
         return snmp_value
 
-    @_snmpProperty("1.3.6.1.4.1.4115.1.20.1.1.1.12.4")
+    @snmp_property("1.3.6.1.4.1.4115.1.20.1.1.1.12.4")
     def wanDHCPExpire(self, snmp_value):
         return snmp_value
 
-    @_snmpProperty("1.3.6.1.4.1.4115.1.20.1.1.1.12.7")
+    @snmp_property("1.3.6.1.4.1.4115.1.20.1.1.1.12.7")
     def wanDHCPDurationV6(self, snmp_value):
         return snmp_value
 
-    @_snmpProperty("1.3.6.1.4.1.4115.1.20.1.1.1.12.8")
+    @snmp_property("1.3.6.1.4.1.4115.1.20.1.1.1.12.8")
     def wanDHCPExpireV6(self, snmp_value):
         return snmp_value
 
-    @_snmpProperty("1.3.6.1.4.1.4115.1.20.1.1.2.2.1.3.200")
+    @snmp_property("1.3.6.1.4.1.4115.1.20.1.1.2.2.1.3.200")
     def lanSubnetMask(self, snmp_value):
-        return _extract_ip(snmp_value)
+        return extract_ip(snmp_value)
 
-    @_snmpProperty("1.3.6.1.4.1.4115.1.20.1.1.2.2.1.5.200")
+    @snmp_property("1.3.6.1.4.1.4115.1.20.1.1.2.2.1.5.200")
     def lanGatewayIpv4(self, snmp_value):
-        return _extract_ip(snmp_value)
+        return extract_ip(snmp_value)
 
-    @_snmpProperty("1.3.6.1.4.1.4115.1.20.1.1.2.2.1.7.200")
+    @snmp_property("1.3.6.1.4.1.4115.1.20.1.1.2.2.1.7.200")
     def lanGatewayIp2v4(self, snmp_value):
-        ip = _extract_ip(snmp_value)
+        ip = extract_ip(snmp_value)
         if ip == '0.0.0.0':
             return None
         return ip
 
-    @_snmpProperty("1.3.6.1.4.1.4115.1.20.1.1.2.2.1.9.200")
+    @snmp_property("1.3.6.1.4.1.4115.1.20.1.1.2.2.1.9.200")
     def lanDHCPEnabled(self, snmp_value):
         return int(snmp_value) == 1
 
-    @_snmpProperty("1.3.6.1.4.1.4115.1.20.1.1.2.2.1.11.200")
+    @snmp_property("1.3.6.1.4.1.4115.1.20.1.1.2.2.1.11.200")
     def lanDHCPv4Start(self, snmp_value):
-        return _extract_ip(snmp_value)
+        return extract_ip(snmp_value)
 
-    @_snmpProperty("1.3.6.1.4.1.4115.1.20.1.1.2.2.1.13.200")
+    @snmp_property("1.3.6.1.4.1.4115.1.20.1.1.2.2.1.13.200")
     def lanDHCPv4End(self, snmp_value):
-        return _extract_ip(snmp_value)
+        return extract_ip(snmp_value)
 
-    @_snmpProperty("1.3.6.1.4.1.4115.1.20.1.1.2.2.1.14.200")
+    @snmp_property("1.3.6.1.4.1.4115.1.20.1.1.2.2.1.14.200")
     def lanDHCPv4LeaseTimeSecs(self, snmp_value):
         val = int(snmp_value)
         if not val:
             return None
         return val
 
-    @_snmpProperty("1.3.6.1.4.1.4115.1.20.1.1.2.2.1.29.200")
+    @snmp_property("1.3.6.1.4.1.4115.1.20.1.1.2.2.1.29.200")
     def lanDHCPv6PrefixLength(self, snmp_value):
         return int(snmp_value)
 
-    @_snmpProperty("1.3.6.1.4.1.4115.1.20.1.1.2.2.1.31.200")
+    @snmp_property("1.3.6.1.4.1.4115.1.20.1.1.2.2.1.31.200")
     def lanDHCPv6Start(self, snmp_value):
         if snmp_value == "$00000000000000000000000000000000":
             return None
         return snmp_value
 
-    @_snmpProperty("1.3.6.1.4.1.4115.1.20.1.1.2.2.1.33.200")
+    @snmp_property("1.3.6.1.4.1.4115.1.20.1.1.2.2.1.33.200")
     def lanDHCPv6LeaseTime(self, snmp_value):
         val = int(snmp_value)
         if not val:
             return None
         return val
 
-    @_snmpProperty("1.3.6.1.4.1.4115.1.20.1.1.2.2.1.39.200")
+    @snmp_property("1.3.6.1.4.1.4115.1.20.1.1.2.2.1.39.200")
     def lanParentalControlsEnable(self, snmp_value):
         return snmp_value
 
-    @_snmpProperty("1.3.6.1.4.1.4115.1.3.3.1.1.1.3.1")
+    @snmp_property("1.3.6.1.4.1.4115.1.3.3.1.1.1.3.1")
     def devMaxCpeAllowed(self, snmp_value):
         return snmp_value
 
-    @_snmpProperty("1.3.6.1.4.1.4115.1.3.3.1.1.1.3.2")
+    @snmp_property("1.3.6.1.4.1.4115.1.3.3.1.1.1.3.2")
     def devNetworkAccess(self, snmp_value):
         return snmp_value
 
-    @_snmpProperty("1.3.6.1.4.1.4115.1.20.1.1.5.6.0")
+    @snmp_property("1.3.6.1.4.1.4115.1.20.1.1.5.6.0")
     def language(self, snmp_value):
         return snmp_value
 
-    @_snmpProperty("1.3.6.1.4.1.4115.1.20.1.1.5.62.0")
+    @snmp_property("1.3.6.1.4.1.4115.1.20.1.1.5.62.0")
     def firstInstallWizardCompleted(self, snmp_value):
         return snmp_value == "1"
 
-    @_snmpProperty("1.3.6.1.4.1.4115.1.20.1.1.1.12.4.0")
+    @snmp_property("1.3.6.1.4.1.4115.1.20.1.1.1.12.4.0")
     def wanIPv4LeaseExpiryDate(self, snmp_value):
         if snmp_value == '$0000000000000000':
             return None
         return _extract_date(snmp_value)
 
-    @_snmpProperty("1.3.6.1.4.1.4115.1.20.1.1.1.12.3.0")
+    @snmp_property("1.3.6.1.4.1.4115.1.20.1.1.1.12.3.0")
     def wanIPv4LeaseTimeSecsRemaining(self, snmp_value):
         "No of seconds remaining of the DHCP lease of the WAN IP address"
         return int(snmp_value)
 
-    @_snmpProperty("1.3.6.1.4.1.4115.1.20.1.1.1.7.1.3.2")
+    @snmp_property("1.3.6.1.4.1.4115.1.20.1.1.1.7.1.3.2")
     def wanIPv6Addr(self, snmp_value):
         "Current external IPv6 address of hub"
-        return  _extract_ipv6(snmp_value)
+        return  extract_ipv6(snmp_value)
 
-    @_snmpProperty("1.3.6.1.4.1.4115.1.20.1.1.1.7.1.6.2")
+    @snmp_property("1.3.6.1.4.1.4115.1.20.1.1.1.7.1.6.2")
     def wanIPv6Gateway(self, snmp_value):
         "Default IPv6 gateway"
-        return  _extract_ipv6(snmp_value)
+        return  extract_ipv6(snmp_value)
 
-    @_snmpProperty("1.3.6.1.4.1.4115.1.3.4.1.3.8.0")
+    @snmp_property("1.3.6.1.4.1.4115.1.3.4.1.3.8.0")
     def cmDoc30SetupPacketCableRegion(self, snmp_value):
         "TODO: Figure out what this is..."
         return int(snmp_value)
 
-    @_snmpProperty("1.3.6.1.4.1.4491.2.1.14.1.5.4.0")
+    @snmp_property("1.3.6.1.4.1.4491.2.1.14.1.5.4.0")
     def esafeErouterInitModeCtrl(self, snmp_value):
         "TODO: Figure out what this is..."
         return int(snmp_value)
 
-    @_snmpProperty("1.3.6.1.4.1.4115.1.20.1.1.5.16.1.2.1")
+    @snmp_property("1.3.6.1.4.1.4115.1.20.1.1.5.16.1.2.1")
     def authUserName(self, snmp_value):
         """The name of the admin user"""
         return snmp_value
 
-    @_snmpProperty("1.3.6.1.4.1.4115.1.20.1.1.3.22.1.2.10001")
+    @snmp_property("1.3.6.1.4.1.4115.1.20.1.1.3.22.1.2.10001")
     def wifi24GHzESSID(self, snmp_value):
         return snmp_value
 
-    @_snmpProperty("1.3.6.1.4.1.4115.1.20.1.1.3.22.1.2.10101")
+    @snmp_property("1.3.6.1.4.1.4115.1.20.1.1.3.22.1.2.10101")
     def wifi5GHzESSID(self, snmp_value):
         return snmp_value
 
-    @_snmpProperty("1.3.6.1.4.1.4115.1.20.1.1.3.26.1.2.10001")
+    @snmp_property("1.3.6.1.4.1.4115.1.20.1.1.3.26.1.2.10001")
     def wifi24GHzPassword(self, snmp_value):
         return snmp_value
 
-    @_snmpProperty("1.3.6.1.4.1.4115.1.20.1.1.3.26.1.2.10101")
+    @snmp_property("1.3.6.1.4.1.4115.1.20.1.1.3.26.1.2.10101")
     def wifi5GHzPassword(self, snmp_value):
         return snmp_value
 
-    @_collect_stats
+    @collect_stats
     def deviceList(self):
         """Iterator which retrieves devices known to the hub.
 
@@ -665,8 +654,8 @@ class Hub:
 
         """
         mac_prefix = "1.3.6.1.4.1.4115.1.20.1.1.2.4.2.1.4.200.1.4"
-        for iod, mac in list(self.snmpWalk(mac_prefix).items()):
-            yield DeviceInfo(self, iod[len(mac_prefix)+1:], _extract_mac(mac))
+        for iod, mac in list(self.snmp_walk(mac_prefix).items()):
+            yield DeviceInfo(self, iod[len(mac_prefix)+1:], extract_map(mac))
 
     def getDevice(self, ipv4_address):
         """Get information for the given device
@@ -677,12 +666,12 @@ class Hub:
 
         If the device is not known to the hub, None will be returned.
         """
-        mac = self.snmpGet("1.3.6.1.4.1.4115.1.20.1.1.2.4.2.1.4.200.1.4.%s" % ipv4_address)
+        mac = self.snmp_get("1.3.6.1.4.1.4115.1.20.1.1.2.4.2.1.4.200.1.4.%s" % ipv4_address)
         if not mac:
             return None
-        return DeviceInfo(self, ipv4_address, _extract_mac(mac))
+        return DeviceInfo(self, ipv4_address, extract_map(mac))
 
-    @_collect_stats
+    @collect_stats
     def portForwardings(self):
         """Get a list of port forwardings from the hub.
 
@@ -691,7 +680,7 @@ class Hub:
         top_oid = "1.3.6.1.4.1.4115.1.20.1.1.4.12.1"
 
         data = [(iod[len(top_oid)+1:], info)
-                for (iod, info) in list(self.snmpWalk(top_oid).items())]
+                for (iod, info) in list(self.snmp_walk(top_oid).items())]
         data.sort(key=lambda e: [int(e[0].split('.')[1]),
                                  int(e[0].split('.')[0])])
 
@@ -720,7 +709,7 @@ class Hub:
                     pf_list[seq-1].protocol = 'BOTH'
             # Column 6: arrisRouterFWVirtSrvIPAddrType : "1" seems to mean IPV4
             elif column == 7:
-                pf_list[seq-1].local_ip = _extract_ip(value)
+                pf_list[seq-1].local_ip = extract_ip(value)
             # Column 8 does not exist
             elif column == 9:
                 pf_list[seq-1].local_port_start = int(value)
@@ -877,15 +866,15 @@ class PortForward(object):
                         enabled="Enabled" if self.enabled else "Disabled",
                         desc="" if not self.desc else '- ' + self.desc)
 
-# Some properties cannot be snmpGet()'ed - they have to be snmpWalk()'ed instead??
-_snmpWalks = [
+# Some properties cannot be snmp_get()'ed - they have to be snmp_walk()'ed instead??
+_snmp_walks = [
     ("webAccessTable", "1.3.6.1.4.1.4115.1.20.1.1.6.7")
 ]
 
-for the_name, the_oid in _snmpWalks:
+for the_name, the_oid in _snmp_walks:
     def newGetters(name, oid):
         def getter(self):
-            return self.snmpWalk(oid)
+            return self.snmp_walk(oid)
         return property(MethodType(getter, Hub), None, None, name)
     setattr(Hub, the_name, newGetters(the_name, the_oid))
 
@@ -908,18 +897,16 @@ class DeviceInfo(object):
         return self._ipv4_address
 
     @property
-    @cache_result
     def connected(self):
         """Whether the device is currently connected to the hub.
 
         For some reason, the hub "remembers" recently connected
         devices - which is useful.
         """
-        return self._hub.snmpGet("1.3.6.1.4.1.4115.1.20.1.1.2.4.2.1.14.200.1.4.%s"
-                                 % self._ipv4_address) == "1"
+        return self._hub.snmp_get("1.3.6.1.4.1.4115.1.20.1.1.2.4.2.1.14.200.1.4.%s"
+                                  % self._ipv4_address) == "1"
 
     @property
-    @cache_result
     def name(self):
         """The name the device reports to the hub.
 
@@ -927,7 +914,7 @@ class DeviceInfo(object):
         the device, or possibly the mDNS name broadcasted by
         it.  Nobody knows for sure, but the hub knows somehow!
         """
-        thename = self._hub.snmpGet("1.3.6.1.4.1.4115.1.20.1.1.2.4.2.1.3.200.1.4.%s" \
+        thename = self._hub.snmp_get("1.3.6.1.4.1.4115.1.20.1.1.2.4.2.1.3.200.1.4.%s" \
                                     % self._ipv4_address)
         if thename == "unknown":
             return None
@@ -941,42 +928,31 @@ class DeviceInfo(object):
         return "DeviceInfo(ipv4_address=%s, mac_address=%s, connected=%s, name=%s)" \
             % (self.ipv4_address, self.mac_address, self.connected, self.name)
 
-def _demo(hub):
-    print('Demo Properties:')
-    for name in sorted(KNOWN_PROPERTIES):
-        try:
-            val = getattr(hub, name)
-            print('-', name, ":", val.__class__.__name__, ":", val)
-        except Exception as e:
-            print("Problem with property", name)
-            raise
-
-    print("Device List")
-    for dev in [x for x in hub.deviceList() if x.connected]:
-        print("-", dev)
-
-    print("Session counters:")
-    for c in sorted(hub.counters):
-        print('-', c, hub.counters[c])
-
-
-def _describe_oids(hub):
-    with open('oid-list') as fp:
-        for oid in fp:
-            oid = oid.rstrip('\n')
-            try:
-                print(oid, '=', hub.snmpGet(oid))
-            except Exception as e:
-                print(oid, ':', e)
-
-if __name__ == '__main__':
-    with Hub() as thehub:
+def _demo():
+    with Hub() as hub:
         password = os.environ.get('HUB_PASSWORD')
         if password:
-            thehub.login(password=password)
-        print("Got", thehub)
-        #_describe_oids(thehub)
-        _demo(thehub)
+            hub.login(password=password)
+
+        print('Demo Properties:')
+        for name in sorted(KNOWN_PROPERTIES):
+            try:
+                val = getattr(hub, name)
+                print('-', name, ":", val.__class__.__name__, ":", val)
+            except Exception as e:
+                print("Problem with property", name)
+                raise
+
+        print("Device List")
+        for dev in [x for x in hub.deviceList() if x.connected]:
+            print("-", dev)
+
+        print("Session counters:")
+        for c in sorted(hub.counters):
+            print('-', c, hub.counters[c])
+
+if __name__ == '__main__':
+    _demo()
 
 # Local Variables:
 # compile-command: "./virginmedia.py"
