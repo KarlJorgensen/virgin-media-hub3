@@ -83,12 +83,13 @@ def wansettings(hub, args):
     dump_properties(hub,
                     [
                         "wanIPv4Address",
-                        "dns_servers",
+                        "wanIPv4NetMask",
                         "wanIPv4Gateway",
                         "wanMACAddr",
                         "wanMTUSize",
                         "wanIPv6Addr",
                         "wanIPv6Gateway",
+                        "dns_servers"
                         ])
 
 @subcommand

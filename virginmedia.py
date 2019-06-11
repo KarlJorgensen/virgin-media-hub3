@@ -416,6 +416,13 @@ class Hub:
             return None
         return x
 
+    @_snmpProperty("1.3.6.1.4.1.4115.1.20.1.1.1.7.1.8.1")
+    def wanIPv4NetMask(self, snmpValue):
+        x = _extract_ip(snmpValue)
+        if x == "0.0.0.0":
+            return None
+        return x
+
     @_snmpProperty("1.3.6.1.4.1.4115.1.20.1.1.1.11.2.1.3.1")
     def dns_servers(self, snmpValue):
         """DNS servers used by the hub.
