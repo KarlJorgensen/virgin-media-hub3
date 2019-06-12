@@ -97,6 +97,8 @@ def wanstatus(hub, args):
                         "wan_dhcp_duration_ipv6",
                         "wan_current_gw_ipv6",
 
+                        "wan_dhcp_server_ip",
+
                         "wan_conn_hostname",
                         "wan_conn_domainname",
                         "dns_servers"

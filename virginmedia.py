@@ -674,6 +674,11 @@ class Hub:
         """
         return extract_date(snmp_value)
 
+    @snmp_property("1.3.6.1.4.1.4115.1.20.1.1.1.12.9.0")
+    def wan_dhcp_server_ip(self, snmp_value):
+        """IP address of DHCP server that gave the hub a lease"""
+        return extract_ip(snmp_value)
+
     @snmp_property("1.3.6.1.4.1.4115.1.20.1.1.1.17")
     def wan_ip_prov_mode(self, snmp_value):
         """eRouter initialization mode"""
