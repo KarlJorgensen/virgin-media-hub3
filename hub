@@ -107,8 +107,11 @@ def wanstatus(hub, args):
 @subcommand
 def portforward_list(hub, args):
     """List current port forwardings"""
+
+    format = "{e.proto:<4s}/{e.ext_ports:<10s} => {e.local_addr:>15s}:{e.local_ports:<10s} {e.desc}"
+
     for pfentry in hub.portForwardings():
-        print(str(pfentry))
+        print(format.format(e=pfentry))
 
 @subcommand
 def devicelist(hub, args):

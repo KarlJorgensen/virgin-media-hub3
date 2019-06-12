@@ -847,6 +847,18 @@ class PortForwardEntry(types.SimpleNamespace):
 
     """
     @classmethod
+    def portsummary(cls, start, end):
+        """Summarise a port range.
+
+            If the start and end are the same, then we only want to show
+            the single port number
+
+        """
+        if start == end:
+            return str(start)
+        return "{0}-{1}".format(start, end)
+
+    @classmethod
     def from_snmp(cls, snmprow):
         props = snmprow._asdict()
 
@@ -862,27 +874,15 @@ class PortForwardEntry(types.SimpleNamespace):
         del props["local_addr_type"]
 
         props["proto"] = ["UDP", "TCP", "BOTH"][int(props["proto"])]
+
+        props["ext_ports"] = cls.portsummary(props["ext_port_start"], props["ext_port_end"])
+        props["local_ports"] = cls.portsummary(props["local_port_start"], props["local_port_end"])
         return cls(**props)
 
     def __str__(self):
-        def portsummary(start, end):
-            """Summarise a port range.
-
-            If the start and end are the same, then we only want to show
-            the single port number
-
-            """
-            if start == end:
-                return str(start)
-            return "{0}-{1}".format(start, end)
-        return ("{proto}/{ext_port} "
-                + "=> {local_addr}:{local_port} {enabled}") \
-                .format(ext_port=portsummary(self.ext_port_start, self.ext_port_end),
-                        local_port=portsummary(self.local_port_start, self.local_port_end),
-                        proto=self.proto,
-                        local_addr=self.local_addr,
-                        enabled="Enabled" if self.enabled else "Disabled",
-                        desc="" if not self.desc else '- ' + self.desc)
+        return (("{e.proto}/{e.ext_ports} "
+                 + "=> {e.local_addr}:{e.local_ports} {e.enabled} {e.desc}") \
+                .format(e=self))
 
 
 # Some properties cannot be snmp_get()'ed - they have to be snmp_walk()'ed instead??
