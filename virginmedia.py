@@ -11,12 +11,12 @@ import random
 import time
 import json
 import datetime
-from types import MethodType
 import os
 import functools
 import itertools
 import collections
 import textwrap
+import types
 import requests
 
 class LoginFailed(IOError):
@@ -201,8 +201,8 @@ def snmp_table(top_oid, columns):
             return int(walked_oid[len(top_oid)+1:].split('.')[1])
 
         rowcls = collections.namedtuple('SNMPRow',
-                                        field_names=list(columns.values()) + [ 'snmp_idx'],
-                                        defaults=itertools.repeat(None, len(columns)))
+                                        field_names=list(columns.values()) + ['snmp_idx'],
+                                        defaults=itertools.repeat(None, len(columns)+1))
 
         @functools.wraps(func)
         def wrapper(*args, **kwargs):
@@ -215,12 +215,12 @@ def snmp_table(top_oid, columns):
             for (dummy, val) in itertools.groupby(results,
                                                   lambda x: row_num(x[0])):
                 therow = rowcls(**{columns[col_num(ccc[0])]: ccc[1]
-                                    for ccc in val})._replace(snmp_idx=dummy)
+                                   for ccc in val})._replace(snmp_idx=dummy)
                 tr.append(therow)
 
             kwargs['table_rows'] = tr
             return func(*args, **kwargs)
-        return listed_property(wrapper)
+        return wrapper
     return real_wrapper
 
 class Hub:
@@ -821,85 +821,48 @@ class Hub:
             return None
         return DeviceInfo(self, ipv4_address, extract_mac(mac))
 
-    @collect_stats
-    def portForwardings(self):
+
+    @snmp_table("1.3.6.1.4.1.4115.1.20.1.1.4.12.1",
+                {"2": "desc",
+                 "3": "ext_port_start",
+                 "4": "ext_port_end",
+                 "5": "proto",
+                 "6": "local_addr_type",
+                 "7": "local_addr",
+                 "9": "local_port_start",
+                 "10": "local_port_end",
+                 "11": "rowstatus"})
+    def portForwardings(self, table_rows=None):
         """Get a list of port forwardings from the hub.
 
-        This is not a lightweight operations due to the speed of the hub...
+        This is not a lightweight operations due to the speed of the
+        hub...
+
         """
-        top_oid = "1.3.6.1.4.1.4115.1.20.1.1.4.12.1"
+        return [PortForwardEntry.from_snmp(x) for x in table_rows]
 
-        data = [(iod[len(top_oid)+1:], info)
-                for (iod, info) in list(self.snmp_walk(top_oid).items())]
-        data.sort(key=lambda e: [int(e[0].split('.')[1]),
-                                 int(e[0].split('.')[0])])
 
-        pf_list = []
-        for (oid, value) in data:
-            seq = int(oid.split('.')[1])
-            while len(pf_list) < seq:
-                pf_list.append(PortForward())
-
-            pf_list[seq-1].idx = seq
-            column = int(oid.split('.')[0])
-
-            # Odd: no column 1 !?
-            if column == 2:
-                pf_list[seq-1].desc = value
-            elif column == 3:
-                pf_list[seq-1].ext_port_start = extract_int(value)
-            elif column == 4:
-                pf_list[seq-1].ext_port_end = extract_int(value)
-            elif column == 5:
-                if value == "0":
-                    pf_list[seq-1].protocol = 'UDP'
-                elif value == "1":
-                    pf_list[seq-1].protocol = 'TCP'
-                else:
-                    pf_list[seq-1].protocol = 'BOTH'
-            # Column 6: arrisRouterFWVirtSrvIPAddrType : "1" seems to mean IPV4
-            elif column == 7:
-                pf_list[seq-1].local_ip = extract_ip(value)
-            # Column 8 does not exist
-            elif column == 9:
-                pf_list[seq-1].local_port_start = extract_int(value)
-            elif column == 10:
-                pf_list[seq-1].local_port_end = extract_int(value)
-            elif column == 11:
-                pf_list[seq-1].enabled = (value == "1")
-            # Column 12 does not exist
-            # Column 13 does not exist
-            #
-            # Column 14: arrisRouterFWSrvTr69InstanceID - some unique
-            # ID of the table according to dox, but always set to "0"
-            # !??
-
-        return pf_list
-
-class PortForward(object):
+class PortForwardEntry(types.SimpleNamespace):
     """Object to represent a port forwarding rule.
 
-    The "idx" attribute is the rule number from the hub
     """
-    def __init__(self,
-                 idx=None,
-                 desc=None,
-                 local_ip=None,
-                 local_port_start=None,
-                 local_port_end=None,
-                 ext_port_start=None,
-                 ext_port_end=None,
-                 protocol='TCP',
-                 enabled=True):
-        self.idx = idx
-        self.desc = desc
-        self.local_ip = local_ip
-        self.local_port_start = local_port_start
-        self.local_port_end = local_port_end
-        self.ext_port_start = ext_port_start
-        self.ext_port_end = ext_port_end
-        self.protocol = protocol
-        self.enabled = enabled
+    @classmethod
+    def from_snmp(cls, snmprow):
+        props = snmprow._asdict()
+
+        # Cast port numbers
+        for k, v in props.items():
+            if "port" in k:
+                props[k] = extract_int(v)
+
+        props["enabled"] = props["rowstatus"] == "1"
+        del props["rowstatus"]
+
+        props["local_addr"] = extract_ip_generic(props["local_addr"], props["local_addr_type"])
+        del props["local_addr_type"]
+
+        props["proto"] = ["UDP", "TCP", "BOTH"][int(props["proto"])]
+        return cls(**props)
 
     def __str__(self):
         def portsummary(start, end):
@@ -912,15 +875,15 @@ class PortForward(object):
             if start == end:
                 return str(start)
             return "{0}-{1}".format(start, end)
-        return ("PortForward: [{idx}] : {protocol}/{ext_port} "
-                + "=> {local_ip}:{local_port} {enabled}") \
-                .format(idx=self.idx,
-                        ext_port=portsummary(self.ext_port_start, self.ext_port_end),
+        return ("{proto}/{ext_port} "
+                + "=> {local_addr}:{local_port} {enabled}") \
+                .format(ext_port=portsummary(self.ext_port_start, self.ext_port_end),
                         local_port=portsummary(self.local_port_start, self.local_port_end),
-                        protocol=self.protocol,
-                        local_ip=self.local_ip,
+                        proto=self.proto,
+                        local_addr=self.local_addr,
                         enabled="Enabled" if self.enabled else "Disabled",
                         desc="" if not self.desc else '- ' + self.desc)
+
 
 # Some properties cannot be snmp_get()'ed - they have to be snmp_walk()'ed instead??
 _snmp_walks = [
@@ -931,7 +894,7 @@ for the_name, the_oid in _snmp_walks:
     def newGetters(name, oid):
         def getter(self):
             return self.snmp_walk(oid)
-        return property(MethodType(getter, Hub), None, None, name)
+        return property(types.MethodType(getter, Hub), None, None, name)
     setattr(Hub, the_name, newGetters(the_name, the_oid))
 
 class DeviceInfo(object):
@@ -998,6 +961,10 @@ def _demo():
             except Exception:
                 print("Problem with property", name)
                 raise
+
+        print("Port Forwardings")
+        for portforward in hub.portForwardings():
+            print("-", portforward)
 
         print("Device List")
         for dev in [x for x in hub.deviceList() if x.connected]:
