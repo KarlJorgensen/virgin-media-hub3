@@ -111,6 +111,12 @@ def portforward_list(hub, args):
         print(str(pfentry))
 
 @subcommand
+def devicelist(hub, args):
+    """List devices connected to the hub"""
+    for dev in hub.deviceList():
+        print(dev)
+
+@subcommand
 @nohub
 def properties(args):
     """Get a list of the known property names. Not all properties will be settable"""
