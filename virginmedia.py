@@ -500,6 +500,26 @@ class Hub:
         """Whether the hub has got network access."""
         return snmp_value == "1"
 
+    @snmp_property("1.3.6.1.4.1.4115.1.3.4.1.1.14.0")
+    def docsis_base_tod_status(self, snmp_value):
+        """The TOD status"""
+        statusmap = {
+            "0": "Not Provisioned",
+            "1": "Missing Server Address",
+            "2": "Missing Server Address",
+            "3": "Missing Server Address",
+            "4": "Starting Request",
+            "5": "Request Failed",
+            "6": "No Response Received",
+            "7": "Invalid Data Format",
+            "8": "Retrieved",
+            "9": "Failed"
+            }
+        try:
+            return statusmap[snmp_value]
+        except KeyError:
+            return "Unknown SNMP value %s" % snmp_value
+
     @snmp_property("1.3.6.1.4.1.4115.1.3.4.1.3.8.0")
     def cmDoc30SetupPacketCableRegion(self, snmp_value):
         "TODO: Figure out what this is..."
