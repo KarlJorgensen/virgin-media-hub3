@@ -15,6 +15,7 @@ from types import MethodType
 import os
 import functools
 import itertools
+import collections
 import textwrap
 import requests
 
@@ -199,30 +200,25 @@ def snmp_table(top_oid, columns):
         def row_num(walked_oid):
             return int(walked_oid[len(top_oid)+1:].split('.')[1])
 
-        class Row:
-            """A class that creates attributes dynamically"""
-            def __init__(self, col_values):
-                for colname in columns.values():
-                    setattr(self, colname, None)
-                for ccc in col_values:
-                    if col_num(ccc[0]) in columns.keys():
-                        setattr(self, columns[col_num(ccc[0])], ccc[1])
-
-            def __str__(self):
-                res = "Row(" + \
-                    ", ".join(["%s=%s" %(colname, getattr(self, colname))
-                               for colname in columns.values()]) + ")"
-                return res
+        rowcls = collections.namedtuple('SNMPRow',
+                                        field_names=list(columns.values()) + [ 'snmp_idx'],
+                                        defaults=itertools.repeat(None, len(columns)))
 
         @functools.wraps(func)
         def wrapper(*args, **kwargs):
             self = args[0]
-            results = list(self.snmp_walk(top_oid).items())
+            results = [x for x in self.snmp_walk(top_oid).items()
+                       if col_num(x[0]) in columns]
             results.sort(key=lambda x: (row_num(x[0]), col_num(x[0])))
 
-            kwargs['table_rows'] = [Row(val)
-                                    for (dummy, val) in itertools.groupby(results,
-                                                                          lambda x: row_num(x[0]))]
+            tr = []
+            for (dummy, val) in itertools.groupby(results,
+                                                  lambda x: row_num(x[0])):
+                therow = rowcls(**{columns[col_num(ccc[0])]: ccc[1]
+                                    for ccc in val})._replace(snmp_idx=dummy)
+                tr.append(therow)
+
+            kwargs['table_rows'] = tr
             return func(*args, **kwargs)
         return listed_property(wrapper)
     return real_wrapper
