@@ -512,20 +512,12 @@ class Hub:
         if datatype is not None and str(datatype.value) != "":
             oid_value += str(datatype.value)
 
-        print("snmp_setting OID: " +oid_value)
         resp = self._get("snmpSet?oid={oid};&{nonce}".format(oid=oid_value,
                                                              nonce=self._nonce_str))
         resp.raise_for_status()
-        # TODO: Verify that the response contains the correct json,
-        # listing the iods and values that were set - e.g:
-        #
-        # {
-        # "1.3.6.1.4.1.4115.1.20.1.1.4.12.1.11.5":"5"
-        # }
-
-        print("result:", resp.text)
         if not oid in resp.json().keys():
-            raise RuntimeError("Hub did not confirm setting of SNMP Value: Set {oid}, but response json said {json}" \
+            raise RuntimeError("Hub did not confirm setting of SNMP Value: " \
+                               "Set {oid}, but response json said {json}" \
                                .format(oid=oid, json=resp.json()))
 
         if resp.status_code == 304:
@@ -966,8 +958,6 @@ class Hub:
         else:
             new_idx += 1
 
-        print("New index:", new_idx)
-
         def doset(column, val, datatype):
             self.snmp_set("1.3.6.1.4.1.4115.1.20.1.1.4.12.1.{1}.{0}" \
                           .format(new_idx, column),
@@ -994,10 +984,11 @@ class Hub:
         """
         try:
             for oldentry in self.portforward_list():
-                if oldentry.ext_port_start == ext_port_start and oldentry.ext_port_end == ext_port_end  and oldentry.proto == proto:
-                    print("Removing PF index", oldentry.row_idx)
-                    print("Removing PF", oldentry)
-                    self.snmp_set("1.3.6.1.4.1.4115.1.20.1.1.4.12.1.11.{0}".format(oldentry.row_idx),
+                if oldentry.ext_port_start == ext_port_start \
+                   and oldentry.ext_port_end == ext_port_end  \
+                   and oldentry.proto == proto:
+                    self.snmp_set("1.3.6.1.4.1.4115.1.20.1.1.4.12.1.11.{0}" \
+                                  .format(oldentry.row_idx),
                                   6, # 6 seems to be a special value indicating removal?
                                   SNMPType.INT)
         finally:
