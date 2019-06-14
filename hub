@@ -108,13 +108,42 @@ def wan_status(hub, args):
 def portforward_list(hub, args):
     """List current port forwardings"""
 
-    format = "{e.proto:<4s}/{e.ext_ports:<10s} => {e.local_addr:>15s}:{e.local_ports:<10s} {e.desc}"
+    fmt = "{e.proto.name:<4s} {e.ext_ports:<10s} " \
+        "=> {e.local_addr:>15s}:{e.local_ports:<10s} {e.desc}"
 
-    for pfentry in hub.portForwardings():
-        print(format.format(e=pfentry))
+    for pfentry in hub.portforward_list():
+        print(fmt.format(e=pfentry))
 
 @subcommand
-def devicelist(hub, args):
+@Args([
+    ("protocol", {"help":"Protocol to forward",
+                  "choices": [p.name for p in virginmedia.IPProtocol]}),
+    ("external_port", {"type": int,
+                       "help": "The external port number to map"}),
+    ("internal_ip", {"help": "Internal IP address to map it to"}),
+    ("internal_port", {"type": int,
+                       "help": "The internal port number to map it to"})
+])
+def portforward_add(hub, args):
+    """Add a port forwarding entry
+
+    This directs the hub to forward incoming traffic (arriving at the
+    external interface) on that port to some port internally.
+
+    """
+    pfentry = virginmedia.PortForwardEntry(
+        local_addr_type=virginmedia.IPVersion.IPV4,
+        local_addr=args.internal_ip,
+        proto=virginmedia.IPProtocol.from_name(args.protocol),
+        ext_port_start=args.external_port,
+        ext_port_end=args.external_port,
+        local_port_start=args.internal_port,
+        local_port_end=args.internal_port,
+        )
+    hub.portforward_add(pfentry)
+
+@subcommand
+def device_list(hub, args):
     """List devices connected to the hub"""
     for dev in hub.deviceList():
         print(dev)
@@ -155,12 +184,11 @@ def property_set(hub, args):
 
 @subcommand
 @Args([
-    ("oid", {"help": "OID of the SNMP property to retrieve"})])
+    ("oid", {"help": "OID of the SNMP property to retrieve. " \
+             "This should be given as a dot-separated number string, " \
+             "e.g. '1.3.6.1.4.1.4115.1.20.1.1.5.10.0'"})])
 def snmp_get(hub, args):
     """Retrieve an SNMP property from the hub.
-
-    The property name should be give as the OID - i.e. dot-separated
-    numbers, e.g. '1.3.6.1.4.1.4115.1.20.1.1.5.10.0'
 
     """
     args.oid = args.oid.strip('.')
@@ -168,12 +196,11 @@ def snmp_get(hub, args):
 
 @subcommand
 @Args([
-    ("oid", {"help": "OID of the SNMP property walk"})])
+    ("oid", {"help": "OID of the SNMP property walk down from. " \
+             "This should be given as a dot-separated number string, " \
+             "e.g. '1.3.6.1.4.1.4115.1.20.1.1.5.10.0'"})])
 def snmp_walk(hub, args):
     """Do an SNMP walk on the hub.
-
-    The property name should be give as the OID - i.e. dot-separated
-    numbers, e.g. '1.3.6.1.4.1.4115.1.20.1.1.5.10.0'
 
     """
     args.oid = args.oid.strip('.')
@@ -202,7 +229,7 @@ def main():
     subparsers = parser.add_subparsers(help="sub-command help")
 
     for cmd in SUBCOMMANDS:
-        cmd_parser = subparsers.add_parser(cmd.__name__.lower().replace('_','-'),
+        cmd_parser = subparsers.add_parser(cmd.__name__.lower().replace('_', '-'),
                                            help=cmd.__doc__)
 
         if hasattr(cmd, 'args'):

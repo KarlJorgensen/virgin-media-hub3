@@ -8,13 +8,13 @@ all : selftest pylints
 .PHONY: selftest
 selftest: pylints
 	./virginmedia.py
-	./hub properties
+	./hub property-list
 	./hub info
-	./hub lanstatus
-	./hub wanstatus
-	./hub portforward_list
-	./hub get_property hardware_version firmware_version serial_number
-	! ./hub set_property hardware_version "This should fail. Do not worry."
+	./hub lan-status
+	./hub wan-status
+	./hub portforward-list
+	./hub property-get hardware_version firmware_version serial_number
+	! ./hub property-set hardware_version "This should fail. Do not worry."
 
 .PHONY: pylints
 pylints: .hub.lint .virginmedia.py.lint

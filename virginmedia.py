@@ -7,6 +7,7 @@ work for other varieties too.
 """
 
 import base64
+import enum
 import random
 import time
 import json
@@ -58,7 +59,7 @@ def extract_int(strvalue, zero_is_none=True):
         return None
     return ival
 
-def extract_ip(hexvalue):
+def extract_ip(hexvalue, zero_is_none=True):
     """Extract an IP address to a sensible format.
 
     The router encodes IPv4 addresses in hex, prefixed by a dollar
@@ -68,32 +69,42 @@ def extract_ip(hexvalue):
               + '.' + str(int(hexvalue[3:5], base=16))
               + '.' + str(int(hexvalue[5:7], base=16))
               + '.' + str(int(hexvalue[7:9], base=16)))
-    if ipaddr == "0.0.0.0":
+    if ipaddr == "0.0.0.0" and zero_is_none:
         return None
     return ipaddr
 
-def extract_ipv6(hexvalue):
+def ipv4_to_dollar(address):
+    """Translates an IP address to the router's representation.
+
+    The router encodes IPv4 addresses in hex, prefixed by a dollar
+    sign, e.g. "$c2a80464" => 192.168.4.100
+    """
+    def tohex(decimal):
+        return "{0:0>2s}".format(hex(int(decimal))[2:].lower())
+    return "$" + ''.join(map(tohex, address.split('.')))
+
+def extract_ipv6(hexvalue, zero_is_none=True):
     """Extract an IPv6 address to a sensible format
 
     The router encodes IPv6 address in hex, prefixed by a dollar sign
     """
-    if hexvalue == "$00000000000000000000000000000000":
+    if hexvalue == "$00000000000000000000000000000000" and zero_is_none:
         return None
     res = hexvalue[1:5]
     for chunk in range(5, 30, 4):
         res += ':' + hexvalue[chunk:chunk+4]
     return res
 
-def extract_ip_generic(hexvalue, addrtype):
+def extract_ip_generic(hexvalue, addrtype, zero_is_none=True):
     """Transform a hex value into an ip address.
 
     The address type controls the conversion made
 
     """
-    if addrtype == "1":
-        return extract_ip(hexvalue)
-    if addrtype == "2":
-        return extract_ipv6(hexvalue)
+    if addrtype == IPVersion.IPV4:
+        return extract_ip(hexvalue, zero_is_none)
+    if addrtype == IPVersion.IPV6:
+        return extract_ipv6(hexvalue, zero_is_none)
 
     return "Unknown:{hexvalue=%s, addrtype=%s}" % (hexvalue, addrtype)
 
@@ -133,6 +144,59 @@ def extract_date(vmdate):
     minute = int(vmdate[11:13], base=16)
     second = int(vmdate[13:15], base=16)
     return datetime.datetime(year, month, dom, hour, minute, second)
+
+class Enum(enum.Enum):
+    """A convenience wrapper around the Enum class.
+
+    This provides two extra methods for driving enum values from
+    either keys or values.
+
+    """
+    @classmethod
+    def from_name(cls, name):
+        """Find the enum with the given name"""
+        try:
+            return [e for e in cls if e.name == name][0]
+        except IndexError:
+            raise IndexError("Name '%s' does not exist for class %s" % (str(name), cls.__name__))
+
+    @classmethod
+    def from_value(cls, value):
+        """Find the enum with the given value"""
+        try:
+            return [e for e in cls if e.value == value][0]
+        except IndexError:
+            raise IndexError("Value '%s' does not exist for class %s" % (str(value), cls.__name__))
+
+@enum.unique
+class Boolean(Enum):
+    """The hub's representation of True and False"""
+    # Fixme: This is complete and utter guesswork
+    TRUE = "1"
+    FALSE = "0"
+
+@enum.unique
+class IPProtocol(Enum):
+    """IP IPProtocols"""
+    UDP = "0"
+    TCP = "1"
+    BOTH = "2"
+
+@enum.unique
+class IPVersion(Enum):
+    "IP Address Version"
+    IPV4 = "1"
+    IPV6 = "2"
+
+@enum.unique
+class SNMPType(Enum):
+    """SNMP Data Types.
+
+    ...I think...
+    """
+    INT = 2
+    PORT = 66
+    STRING = 4
 
 KNOWN_PROPERTIES = set()
 
@@ -211,14 +275,14 @@ def snmp_table(top_oid, columns):
                        if col_num(x[0]) in columns]
             results.sort(key=lambda x: (row_num(x[0]), col_num(x[0])))
 
-            tr = []
+            tabrows = []
             for (dummy, val) in itertools.groupby(results,
                                                   lambda x: row_num(x[0])):
                 therow = rowcls(**{columns[col_num(ccc[0])]: ccc[1]
                                    for ccc in val})._replace(snmp_idx=dummy)
-                tr.append(therow)
+                tabrows.append(therow)
 
-            kwargs['table_rows'] = tr
+            kwargs['table_rows'] = tabrows
             return func(*args, **kwargs)
         return wrapper
     return real_wrapper
@@ -245,6 +309,7 @@ class Hub:
         self.counters = {}
         self._modelname = None
         self._family = None
+        self._unapplied_settings = False
         if kwargs:
             self.login(**kwargs)
 
@@ -427,6 +492,52 @@ class Hub:
             raise
         return resp
 
+    @collect_stats
+    def snmp_set(self, oid, value=None, datatype=None):
+        """Set the value of a given OID on the hub
+
+        If the value cannot be set, an exception will be raised.
+
+        The return value will be a boolean indicating whether the hub
+        considered this a change or not.
+
+        """
+        oid_value = oid
+        if value is not None:
+            oid_value += '=' + str(value)
+        oid_value += ';'
+        if datatype is not None and str(datatype.value) != "":
+            oid_value += str(datatype.value)
+
+        print("snmp_setting OID: " +oid_value)
+        resp = self._get("snmpSet?oid={oid};&{nonce}".format(oid=oid_value,
+                                                             nonce=self._nonce_str))
+        resp.raise_for_status()
+        # TODO: Verify that the response contains the correct json,
+        # listing the iods and values that were set - e.g:
+        #
+        # {
+        # "1.3.6.1.4.1.4115.1.20.1.1.4.12.1.11.5":"5"
+        # }
+
+        print("result:", resp.text)
+        if not oid in resp.json().keys():
+            raise RuntimeError("Hub did not confirm setting of SNMP Value: Set {oid}, but response json said {json}" \
+                               .format(oid=oid, json=resp.json()))
+
+        if resp.status_code == 304:
+            return False
+        self._unapplied_settings = True
+        return True
+
+    def apply_settings(self):
+        """Tells the hub to make the previous saved settings take effect."""
+        if not self._unapplied_settings:
+            return
+        # self.snmp_set("1.3.6.1.4.1.4115.1.20.1.1.9.0")
+        self.snmp_set("1.3.6.1.4.1.4115.1.20.1.1.9.0", 1, SNMPType.INT)
+        self._unapplied_settings = False
+
     def __str__(self):
         return "Hub(hostname=%s, username=%s)" % (self._hostname, self._username)
 
@@ -452,7 +563,7 @@ class Hub:
         #
         #    "Error in OID formatting!"
         #
-        # which really messes up the JSON decoding (!). Since the IOD
+        # which really messes up the JSON decoding (!). Since the OID
         # is obviously correct, and the hub happily returns other
         # data, our only recourse is to remove such lines before
         # attempting to interpret it as JSON... (sigh).
@@ -626,7 +737,7 @@ class Hub:
         representing an IP address.
 
         """
-        return [extract_ip_generic(x.address, x.addrtype)
+        return [extract_ip_generic(x.address, IPVersion.from_value(x.addrtype))
                 for x in table_rows]
 
     @snmp_property("1.3.6.1.4.1.4115.1.20.1.1.1.13.0")
@@ -804,8 +915,8 @@ class Hub:
 
         """
         mac_prefix = "1.3.6.1.4.1.4115.1.20.1.1.2.4.2.1.4.200.1.4"
-        for iod, mac in list(self.snmp_walk(mac_prefix).items()):
-            yield DeviceInfo(self, iod[len(mac_prefix)+1:], extract_mac(mac))
+        for oid, mac in list(self.snmp_walk(mac_prefix).items()):
+            yield DeviceInfo(self, oid[len(mac_prefix)+1:], extract_mac(mac))
 
     def getDevice(self, ipv4_address):
         """Get information for the given device
@@ -823,7 +934,8 @@ class Hub:
 
 
     @snmp_table("1.3.6.1.4.1.4115.1.20.1.1.4.12.1",
-                {"2": "desc",
+                {"1": "index",
+                 "2": "desc",
                  "3": "ext_port_start",
                  "4": "ext_port_end",
                  "5": "proto",
@@ -832,7 +944,7 @@ class Hub:
                  "9": "local_port_start",
                  "10": "local_port_end",
                  "11": "rowstatus"})
-    def portForwardings(self, table_rows=None):
+    def portforward_list(self, table_rows=None):
         """Get a list of port forwardings from the hub.
 
         This is not a lightweight operations due to the speed of the
@@ -841,6 +953,36 @@ class Hub:
         """
         return [PortForwardEntry.from_snmp(x) for x in table_rows]
 
+
+    def portforward_add(self, pfentry):
+        oldlist = self.portforward_list()
+
+        new_idx = max(map(int, [x.snmp_idx for x in oldlist]))
+        if new_idx is None:
+            new_idx = 1
+        else:
+            new_idx += 1
+
+        print("New index:", new_idx)
+
+        def doset(column, val, datatype):
+            self.snmp_set("1.3.6.1.4.1.4115.1.20.1.1.4.12.1.{1}.{0}" \
+                          .format(new_idx, column),
+                          val,
+                          datatype)
+
+        # The order might look odd, but this is the same order as the
+        # web interface does it...
+        doset(11, 5, SNMPType.INT) # 5 seems to be a special value here indicating "creation" ?
+        doset(3, pfentry.ext_port_start, SNMPType.PORT)
+        doset(4, pfentry.ext_port_end, SNMPType.PORT)
+        doset(5, pfentry.proto.value, SNMPType.INT)
+        doset(6, pfentry.local_addr_type.value, SNMPType.INT)
+        doset(7, ipv4_to_dollar(pfentry.local_addr).upper().replace('$', '%24'), SNMPType.STRING)
+        doset(9, pfentry.local_port_start, SNMPType.PORT)
+        doset(10, pfentry.local_port_end, SNMPType.PORT)
+        doset(11, 1, SNMPType.INT)
+        self.apply_settings()
 
 class PortForwardEntry(types.SimpleNamespace):
     """Object to represent a port forwarding rule.
@@ -867,22 +1009,19 @@ class PortForwardEntry(types.SimpleNamespace):
             if "port" in k:
                 props[k] = extract_int(v)
 
-        props["enabled"] = props["rowstatus"] == "1"
+        props["enabled"] = Boolean.from_value(props["rowstatus"])
         del props["rowstatus"]
 
-        props["local_addr"] = extract_ip_generic(props["local_addr"], props["local_addr_type"])
-        del props["local_addr_type"]
+        props["local_addr_type"] = IPVersion.from_value(props["local_addr_type"])
+        props["local_addr"] = extract_ip_generic(props["local_addr"],
+                                                 props["local_addr_type"],
+                                                 zero_is_none=False)
 
-        props["proto"] = ["UDP", "TCP", "BOTH"][int(props["proto"])]
+        props["proto"] = IPProtocol.from_value(props["proto"])
 
         props["ext_ports"] = cls.portsummary(props["ext_port_start"], props["ext_port_end"])
         props["local_ports"] = cls.portsummary(props["local_port_start"], props["local_port_end"])
         return cls(**props)
-
-    def __str__(self):
-        return (("{e.proto}/{e.ext_ports} "
-                 + "=> {e.local_addr}:{e.local_ports} {e.enabled} {e.desc}") \
-                .format(e=self))
 
 
 # Some properties cannot be snmp_get()'ed - they have to be snmp_walk()'ed instead??
@@ -897,7 +1036,7 @@ for the_name, the_oid in _snmp_walks:
         return property(types.MethodType(getter, Hub), None, None, name)
     setattr(Hub, the_name, newGetters(the_name, the_oid))
 
-class DeviceInfo(object):
+class DeviceInfo:
     """Information about a device known to a hub
 
     This makes the information known about a device available as attributes.
@@ -963,7 +1102,7 @@ def _demo():
                 raise
 
         print("Port Forwardings")
-        for portforward in hub.portForwardings():
+        for portforward in hub.portforward_list():
             print("-", portforward)
 
         print("Device List")
