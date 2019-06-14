@@ -246,6 +246,9 @@ def snmp_table(top_oid, columns):
     which is an array of namespace objects, where the columns can be
     referenced by name.
 
+    The unique row ID for each row gets assigned to the 'row_idx'
+    value in the namespace object.
+
     The "columns" parameter to the decorator describes the columns: It
     is expected to be a dicts, where the key is the (partial) OID
     number of the column, and the value indicates the column name.
@@ -265,7 +268,7 @@ def snmp_table(top_oid, columns):
             return int(walked_oid[len(top_oid)+1:].split('.')[1])
 
         rowcls = collections.namedtuple('SNMPRow',
-                                        field_names=list(columns.values()) + ['snmp_idx'],
+                                        field_names=list(columns.values()) + ['row_idx'],
                                         defaults=itertools.repeat(None, len(columns)+1))
 
         @functools.wraps(func)
@@ -279,7 +282,7 @@ def snmp_table(top_oid, columns):
             for (dummy, val) in itertools.groupby(results,
                                                   lambda x: row_num(x[0])):
                 therow = rowcls(**{columns[col_num(ccc[0])]: ccc[1]
-                                   for ccc in val})._replace(snmp_idx=dummy)
+                                   for ccc in val})._replace(row_idx=dummy)
                 tabrows.append(therow)
 
             kwargs['table_rows'] = tabrows
@@ -957,7 +960,7 @@ class Hub:
     def portforward_add(self, pfentry):
         oldlist = self.portforward_list()
 
-        new_idx = max(map(int, [x.snmp_idx for x in oldlist]))
+        new_idx = max(map(int, [x.row_idx for x in oldlist]))
         if new_idx is None:
             new_idx = 1
         else:
