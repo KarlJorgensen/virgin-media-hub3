@@ -143,6 +143,19 @@ def portforward_add(hub, args):
     hub.portforward_add(pfentry)
 
 @subcommand
+@Args([
+    ("protocol", {"help":"Protocol to forward",
+                  "choices": [p.name for p in virginmedia.IPProtocol]}),
+    ("external_port", {"type": int,
+                       "help": "The external port number to map"})])
+def portforward_del(hub, args):
+    """Remove a port forwarding entry.
+    """
+    hub.portforward_del(proto=virginmedia.IPProtocol.from_name(args.protocol),
+                        ext_port_start=args.external_port,
+                        ext_port_end=args.external_port)
+
+@subcommand
 def device_list(hub, args):
     """List devices connected to the hub"""
     for dev in hub.deviceList():

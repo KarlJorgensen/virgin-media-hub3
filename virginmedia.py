@@ -987,6 +987,22 @@ class Hub:
         doset(11, 1, SNMPType.INT)
         self.apply_settings()
 
+    def portforward_del(self, proto, ext_port_start, ext_port_end):
+        """Remove a given port forwarding entry from the hub.
+
+        If the port forwarding entry is not found, it is silently ignored.
+        """
+        try:
+            for oldentry in self.portforward_list():
+                if oldentry.ext_port_start == ext_port_start and oldentry.ext_port_end == ext_port_end  and oldentry.proto == proto:
+                    print("Removing PF index", oldentry.row_idx)
+                    print("Removing PF", oldentry)
+                    self.snmp_set("1.3.6.1.4.1.4115.1.20.1.1.4.12.1.11.{0}".format(oldentry.row_idx),
+                                  6, # 6 seems to be a special value indicating removal?
+                                  SNMPType.INT)
+        finally:
+            self.apply_settings()
+
 class PortForwardEntry(types.SimpleNamespace):
     """Object to represent a port forwarding rule.
 
