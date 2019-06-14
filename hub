@@ -64,7 +64,7 @@ def info(hub, args):
                     ])
 
 @subcommand
-def lanstatus(hub, args):
+def lan_status(hub, args):
     """Show LAN settings"""
     dump_properties(hub,
                     [
@@ -81,7 +81,7 @@ def lanstatus(hub, args):
                     ])
 
 @subcommand
-def wanstatus(hub, args):
+def wan_status(hub, args):
     """Show Wide Area Network settings"""
     dump_properties(hub,
                     [
@@ -121,7 +121,7 @@ def devicelist(hub, args):
 
 @subcommand
 @nohub
-def properties(args):
+def property_list(args):
     """Get a list of the known property names. Not all properties will be settable"""
     for prop in sorted(virginmedia.KNOWN_PROPERTIES):
         print(prop)
@@ -132,7 +132,7 @@ def properties(args):
                   "help": "The property to retrieve",
                   "choices": virginmedia.KNOWN_PROPERTIES})
 ])
-def get_property(hub, args):
+def property_get(hub, args):
     """Get one or more properties"""
     for prop in args.property:
         print(getattr(hub, prop))
@@ -142,7 +142,7 @@ def get_property(hub, args):
     ("property", {"help": "The name of the property to set",
                   "choices": virginmedia.KNOWN_PROPERTIES}),
     ("value", {"help": "Value to set the property to"})])
-def set_property(hub, args):
+def property_set(hub, args):
     """Set a specific property.
 
     Note that not all properties are settable."""
@@ -202,7 +202,7 @@ def main():
     subparsers = parser.add_subparsers(help="sub-command help")
 
     for cmd in SUBCOMMANDS:
-        cmd_parser = subparsers.add_parser(cmd.__name__,
+        cmd_parser = subparsers.add_parser(cmd.__name__.lower().replace('_','-'),
                                            help=cmd.__doc__)
 
         if hasattr(cmd, 'args'):
