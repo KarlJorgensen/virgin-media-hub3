@@ -675,12 +675,12 @@ class Hub:
     @snmp_property("1.3.6.1.4.1.4115.1.20.1.1.1.10.1.0")
     def wan_user_name(self, snmp_value):
         """WAN L2TP user name"""
-        return snmp_value
+        return snmp_value if snmp_value else None
 
     @snmp_property("1.3.6.1.4.1.4115.1.20.1.1.1.10.2.0")
     def wan_password(self, snmp_value):
         """WAN L2TP password"""
-        return snmp_value
+        return snmp_value if snmp_value else None
 
     @snmp_property("1.3.6.1.4.1.4115.1.20.1.1.1.10.3.0")
     def wan_enable_idle_timeout(self, snmp_value):
