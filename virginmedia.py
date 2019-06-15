@@ -789,49 +789,50 @@ class Hub:
         return snmp_value
 
     @snmp_property("1.3.6.1.4.1.4115.1.20.1.1.2.2.1.3.200")
-    def lanSubnetMask(self, snmp_value):
+    def lan_subnetmask(self, snmp_value):
         return extract_ip(snmp_value)
 
     @snmp_property("1.3.6.1.4.1.4115.1.20.1.1.2.2.1.5.200")
-    def lanGatewayIpv4(self, snmp_value):
+    def lan_gateway_ipv4(self, snmp_value):
         return extract_ip(snmp_value)
 
     @snmp_property("1.3.6.1.4.1.4115.1.20.1.1.2.2.1.7.200")
-    def lanGatewayIp2v4(self, snmp_value):
+    def lan_gateway2_ipv4(self, snmp_value):
         return extract_ip(snmp_value)
 
     @snmp_property("1.3.6.1.4.1.4115.1.20.1.1.2.2.1.9.200")
-    def lanDHCPEnabled(self, snmp_value):
+    def lan_dhcp_enabled(self, snmp_value):
         return int(snmp_value) == 1
 
     @snmp_property("1.3.6.1.4.1.4115.1.20.1.1.2.2.1.11.200")
-    def lanDHCPv4Start(self, snmp_value):
+    def lan_dhcpv4_range_start(self, snmp_value):
         return extract_ip(snmp_value)
 
     @snmp_property("1.3.6.1.4.1.4115.1.20.1.1.2.2.1.13.200")
-    def lanDHCPv4End(self, snmp_value):
+    def lan_dhcpv4_range_end(self, snmp_value):
         return extract_ip(snmp_value)
 
     @snmp_property("1.3.6.1.4.1.4115.1.20.1.1.2.2.1.14.200")
-    def lanDHCPv4LeaseTimeSecs(self, snmp_value):
+    def lan_dhcpv4_leasetime(self, snmp_value):
+        """The lease time (in seconds)"""
         return extract_int(snmp_value)
 
     @snmp_property("1.3.6.1.4.1.4115.1.20.1.1.2.2.1.29.200")
-    def lanDHCPv6PrefixLength(self, snmp_value):
+    def lan_dhcpv6_prefixlength(self, snmp_value):
         return extract_int(snmp_value)
 
     @snmp_property("1.3.6.1.4.1.4115.1.20.1.1.2.2.1.31.200")
-    def lanDHCPv6Start(self, snmp_value):
+    def lan_dhcpv6_range_start(self, snmp_value):
         if snmp_value == "$00000000000000000000000000000000":
             return None
         return snmp_value
 
     @snmp_property("1.3.6.1.4.1.4115.1.20.1.1.2.2.1.33.200")
-    def lanDHCPv6LeaseTime(self, snmp_value):
+    def lan_dhcpv6_leasetime(self, snmp_value):
         return extract_int(snmp_value)
 
     @snmp_property("1.3.6.1.4.1.4115.1.20.1.1.2.2.1.39.200")
-    def lanParentalControlsEnable(self, snmp_value):
+    def lan_parentalcontrols_enabled(self, snmp_value):
         return snmp_value
 
     @snmp_property("1.3.6.1.4.1.4115.1.20.1.1.3.22.1.2.10001")

@@ -69,15 +69,16 @@ def lan_status(hub, args):
     dump_properties(hub,
                     [
                         "lanIPAddress",
-                        "lanSubnetMask",
-                        "lanDHCPEnabled",
-                        "lanGatewayIpv4",
-                        "lanDHCPv4Start",
-                        "lanDHCPv4End",
-                        "lanDHCPv4LeaseTimeSecs",
-                        "lanDHCPv6PrefixLength",
-                        "lanDHCPv6Start",
-                        "lanDHCPv6LeaseTime"
+                        "lan_subnetmask",
+                        "lan_dhcp_enabled",
+                        "lan_gateway_ipv4",
+                        "lan_dhcpv4_range_start",
+                        "lan_dhcpv4_range_end",
+                        "lan_dhcpv4_leasetime",
+                        "lan_dhcpv6_prefixlength",
+                        "lan_dhcpv6_range_start",
+                        "lan_dhcpv6_leasetime",
+                        "lan_parentalcontrols_enabled"
                     ])
 
 @subcommand
