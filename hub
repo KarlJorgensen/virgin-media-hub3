@@ -55,6 +55,7 @@ def info(hub, args):
                         "bootcode_version",
                         "firmware_version",
                         "name",
+                        "current_time",
                         "first_install_wizard_completed",
                         "wan_ip_prov_mode",
                         "wan_current_ipaddr_ipv4",

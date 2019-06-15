@@ -886,6 +886,14 @@ class Hub:
         "The value 8 appears to indicate Virgin Media"
         return snmp_value
 
+    @snmp_property("1.3.6.1.4.1.4115.1.20.1.1.5.15.0")
+    def current_time(self, snmp_value):
+        """The current time on the hub.
+
+        Usually, this will be set to GMT
+        """
+        return extract_date(snmp_value)
+
     @snmp_property("1.3.6.1.4.1.4115.1.20.1.1.5.16.1.2.1")
     def auth_username(self, snmp_value):
         """The name of the admin user"""
