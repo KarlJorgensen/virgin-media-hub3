@@ -19,3 +19,16 @@ router:
 - Sales blurb:  https://www.arris.com/products/touchstone-telephony-gateway-tg2492-s/
 
 - End user documentation : https://fccid.io/UIDTG2492/User-Manual/Users-Guide-3118366
+
+
+At the moment, this repo is somewhat basic: There is no python pip
+package structure. Yet. And no Debian or RedHat packages. To use it,
+you use the source:
+
+    git clone git@github.com:KarlJorgensen/virgin-media-hub3.git
+	cd virgin-media-hub3
+	export HUB_PASSWORD=YouRouterPassword
+	./hub info
+	./hub --help
+
+Enjoy!
