@@ -19,4 +19,3 @@ router:
 - Sales blurb:  https://www.arris.com/products/touchstone-telephony-gateway-tg2492-s/
 
 - End user documentation : https://fccid.io/UIDTG2492/User-Manual/Users-Guide-3118366
-
