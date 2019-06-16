@@ -29,3 +29,20 @@ To hack around with the source code, you will need:
 - pylint3
 - python-requests
 
+- For some tasks, it is useful to first do the task through the web
+  interface and use Firefox's developer mode to track the HTTP
+  requests. Alternatively, use tcpdump and/or wireshark to capture and
+  analyze the traffic.
+
+Interesting other stuff:
+
+- https://wikidevi.com/wiki/Virgin_Media_Super_Hub_3
+- Hacking an Arris Cablemodem : https://blog.korelogic.com/blog/2016/02/12
+- Teardown: https://www.mobile-computer-repairs.co.uk/blog/topic/29/routers/Arris-TG2492
+- https://www.netscylla.com/blog/2019/02/04/Arris-CableModem-SNMP.html
+
+
+MIBs:
+- https://mibs.observium.org/mib/ARRIS-MTA-DEVICE-MIB/
+- https://mibs.observium.org/mib/ARRIS-ROUTER-DEVICE-MIB/
+- https://mibs.observium.org/mib/ARRIS-CM-DOC30-DEVICE-MIB/
