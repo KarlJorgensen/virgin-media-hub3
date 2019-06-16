@@ -296,14 +296,14 @@ class Hub:
     This class provides a pythonic interface to the Virgin Media Hub3.
 
     """
-    def __init__(self, hostname='192.168.0.1', client_timeout=30, **kwargs):
+    def __init__(self, hostname='192.168.0.1', http_timeout=30, **kwargs):
 
         self._credential = None
         self._url = 'http://' + hostname
         self._hostname = hostname
         self._username = None
         self._password = None
-        self.client_timeout = client_timeout
+        self.http_timeout = http_timeout
         self._nonce = {
             "_": int(round(time.time() * 1000)),
             "_n": "%05d" % random.randint(10000, 99999)
@@ -339,11 +339,11 @@ class Hub:
             if self._credential:
                 resp = requests.get(self._url + '/' + url,
                                     cookies={"credential": self._credential},
-                                    timeout=self.client_timeout,
+                                    timeout=self.http_timeout,
                                     **kwargs)
             else:
                 resp = requests.get(self._url + '/' + url,
-                                    timeout=self.client_timeout,
+                                    timeout=self.http_timeout,
                                     **kwargs)
             self._increment_counter('received_http_' + str(resp.status_code))
             if resp.status_code == 401:
