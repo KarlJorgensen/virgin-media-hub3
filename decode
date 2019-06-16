@@ -1,3 +1,0 @@
-#!/bin/sh
-
-base64 -d

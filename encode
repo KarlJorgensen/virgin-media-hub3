@@ -1,7 +1,0 @@
-#!/bin/sh
-
-while IFS="" read line
-do
-    echo "$line" | base64 --wrap=0
-    echo
-done
