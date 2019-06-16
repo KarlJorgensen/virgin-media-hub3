@@ -388,7 +388,7 @@ class Hub:
         default username first.
         """
         if not username:
-            username = self.authUserName
+            username = self.auth_username
 
         resp = self._get('login',
                          retry401=0,
@@ -836,19 +836,19 @@ class Hub:
         return snmp_value
 
     @snmp_property("1.3.6.1.4.1.4115.1.20.1.1.3.22.1.2.10001")
-    def wifi24GHzESSID(self, snmp_value):
+    def wifi_24ghz_essid(self, snmp_value):
         return snmp_value
 
     @snmp_property("1.3.6.1.4.1.4115.1.20.1.1.3.22.1.2.10101")
-    def wifi5GHzESSID(self, snmp_value):
+    def wifi_5ghz_essid(self, snmp_value):
         return snmp_value
 
     @snmp_property("1.3.6.1.4.1.4115.1.20.1.1.3.26.1.2.10001")
-    def wifi24GHzPassword(self, snmp_value):
+    def wifi_24ghz_password(self, snmp_value):
         return snmp_value
 
     @snmp_property("1.3.6.1.4.1.4115.1.20.1.1.3.26.1.2.10101")
-    def wifi5GHzPassword(self, snmp_value):
+    def wifi_5ghz_password(self, snmp_value):
         return snmp_value
 
     @snmp_property("1.3.6.1.4.1.4115.1.20.1.1.5.6.0")
@@ -886,12 +886,12 @@ class Hub:
         return snmp_value
 
     @snmp_property("1.3.6.1.4.1.4115.1.20.1.1.5.16.1.2.1")
-    def authUserName(self, snmp_value):
+    def auth_username(self, snmp_value):
         """The name of the admin user"""
         return snmp_value
 
     @snmp_property("1.3.6.1.4.1.4115.1.20.1.1.5.62.0")
-    def firstInstallWizardCompleted(self, snmp_value):
+    def first_install_wizard_completed(self, snmp_value):
         return snmp_value == "1"
 
     @snmp_property("1.3.6.1.4.1.4491.2.1.14.1.5.4.0")
@@ -900,7 +900,7 @@ class Hub:
         return int(snmp_value)
 
     @collect_stats
-    def deviceList(self):
+    def device_list(self):
         """Iterator which retrieves devices known to the hub.
 
         This will return successive DeviceInfo instances, which can be
@@ -914,7 +914,7 @@ class Hub:
         for oid, mac in list(self.snmp_walk(mac_prefix).items()):
             yield DeviceInfo(self, oid[len(mac_prefix)+1:], extract_mac(mac))
 
-    def getDevice(self, ipv4_address):
+    def get_device(self, ipv4_address):
         """Get information for the given device
 
         If the hub knows about a network device on the local lan (or
@@ -1013,6 +1013,19 @@ class PortForwardEntry(types.SimpleNamespace):
 
     @classmethod
     def from_snmp(cls, snmprow):
+        """Create a PortForwardEntry from an SNMP table row.
+
+        For convenience, this creates two extra attributes: ext_ports
+        and local_ports which contain string representations of the
+        port range for human consumption:
+
+        - If only one port is being forwarded, it will simply contain
+          that.
+
+        - If a port range is being forwarded, it will contain the
+          start and end port numbers separated by a hyphen.
+
+        """
         props = snmprow._asdict()
 
         # Cast port numbers
@@ -1033,19 +1046,6 @@ class PortForwardEntry(types.SimpleNamespace):
         props["ext_ports"] = cls.portsummary(props["ext_port_start"], props["ext_port_end"])
         props["local_ports"] = cls.portsummary(props["local_port_start"], props["local_port_end"])
         return cls(**props)
-
-
-# Some properties cannot be snmp_get()'ed - they have to be snmp_walk()'ed instead??
-_snmp_walks = [
-    ("webAccessTable", "1.3.6.1.4.1.4115.1.20.1.1.6.7")
-]
-
-for the_name, the_oid in _snmp_walks:
-    def newGetters(name, oid):
-        def getter(self):
-            return self.snmp_walk(oid)
-        return property(types.MethodType(getter, Hub), None, None, name)
-    setattr(Hub, the_name, newGetters(the_name, the_oid))
 
 class DeviceInfo:
     """Information about a device known to a hub
@@ -1117,7 +1117,7 @@ def _demo():
             print("-", portforward)
 
         print("Device List")
-        for dev in [x for x in hub.deviceList() if x.connected]:
+        for dev in [x for x in hub.device_list() if x.connected]:
             print("-", dev)
 
         print("Session counters:")

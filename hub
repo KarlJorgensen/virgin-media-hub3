@@ -55,7 +55,7 @@ def info(hub, args):
                         "bootcode_version",
                         "firmware_version",
                         "name",
-                        "firstInstallWizardCompleted",
+                        "first_install_wizard_completed",
                         "wan_ip_prov_mode",
                         "wan_current_ipaddr_ipv4",
                         "wan_current_ipaddr_ipv6",
@@ -159,7 +159,7 @@ def portforward_del(hub, args):
 @subcommand
 def device_list(hub, args):
     """List devices connected to the hub"""
-    for dev in hub.deviceList():
+    for dev in hub.device_list():
         print(dev)
 
 @subcommand
