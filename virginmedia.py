@@ -18,6 +18,7 @@ import itertools
 import collections
 import textwrap
 import types
+import warnings
 import requests
 
 class LoginFailed(IOError):
@@ -349,16 +350,16 @@ class Hub:
             if resp.status_code == 401:
                 retry401 -= 1
                 if retry401 > 0 and self.is_loggedin:
-                    print("Got http status %s - Retrying after logging in again" \
-                        %(resp.status_code))
+                    warnings.warn("Got http status %s - Retrying after logging in again" \
+                                  %(resp.status_code))
                     self.login(username=self._username, password=self._password)
                     self._increment_counter('_get_retries_401')
                     continue
             if resp.status_code == 500:
                 retry500 -= 1
                 if retry500 > 0:
-                    print("Got http status %s - retrying after %s seconds" \
-                        % (resp.status_code, sleep))
+                    warnings.warn("Got http status %s - retrying after %s seconds" \
+                                  % (resp.status_code, sleep))
                     time.sleep(sleep)
                     sleep *= 2
                     self._increment_counter('_get_retries_500')
@@ -409,18 +410,18 @@ class Hub:
 
         if attrs.get("gwWan") == "f" and attrs.get("conType") == "LAN":
             if attrs.get("muti") == "GW_WAN":
-                print("Warning: Remote user has already logged in: " \
-                    "Some things may fail with HTTP 401...")
+                warnings.warn("Warning: Remote user has already logged in: " \
+                              "Some things may fail with HTTP 401...")
             elif attrs.get("muti") == "LAN":
-                print("Warning: Other local user has already logged in: " \
-                    "Some things may fail with HTTP 401...")
+                warnings.warn("Warning: Other local user has already logged in: " \
+                              "Some things may fail with HTTP 401...")
         elif attrs.get("gwWan") == "t":
             if attrs.get("muti") == "LAN":
-                print("Warning: Local user has already logged in: " \
-                    "Some things may fail with HTTP 401...")
+                warnings.warn("Warning: Local user has already logged in: " \
+                              "Some things may fail with HTTP 401...")
             elif attrs.get("muti") == "GW_WAN":
-                print("Warning: Other remote user has already logged in: " \
-                    "Some things may fail with HTTP 401...")
+                warnings.warn("Warning: Other remote user has already logged in: " \
+                              "Some things may fail with HTTP 401...")
 
         self._credential = resp.text
         self._username = username
@@ -491,7 +492,7 @@ class Hub:
         try:
             resp = json.loads(cont)
         except ValueError:
-            print('Response content:', cont)
+            warnings.warn('Response content:', cont)
             raise
         return resp
 
