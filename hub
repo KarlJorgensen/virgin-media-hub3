@@ -184,7 +184,7 @@ def property_get(hub, args):
 @subcommand
 @Args([
     ("--skip-get", {"help": "Do not try to retrieve the property first",
-                    "action": "store_true")),
+                    "action": "store_true"}),
     ("property", {"help": "The name of the property to set",
                   "choices": virginmedia.KNOWN_PROPERTIES}),
     ("value", {"help": "Value to set the property to"})])
@@ -194,6 +194,10 @@ def property_set(hub, args):
     Note that not all properties are settable."""
     if not args.skip_get:
         oldvalue = getattr(hub, args.property)
+
+        if oldvalue == args.value:
+            print("Property", args.property, "is already set to", args.value)
+            return
 
     try:
         setattr(hub, args.property, args.value)
