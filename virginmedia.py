@@ -16,6 +16,7 @@ import json
 import operator
 import os
 import random
+import re
 import textwrap
 import time
 import types
@@ -224,6 +225,49 @@ def listed_property(func):
     KNOWN_PROPERTIES.add(func.__name__)
     return func
 
+ipaddr_re = re.compile("\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}")
+
+def param_check(argid, checker):
+    """A function decorator that enforces that a parameter should pass _checker_.
+
+    The parameter can be indicated in two ways:
+
+    - as an integer N: The N'th parameter must satisfy the check
+
+    - as a string X: The keyword argument X must satisfy the check
+
+    The decorator will raise ValueError if attempts are made at
+    calling the function with invalid parameters.
+
+    """
+    def decorator(func):
+
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs):
+            if isinstance(argid, int):
+                param = args[argid]
+            else:
+                param = kwargs[argid]
+
+            checker(param)
+            return func(*args, **kwargs)
+        return wrapper
+
+    if not (isinstance(argid, int) or isinstance(argid, str)):
+        raise TypeError("param_check takes an int or str, not %s" % argid.__class__)
+
+    return decorator
+
+def check_ipv4_address(param):
+    """Raise ValueError if the parameter is not an ipv4 address"""
+    if not ipaddr_re.fullmatch(param):
+        raise ValueError("'%s' is not an IP address" % param)
+
+def ipaddress(argid):
+    """A function decorator that enforces that a parameter should be an IPv4 Address."""
+
+    return param_check(argid, check_ipv4_address)
+
 def snmp_property(oid):
     """A function decorator to present an MIB value as an attribute.
 
@@ -250,6 +294,7 @@ def snmp_property(oid):
             self._fset = fset
             self._listed = False
             self._name = None
+            self._datatype = None
             self._update()
 
         def getter(self, fget):
@@ -269,7 +314,17 @@ def snmp_property(oid):
             value - this will then be se in SNMP.
 
             """
-            self._fset = fset
+            if isinstance(fset, types.MethodType):
+                self._fset = fset
+                self._update()
+                return self
+
+            self._datatype = fset
+            return self
+
+        def __call__(self, func):
+            # Gets invoked when we have a setter() decorator with a parameter
+            self._fset = func
             self._update()
             return self
 
@@ -297,9 +352,9 @@ def snmp_property(oid):
 
             newval = self._fset(hub, *args, **kwargs)
             if isinstance(newval, tuple):
-                hub.snmp_set(oid, newval[0], newval[1])
+                hub.snmp_set(oid, *tuple)
             else:
-                hub.snmp_set(oid, newval)
+                hub.snmp_set(oid, newval, self._datatype)
             return newval
 
     return Decorator
@@ -543,7 +598,7 @@ class Hub:
         try:
             attrs = json.loads(base64.b64decode(resp.content))
         except Exception:
-            raise LoginFailed("Cannot decode json response:\n" + resp.content, resp)
+            raise LoginFailed("Cannot decode json response:\n" + resp.text, resp)
 
         if attrs.get("gwWan") == "f" and attrs.get("conType") == "LAN":
             if attrs.get("muti") == "GW_WAN":
@@ -645,7 +700,10 @@ class Hub:
         """
         oid_value = oid
         if value is not None:
-            oid_value += '=' + str(value)
+            if datatype == SNMPType.STRING:
+                oid_value += '=' + str(value).replace('$', '%24')
+            else:
+                oid_value += '=' + str(value)
         oid_value += ';'
         if datatype is not None and str(datatype.value) != "":
             oid_value += str(datatype.value)
@@ -665,7 +723,6 @@ class Hub:
         """Tells the hub to make the previous saved settings take effect."""
         if not self._unapplied_settings:
             return
-        # self.snmp_set("1.3.6.1.4.1.4115.1.20.1.1.9.0")
         self.snmp_set("1.3.6.1.4.1.4115.1.20.1.1.9.0", 1, SNMPType.INT)
         self._unapplied_settings = False
 
@@ -977,14 +1034,28 @@ class Hub:
     def lan_dhcpv4_range_start(self, snmp_value):
         return extract_ip(snmp_value)
 
+    @lan_dhcpv4_range_start.setter(SNMPType.STRING)
+    @ipaddress(1)
+    def lan_dhcpv4_range_start(self, newvalue):
+        return ipv4_to_dollar(newvalue)
+
     @snmp_property("1.3.6.1.4.1.4115.1.20.1.1.2.2.1.13.200")
     def lan_dhcpv4_range_end(self, snmp_value):
         return extract_ip(snmp_value)
+
+    @lan_dhcpv4_range_end.setter(SNMPType.STRING)
+    @ipaddress(1)
+    def lan_dhcpv4_range_end(self, newvalue):
+        return ipv4_to_dollar(newvalue)
 
     @snmp_property("1.3.6.1.4.1.4115.1.20.1.1.2.2.1.14.200")
     def lan_dhcpv4_leasetime(self, snmp_value):
         """The lease time (in seconds)"""
         return extract_int(snmp_value)
+
+    @lan_dhcpv4_leasetime.setter
+    def lan_dhcpv4_leasetime(self, new_value):
+        return (str(new_value), SNMPType.INT)
 
     @snmp_property("1.3.6.1.4.1.4115.1.20.1.1.2.2.1.29.200")
     def lan_dhcpv6_prefixlength(self, snmp_value):
