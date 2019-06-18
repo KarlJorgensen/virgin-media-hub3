@@ -152,13 +152,17 @@ def extract_date(vmdate):
 
 
 KNOWN_PROPERTIES = set([
+    "bootcode_version",
+    "customer_id",
+    "firmware_version",
+    "hardware_version",
     "language",
     "name",
     "serial_number",
-    "bootcode_version",
-    "hardware_version",
-    "firmware_version",
-    "customer_id"
+    "wifi_24ghz_essid",
+    "wifi_24ghz_password",
+    "wifi_5ghz_essid",
+    "wifi_5ghz_password"
 ])
 
 def collect_stats(func):
@@ -472,6 +476,10 @@ class Hub:
     hardware_version = snmp.Attribute("1.3.6.1.4.1.4115.1.20.1.1.5.10.0")
     firmware_version = snmp.Attribute("1.3.6.1.4.1.4115.1.20.1.1.5.11.0")
     customer_id = snmp.Attribute("1.3.6.1.4.1.4115.1.20.1.1.5.14.0")
+    wifi_24ghz_essid = snmp.Attribute("1.3.6.1.4.1.4115.1.20.1.1.3.22.1.2.10001")
+    wifi_24ghz_password = snmp.Attribute("1.3.6.1.4.1.4115.1.20.1.1.3.26.1.2.10001")
+    wifi_5ghz_essid = snmp.Attribute("1.3.6.1.4.1.4115.1.20.1.1.3.22.1.2.10101")
+    wifi_5ghz_password = snmp.Attribute("1.3.6.1.4.1.4115.1.20.1.1.3.26.1.2.10101")
 
     def _increment_counter(self, name, increment=1):
         """Increase a counter increment (usually) 1.
@@ -1079,26 +1087,6 @@ class Hub:
     @snmp_property("1.3.6.1.4.1.4115.1.20.1.1.2.2.1.39.200")
     # pylint: disable=R0201
     def lan_parentalcontrols_enabled(self, snmp_value):
-        return snmp_value
-
-    @snmp_property("1.3.6.1.4.1.4115.1.20.1.1.3.22.1.2.10001")
-    # pylint: disable=R0201
-    def wifi_24ghz_essid(self, snmp_value):
-        return snmp_value
-
-    @snmp_property("1.3.6.1.4.1.4115.1.20.1.1.3.22.1.2.10101")
-    # pylint: disable=R0201
-    def wifi_5ghz_essid(self, snmp_value):
-        return snmp_value
-
-    @snmp_property("1.3.6.1.4.1.4115.1.20.1.1.3.26.1.2.10001")
-    # pylint: disable=R0201
-    def wifi_24ghz_password(self, snmp_value):
-        return snmp_value
-
-    @snmp_property("1.3.6.1.4.1.4115.1.20.1.1.3.26.1.2.10101")
-    # pylint: disable=R0201
-    def wifi_5ghz_password(self, snmp_value):
         return snmp_value
 
     @snmp_property("1.3.6.1.4.1.4115.1.20.1.1.5.15.0")

@@ -7,7 +7,6 @@ and retrieving SNMP OIDs in a pythonic way.
 """
 import enum
 
-
 class Enum(enum.Enum):
     """A convenience wrapper around the Enum class.
 
@@ -61,7 +60,7 @@ class IPProtocol(Enum):
     TCP = "1"
     BOTH = "2"
 
-class Attribute:
+class RawAttribute:
     """An abstraction of an SNMP attribute.
 
     This behaves like a normal attribute: Reads of it will retrieve
@@ -70,8 +69,12 @@ class Attribute:
 
     For convenience, the value will be cached so repeated reads can be
     done without needing multiple round-trips to the hub.
+
+    This allows you to read/write the 'raw' values. For most use cases
+    you probably want to use the Attribute class, as this can do
+    translation.
     """
-    def __init__(self, oid, datatype=Type.STRING, value=None):
+    def __init__(self, oid, datatype, value=None):
         self._oid = oid
         self._datatype = datatype
         self._value = value
@@ -111,3 +114,59 @@ class Attribute:
 
     def __delete__(self, instance):
         raise NotImplementedError("Deleting SNMP values do not make sense")
+
+class NullTranslator:
+    """A translator which does nothing"""
+    type = Type.STRING
+    @staticmethod
+    def snmp(human_value):
+        "Returns the input value"
+        return human_value
+    @staticmethod
+    def human(snmp_value):
+        "Returns the input value"
+        return snmp_value
+
+class IPv4Translator:
+    """Handles translation of IPv4 addresses to/from the hub.
+
+    The hub encodes IPv4 addresses in hex, prefixed by a dollar sign,
+    e.g. "$c2a80464" => 192.168.4.100
+    """
+
+    type = Type.STRING
+
+    @staticmethod
+    def snmp(human_value):
+        "Translates an ipv4 address to something the hub understands"
+        if human_value is None:
+            return "$00000000"
+        def tohex(decimal):
+            return "{0:0>2s}".format(hex(int(decimal))[2:].lower())
+        return "$" + ''.join(map(tohex, human_value.split('.')))
+
+    @staticmethod
+    def human(snmp_value):
+        "Translates a hub-representation of an ipv4 address to human-readable form"
+        if snmp_value == "$00000000":
+            return None
+        ipaddr = (str(int(snmp_value[1:3], base=16))
+                  + '.' + str(int(snmp_value[3:5], base=16))
+                  + '.' + str(int(snmp_value[5:7], base=16))
+                  + '.' + str(int(snmp_value[7:9], base=16)))
+        return ipaddr
+
+class Attribute(RawAttribute):
+    """A generic SNMP Attribute which can use a translator.
+
+    The translator will map the SNMP values to and from 'human' values
+    """
+    def __init__(self, oid, translator=NullTranslator, value=None):
+        RawAttribute.__init__(self, oid, datatype=translator.type, value=value)
+        self._translator = translator
+
+    def __get__(self, instance, owner):
+        return self._translator.human(RawAttribute.__get__(self, instance, owner))
+
+    def __set__(self, instance, value):
+        return RawAttribute.__set__(self, instance, self._translator.snmp(value))
