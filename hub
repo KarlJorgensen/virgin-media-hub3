@@ -67,24 +67,6 @@ def info(hub, _args):
                     ])
 
 @subcommand
-def lan_status(hub, _args):
-    """Show LAN settings"""
-    dump_properties(hub,
-                    [
-                        "lanIPAddress",
-                        "lan_subnetmask",
-                        "lan_dhcp_enabled",
-                        "lan_gateway_ipv4",
-                        "lan_dhcpv4_range_start",
-                        "lan_dhcpv4_range_end",
-                        "lan_dhcpv4_leasetime",
-                        "lan_dhcpv6_prefixlength",
-                        "lan_dhcpv6_range_start",
-                        "lan_dhcpv6_leasetime",
-                        "lan_parentalcontrols_enabled"
-                    ])
-
-@subcommand
 def wan_status(hub, _args):
     """Show Wide Area Network settings"""
     dump_properties(hub,
@@ -107,6 +89,41 @@ def wan_status(hub, _args):
                         "wan_conn_domainname",
                         "dns_servers"
                         ])
+
+@subcommand
+def lan_status(hub, _args):
+    """Show LAN settings"""
+    dump_properties(hub,
+                    [
+                        "lanIPAddress",
+                        "lan_subnetmask",
+                        "lan_dhcp_enabled",
+                        "lan_gateway_ipv4",
+                        "lan_dhcpv4_range_start",
+                        "lan_dhcpv4_range_end",
+                        "lan_dhcpv4_leasetime",
+                        "lan_dhcpv6_prefixlength",
+                        "lan_dhcpv6_range_start",
+                        "lan_dhcpv6_leasetime",
+                        "lan_parentalcontrols_enabled"
+                    ])
+
+@subcommand
+def wifi_status(hub, _args):
+    """Show WIFI Status"""
+    dump_properties(hub,
+                    [
+                        "wifi_24ghz_essid",
+                        "wifi_24ghz_password",
+                        "wifi_5ghz_essid",
+                        "wifi_5ghz_password",
+                        "lan_gateway_ipv4",
+                        "lan_subnetmask",
+                        "lan_dhcp_enabled",
+                        "lan_dhcpv4_range_start",
+                        "lan_dhcpv4_range_end",
+                        "lan_dhcpv4_leasetime",
+                    ])
 
 @subcommand
 def portforward_list(hub, _args):

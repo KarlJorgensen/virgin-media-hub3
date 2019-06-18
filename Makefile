@@ -11,8 +11,9 @@ selftest: pylints
 	./virginmedia.py
 	./hub property-list
 	./hub info
-	./hub lan-status
 	./hub wan-status
+	./hub lan-status
+	./hub wifi-status
 	./hub portforward-list
 	./hub property-get hardware_version firmware_version serial_number
 	! ./hub property-set hardware_version "This should fail. Do not worry."
