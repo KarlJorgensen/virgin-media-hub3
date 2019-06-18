@@ -19,6 +19,7 @@ import collections
 import textwrap
 import types
 import warnings
+import operator
 import requests
 
 class LoginFailed(IOError):
@@ -225,20 +226,83 @@ def listed_property(func):
 def snmp_property(oid):
     """A function decorator to present an MIB value as an attribute.
 
-    The function will receive an extra keyword argument: "snmp_value"
-    in which it gets passed the value of the oid as retrieved from the
-    hub.
+    This works similar to the built-in property() class, but with a
+    twist:
+
+    - The constructor requires an OID
+
+    - the getter method will receive a keyword argument: snmp_value
+      which contains the value retrieved from SNMP.
+
+    - the setter method is expected to return a value: The return
+      value will be passed to snmp_set
 
     """
-    def real_wrapper(function):
-        @functools.wraps(function)
-        def wrapper(*args, **kwargs):
-            self = args[0]
-            kwargs["snmp_value"] = self.snmp_get(oid)
-            return function(*args, **kwargs)
-        KNOWN_PROPERTIES.add(function.__name__)
-        return property(wrapper)
-    return real_wrapper
+    class Decorator():
+        """The actual decorator.
+
+        But since this is defined inside the 'snmp_property' function,
+        it has access to the OID
+        """
+        def __init__(self, fget=None, fset=None):
+            self._fget = fget
+            self._fset = fset
+            self._listed = False
+            self._name = None
+            self._update()
+
+        def getter(self, fget):
+            """Decorator for a getter.
+
+            The getter method will receive a keyword argument:
+            snmp_value which contains the value retrieved from SNMP.
+            """
+            self._fget = fget
+            self._update()
+            return self
+
+        def setter(self, fset):
+            """Decorator for a setter.
+
+            Unlike property()'s getter, this is expected to return a
+            value - this will then be se in SNMP.
+
+            """
+            self._fset = fset
+            self._update()
+            return self
+
+        def _update(self):
+            for func in filter(operator.truth, [self._fget, self._fset]):
+                self.__doc__ = func.__doc__
+                self.__name__ = func.__name__
+                if not self._listed:
+                    listed_property(func)
+                    self._listed = True
+                return
+
+        def __get__(self, hub, *args, **kwargs):
+            if not self._fget:
+                raise AttributeError("Attribute {attr} on {hub} is not settable"
+                                     .format(attr=self._name, hub=hub))
+            kwargs["snmp_value"] = hub.snmp_get(oid)
+            return self._fget(*args, **kwargs)
+
+
+        def __set__(self, hub, *args, **kwargs):
+            if not self._fset:
+                raise AttributeError("Attribute {attr} on {hub} is not readable"
+                                     .format(attr=self._name, hub=hub))
+
+            newval = self._fset(hub, *args, **kwargs)
+            if isinstance(newval, tuple):
+                hub.snmp_set(oid, newval[0], newval[1])
+            else:
+                hub.snmp_set(oid, newval)
+            return newval
+
+    return Decorator
+
 
 def snmp_table(top_oid, columns):
     """A function decorator which does a walk of an snmp table
@@ -290,6 +354,17 @@ def snmp_table(top_oid, columns):
             return func(*args, **kwargs)
         return wrapper
     return real_wrapper
+
+class SNMPSetError(AttributeError):
+    """Gets raised when the hub refuses an SNMP Set"""
+    def __init__(self, hub, oid, response):
+        AttributeError.__init__(self,
+                                "Hub {hub} refused to set OID {oid}: Response was {response}"
+                                .format(hub=hub, oid=oid, response=response))
+        warnings.warn(self)
+        self.hub = hub
+        self.oid = oid
+        self.response = response
 
 class Hub:
     """A Virgin Media Hub3.
@@ -517,9 +592,7 @@ class Hub:
                                                              nonce=self._nonce_str))
         resp.raise_for_status()
         if not oid in resp.json().keys():
-            raise RuntimeError("Hub did not confirm setting of SNMP Value: " \
-                               "Set {oid}, but response json said {json}" \
-                               .format(oid=oid, json=resp.json()))
+            raise SNMPSetError(self, oid, resp.text)
 
         if resp.status_code == 304:
             return False
