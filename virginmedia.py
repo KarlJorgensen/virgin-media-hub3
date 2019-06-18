@@ -673,6 +673,12 @@ class Hub:
         return "Hub(hostname=%s, username=%s)" % (self._hostname, self._username)
 
     def __bool__(self):
+        """A hub is 'True' if we have credentials to log in.
+
+        Note: This does not necessarily mean we _can_ log in: The
+        credentials might be bad...
+
+        """
         return self._credential is not None
 
     @collect_stats

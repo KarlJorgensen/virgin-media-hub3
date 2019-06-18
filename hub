@@ -183,6 +183,8 @@ def property_get(hub, args):
 
 @subcommand
 @Args([
+    ("--skip-get", {"help": "Do not try to retrieve the property first",
+                    "action": "store_true")),
     ("property", {"help": "The name of the property to set",
                   "choices": virginmedia.KNOWN_PROPERTIES}),
     ("value", {"help": "Value to set the property to"})])
@@ -190,12 +192,18 @@ def property_set(hub, args):
     """Set a specific property.
 
     Note that not all properties are settable."""
-    oldvalue = getattr(hub, args.property)
+    if not args.skip_get:
+        oldvalue = getattr(hub, args.property)
+
     try:
         setattr(hub, args.property, args.value)
     except AttributeError:
         raise SystemExit("Property {0} is not settable".format(args.property))
-    print("Changed", args.property, "from", oldvalue, "to", args.value)
+
+    if args.skip_get:
+        print("Set", args.property, "to", args.value)
+    else:
+        print("Changed", args.property, "from", oldvalue, "to", args.value)
 
 @subcommand
 @Args([
