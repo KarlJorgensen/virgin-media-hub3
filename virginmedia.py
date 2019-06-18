@@ -265,7 +265,6 @@ def check_ipv4_address(param):
 
 def ipaddress(argid):
     """A function decorator that enforces that a parameter should be an IPv4 Address."""
-
     return param_check(argid, check_ipv4_address)
 
 def snmp_property(oid):
