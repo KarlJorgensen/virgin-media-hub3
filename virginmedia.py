@@ -7,20 +7,20 @@ work for other varieties too.
 """
 
 import base64
-import enum
-import random
-import time
-import json
+import collections
 import datetime
-import os
+import enum
 import functools
 import itertools
+import json
 import operator
-import collections
+import os
+import random
 import textwrap
+import time
 import types
 import warnings
-import operator
+
 import requests
 
 class LoginFailed(IOError):
