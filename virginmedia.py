@@ -9,7 +9,6 @@ work for other varieties too.
 import base64
 import collections
 import datetime
-import enum
 import functools
 import itertools
 import json
@@ -23,6 +22,8 @@ import types
 import warnings
 
 import requests
+
+import snmp
 
 class LoginFailed(IOError):
     """Exception that indicates that logging in failed.
@@ -105,9 +106,9 @@ def extract_ip_generic(hexvalue, addrtype, zero_is_none=True):
     The address type controls the conversion made
 
     """
-    if addrtype == IPVersion.IPV4:
+    if addrtype == snmp.IPVersion.IPV4:
         return extract_ip(hexvalue, zero_is_none)
-    if addrtype == IPVersion.IPV6:
+    if addrtype == snmp.IPVersion.IPV6:
         return extract_ipv6(hexvalue, zero_is_none)
 
     return "Unknown:{hexvalue=%s, addrtype=%s}" % (hexvalue, addrtype)
@@ -149,60 +150,16 @@ def extract_date(vmdate):
     second = int(vmdate[13:15], base=16)
     return datetime.datetime(year, month, dom, hour, minute, second)
 
-class Enum(enum.Enum):
-    """A convenience wrapper around the Enum class.
 
-    This provides two extra methods for driving enum values from
-    either keys or values.
-
-    """
-    @classmethod
-    def from_name(cls, name):
-        """Find the enum with the given name"""
-        try:
-            return [e for e in cls if e.name == name][0]
-        except IndexError:
-            raise IndexError("Name '%s' does not exist for class %s" % (str(name), cls.__name__))
-
-    @classmethod
-    def from_value(cls, value):
-        """Find the enum with the given value"""
-        try:
-            return [e for e in cls if e.value == value][0]
-        except IndexError:
-            raise IndexError("Value '%s' does not exist for class %s" % (str(value), cls.__name__))
-
-@enum.unique
-class Boolean(Enum):
-    """The hub's representation of True and False"""
-    # Fixme: This is complete and utter guesswork
-    TRUE = "1"
-    FALSE = "0"
-
-@enum.unique
-class IPProtocol(Enum):
-    """IP IPProtocols"""
-    UDP = "0"
-    TCP = "1"
-    BOTH = "2"
-
-@enum.unique
-class IPVersion(Enum):
-    "IP Address Version"
-    IPV4 = "1"
-    IPV6 = "2"
-
-@enum.unique
-class SNMPType(Enum):
-    """SNMP Data Types.
-
-    ...I think...
-    """
-    INT = 2
-    PORT = 66
-    STRING = 4
-
-KNOWN_PROPERTIES = set()
+KNOWN_PROPERTIES = set([
+    "language",
+    "name",
+    "serial_number",
+    "bootcode_version",
+    "hardware_version",
+    "firmware_version",
+    "customer_id"
+])
 
 def collect_stats(func):
     """A function decorator to count how many calls are done to the func.
@@ -251,7 +208,7 @@ def param_check(argid, checker):
             return func(*args, **kwargs)
         return wrapper
 
-    if not isinstance(argid, (int,str)):
+    if not isinstance(argid, (int, str)):
         raise TypeError("param_check takes an int or str, not %s" % argid.__class__)
 
     return decorator
@@ -508,6 +465,14 @@ class Hub:
         if kwargs:
             self.login(**kwargs)
 
+    language = snmp.Attribute("1.3.6.1.4.1.4115.1.20.1.1.5.6.0")
+    name = snmp.Attribute("1.3.6.1.4.1.4115.1.20.1.1.5.7.0")
+    serial_number = snmp.Attribute("1.3.6.1.4.1.4115.1.20.1.1.5.8.0")
+    bootcode_version = snmp.Attribute("1.3.6.1.4.1.4115.1.20.1.1.5.9.0")
+    hardware_version = snmp.Attribute("1.3.6.1.4.1.4115.1.20.1.1.5.10.0")
+    firmware_version = snmp.Attribute("1.3.6.1.4.1.4115.1.20.1.1.5.11.0")
+    customer_id = snmp.Attribute("1.3.6.1.4.1.4115.1.20.1.1.5.14.0")
+
     def _increment_counter(self, name, increment=1):
         """Increase a counter increment (usually) 1.
 
@@ -699,7 +664,7 @@ class Hub:
         """
         oid_value = oid
         if value is not None:
-            if datatype == SNMPType.STRING:
+            if datatype == snmp.Type.STRING:
                 oid_value += '=' + str(value).replace('$', '%24')
             else:
                 oid_value += '=' + str(value)
@@ -722,7 +687,7 @@ class Hub:
         """Tells the hub to make the previous saved settings take effect."""
         if not self._unapplied_settings:
             return
-        self.snmp_set("1.3.6.1.4.1.4115.1.20.1.1.9.0", 1, SNMPType.INT)
+        self.snmp_set("1.3.6.1.4.1.4115.1.20.1.1.9.0", 1, snmp.Type.INT)
         self._unapplied_settings = False
 
     def __str__(self):
@@ -871,10 +836,10 @@ class Hub:
 
         It seems to be possible for the router to have multiple external IP addresses...
         """
-        res = [WanNetwork(extract_ip_generic(row.ipaddr, IPVersion.from_value(row.addrtype)),
+        res = [WanNetwork(extract_ip_generic(row.ipaddr, snmp.IPVersion.from_value(row.addrtype)),
                           int(row.prefix) if row.prefix is not None else None,
                           extract_ip(row.netmask) if row.netmask is not None else None,
-                          extract_ip_generic(row.gw, IPVersion.from_value(row.addrtype)))
+                          extract_ip_generic(row.gw, snmp.IPVersion.from_value(row.addrtype)))
                for row in table_rows
                if row.prefix is not None]
         return res
@@ -976,7 +941,7 @@ class Hub:
         representing an IP address.
 
         """
-        return [extract_ip_generic(x.address, IPVersion.from_value(x.addrtype))
+        return [extract_ip_generic(x.address, snmp.IPVersion.from_value(x.addrtype))
                 for x in table_rows]
 
     @snmp_property("1.3.6.1.4.1.4115.1.20.1.1.1.13.0")
@@ -1065,7 +1030,7 @@ class Hub:
         """The first IP address of the DHCP allocation range on the LAN"""
         return extract_ip(snmp_value)
 
-    @lan_dhcpv4_range_start.setter(SNMPType.STRING)
+    @lan_dhcpv4_range_start.setter(snmp.Type.STRING)
     @ipaddress(1)
     # pylint: disable=R0201
     def _lan_dhcpv4_range_start(self, newvalue):
@@ -1077,7 +1042,7 @@ class Hub:
         """The last IP address of the DHCP allocation range on the LAN"""
         return extract_ip(snmp_value)
 
-    @lan_dhcpv4_range_end.setter(SNMPType.STRING)
+    @lan_dhcpv4_range_end.setter(snmp.Type.STRING)
     @ipaddress(1)
     # pylint: disable=R0201
     def _lan_dhcpv4_range_end(self, newvalue):
@@ -1092,7 +1057,7 @@ class Hub:
     @lan_dhcpv4_leasetime.setter
     # pylint: disable=R0201
     def lan_dhcpv4_leasetime(self, new_value):
-        return (str(new_value), SNMPType.INT)
+        return (str(new_value), snmp.Type.INT)
 
     @snmp_property("1.3.6.1.4.1.4115.1.20.1.1.2.2.1.29.200")
     # pylint: disable=R0201
@@ -1134,47 +1099,6 @@ class Hub:
     @snmp_property("1.3.6.1.4.1.4115.1.20.1.1.3.26.1.2.10101")
     # pylint: disable=R0201
     def wifi_5ghz_password(self, snmp_value):
-        return snmp_value
-
-    @snmp_property("1.3.6.1.4.1.4115.1.20.1.1.5.6.0")
-    # pylint: disable=R0201
-    def language(self, snmp_value):
-        return snmp_value
-
-    @snmp_property("1.3.6.1.4.1.4115.1.20.1.1.5.7.0")
-    # pylint: disable=R0201
-    def name(self, snmp_value):
-        "The name the hub calls itself"
-        return snmp_value
-
-    @snmp_property("1.3.6.1.4.1.4115.1.20.1.1.5.8.0")
-    # pylint: disable=R0201
-    def serial_number(self, snmp_value):
-        "Serial number of the hub"
-        return snmp_value
-
-    @snmp_property("1.3.6.1.4.1.4115.1.20.1.1.5.9.0")
-    # pylint: disable=R0201
-    def bootcode_version(self, snmp_value):
-        "Presumably the IPL firmware version?"
-        return snmp_value
-
-    @snmp_property("1.3.6.1.4.1.4115.1.20.1.1.5.10.0")
-    # pylint: disable=R0201
-    def hardware_version(self, snmp_value):
-        "Hardware version of the hub"
-        return snmp_value
-
-    @snmp_property("1.3.6.1.4.1.4115.1.20.1.1.5.11.0")
-    # pylint: disable=R0201
-    def firmware_version(self, snmp_value):
-        """Software version of the hub."""
-        return snmp_value
-
-    @snmp_property("1.3.6.1.4.1.4115.1.20.1.1.5.14.0")
-    # pylint: disable=R0201
-    def customer_id(self, snmp_value):
-        "The value 8 appears to indicate Virgin Media"
         return snmp_value
 
     @snmp_property("1.3.6.1.4.1.4115.1.20.1.1.5.15.0")
@@ -1272,15 +1196,15 @@ class Hub:
 
         # The order might look odd, but this is the same order as the
         # web interface does it...
-        doset(11, 5, SNMPType.INT) # 5 seems to be a special value here indicating "creation" ?
-        doset(3, pfentry.ext_port_start, SNMPType.PORT)
-        doset(4, pfentry.ext_port_end, SNMPType.PORT)
-        doset(5, pfentry.proto.value, SNMPType.INT)
-        doset(6, pfentry.local_addr_type.value, SNMPType.INT)
-        doset(7, ipv4_to_dollar(pfentry.local_addr).upper().replace('$', '%24'), SNMPType.STRING)
-        doset(9, pfentry.local_port_start, SNMPType.PORT)
-        doset(10, pfentry.local_port_end, SNMPType.PORT)
-        doset(11, 1, SNMPType.INT)
+        doset(11, 5, snmp.Type.INT) # 5 seems to be a special value here indicating "creation" ?
+        doset(3, pfentry.ext_port_start, snmp.Type.PORT)
+        doset(4, pfentry.ext_port_end, snmp.Type.PORT)
+        doset(5, pfentry.proto.value, snmp.Type.INT)
+        doset(6, pfentry.local_addr_type.value, snmp.Type.INT)
+        doset(7, ipv4_to_dollar(pfentry.local_addr).upper().replace('$', '%24'), snmp.Type.STRING)
+        doset(9, pfentry.local_port_start, snmp.Type.PORT)
+        doset(10, pfentry.local_port_end, snmp.Type.PORT)
+        doset(11, 1, snmp.Type.INT)
         self.apply_settings()
 
     def portforward_del(self, proto, ext_port_start, ext_port_end):
@@ -1296,7 +1220,7 @@ class Hub:
                     self.snmp_set("1.3.6.1.4.1.4115.1.20.1.1.4.12.1.11.{0}" \
                                   .format(oldentry.row_idx),
                                   6, # 6 seems to be a special value indicating removal?
-                                  SNMPType.INT)
+                                  snmp.Type.INT)
         finally:
             self.apply_settings()
 
@@ -1338,15 +1262,15 @@ class PortForwardEntry(types.SimpleNamespace):
             if "port" in key:
                 props[key] = extract_int(val)
 
-        props["enabled"] = Boolean.from_value(props["rowstatus"])
+        props["enabled"] = snmp.Boolean.from_value(props["rowstatus"])
         del props["rowstatus"]
 
-        props["local_addr_type"] = IPVersion.from_value(props["local_addr_type"])
+        props["local_addr_type"] = snmp.IPVersion.from_value(props["local_addr_type"])
         props["local_addr"] = extract_ip_generic(props["local_addr"],
                                                  props["local_addr_type"],
                                                  zero_is_none=False)
 
-        props["proto"] = IPProtocol.from_value(props["proto"])
+        props["proto"] = snmp.IPProtocol.from_value(props["proto"])
 
         props["ext_ports"] = cls.portsummary(props["ext_port_start"], props["ext_port_end"])
         props["local_ports"] = cls.portsummary(props["local_port_start"], props["local_port_end"])

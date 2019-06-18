@@ -3,8 +3,10 @@
 
 """
 import argparse
-import os
 import json
+import os
+
+import snmp
 import virginmedia
 
 SUBCOMMANDS = []
@@ -119,7 +121,7 @@ def portforward_list(hub, _args):
 @subcommand
 @Args([
     ("protocol", {"help":"Protocol to forward",
-                  "choices": [p.name for p in virginmedia.IPProtocol]}),
+                  "choices": [p.name for p in snmp.IPProtocol]}),
     ("external_port", {"type": int,
                        "help": "The external port number to map"}),
     ("internal_ip", {"help": "Internal IP address to map it to"}),
@@ -134,9 +136,9 @@ def portforward_add(hub, args):
 
     """
     pfentry = virginmedia.PortForwardEntry(
-        local_addr_type=virginmedia.IPVersion.IPV4,
+        local_addr_type=snmp.IPVersion.IPV4,
         local_addr=args.internal_ip,
-        proto=virginmedia.IPProtocol.from_name(args.protocol),
+        proto=snmp.IPProtocol.from_name(args.protocol),
         ext_port_start=args.external_port,
         ext_port_end=args.external_port,
         local_port_start=args.internal_port,
@@ -147,13 +149,13 @@ def portforward_add(hub, args):
 @subcommand
 @Args([
     ("protocol", {"help":"Protocol to forward",
-                  "choices": [p.name for p in virginmedia.IPProtocol]}),
+                  "choices": [p.name for p in snmp.IPProtocol]}),
     ("external_port", {"type": int,
                        "help": "The external port number to map"})])
 def portforward_del(hub, args):
     """Remove a port forwarding entry.
     """
-    hub.portforward_del(proto=virginmedia.IPProtocol.from_name(args.protocol),
+    hub.portforward_del(proto=snmp.IPProtocol.from_name(args.protocol),
                         ext_port_start=args.external_port,
                         ext_port_end=args.external_port)
 

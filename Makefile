@@ -1,5 +1,6 @@
 #!/usr/bin/make -f
 
+PYFILES=utils.py snmp.py virginmedia.py hub
 
 all : selftest pylints
 
@@ -17,10 +18,10 @@ selftest: pylints
 	! ./hub property-set hardware_version "This should fail. Do not worry."
 
 .PHONY: pylints
-pylints: .hub.lint .virginmedia.py.lint
+pylints: $(PYFILES:%=.%.lint)
 
 clean ::
-	rm -f .hub.lint .virginmedia.py.lint
+	rm -f $(PYFILES:%=.%.lint)
 
 # pylint exit code is a bitmask - we are only interested in fatal/error here
 .%.lint : %
