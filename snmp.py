@@ -5,6 +5,7 @@ This module implements the underlying convenience classes for setting
 and retrieving SNMP OIDs in a pythonic way.
 
 """
+import datetime
 import enum
 
 class Enum(enum.Enum):
@@ -104,8 +105,8 @@ class RawAttribute:
         instance.snmp_set(self._oid, value, self._datatype)
         readback = instance.snmp_get(self._oid)
         if readback != value:
-            raise ValueError("Hub {hub} did not accept a value of '{value}' for {oid}: "
-                             "It read back as '{rb}'"
+            raise ValueError("{hub} did not accept a value of '{value}' for {oid}: "
+                             "It read back as '{rb}'!?"
                              .format(hub=instance,
                                      value=value,
                                      oid=self._oid,
@@ -126,6 +127,52 @@ class NullTranslator:
     def human(snmp_value):
         "Returns the input value"
         return snmp_value
+
+class BoolTranslator:
+    "Translates python boolean values to/from the router's representation"
+    type = Type.INT
+    @staticmethod
+    def snmp(human_value):
+        if isinstance(human_value, str) and human_value.lower() == "false":
+            return "2"
+        return "1" if human_value else "2"
+    @staticmethod
+    def human(snmp_value):
+        return snmp_value == "1"
+
+class IntTranslator:
+    """Translates integers values to/from the router's representation.
+
+    Generally, the router represents them as decimal strings, but it
+    is nice to have them typecast correctly.
+
+    """
+    type = Type.INT
+    @staticmethod
+    def snmp(human_value):
+        return str(int(human_value))
+    @staticmethod
+    def human(snmp_value):
+        if snmp_value == "":
+            return 0
+        return int(snmp_value)
+
+class MacAddressTranslator:
+    """
+    The hub represents mac addresses as e.g. "$787b8a6413f5" - i.e. a
+    dollar sign followed by 12 hex digits, which we need to transform
+    to the traditional mac address representation.
+    """
+    type = Type.STRING
+    @staticmethod
+    def human(snmp_value):
+        res = snmp_value[1:3]
+        for idx in range(3, 13, 2):
+            res += ':' + snmp_value[idx:idx+2]
+        return res
+    @staticmethod
+    def snmp(human_value):
+        raise NotImplementedError()
 
 class IPv4Translator:
     """Handles translation of IPv4 addresses to/from the hub.
@@ -148,13 +195,64 @@ class IPv4Translator:
     @staticmethod
     def human(snmp_value):
         "Translates a hub-representation of an ipv4 address to human-readable form"
-        if snmp_value == "$00000000":
+        if snmp_value in ["", "$00000000"]:
             return None
         ipaddr = (str(int(snmp_value[1:3], base=16))
                   + '.' + str(int(snmp_value[3:5], base=16))
                   + '.' + str(int(snmp_value[5:7], base=16))
                   + '.' + str(int(snmp_value[7:9], base=16)))
         return ipaddr
+
+class IPv6Translator:
+    """
+        The router encodes IPv6 address in hex, prefixed by a dollar sign
+    """
+
+    type = Type.STRING
+
+    @staticmethod
+    def snmp(human_value):
+        raise NotImplementedError()
+
+    @staticmethod
+    def human(snmp_value):
+        if snmp_value == "$00000000000000000000000000000000":
+            return None
+        res = snmp_value[1:5]
+        for chunk in range(5, 30, 4):
+            res += ':' + snmp_value[chunk:chunk+4]
+        return res
+
+class DateTimeTranslator:
+    """
+    Dates (such as the DHCP lease expiry time) are encoded somewhat stranger
+    than even IP addresses:
+
+    E.g. "$07e2030e10071100" is:
+         0x07e2 : year = 2018
+             0x03 : month = March
+               0x0e : day-of-month = 14
+                 0x10 : hour = 16 (seems to at least use 24hr clock!)
+                   0x07 : minute = 07
+                     0x11 : second = 17
+                       0x00 : junk
+    """
+    type = Type.STRING
+    @staticmethod
+    def human(snmp_value):
+        if snmp_value is None or snmp_value in ["", "$0000000000000000"]:
+            return None
+        year = int(snmp_value[1:5], base=16)
+        month = int(snmp_value[5:7], base=16)
+        dom = int(snmp_value[7:9], base=16)
+        hour = int(snmp_value[9:11], base=16)
+        minute = int(snmp_value[11:13], base=16)
+        second = int(snmp_value[13:15], base=16)
+        return datetime.datetime(year, month, dom, hour, minute, second)
+
+    @staticmethod
+    def snmp(human_value):
+        raise NotImplementedError()
 
 class Attribute(RawAttribute):
     """A generic SNMP Attribute which can use a translator.
