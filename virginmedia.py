@@ -225,8 +225,6 @@ def listed_property(func):
     KNOWN_PROPERTIES.add(func.__name__)
     return func
 
-ipaddr_re = re.compile("\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}")
-
 def param_check(argid, checker):
     """A function decorator that enforces that a parameter should pass _checker_.
 
@@ -253,14 +251,16 @@ def param_check(argid, checker):
             return func(*args, **kwargs)
         return wrapper
 
-    if not (isinstance(argid, int) or isinstance(argid, str)):
+    if not isinstance(argid, (int,str)):
         raise TypeError("param_check takes an int or str, not %s" % argid.__class__)
 
     return decorator
 
+IPADDR_RE = re.compile("\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}")
+
 def check_ipv4_address(param):
     """Raise ValueError if the parameter is not an ipv4 address"""
-    if not ipaddr_re.fullmatch(param):
+    if not IPADDR_RE.fullmatch(param):
         raise ValueError("'%s' is not an IP address" % param)
 
 def ipaddress(argid):
@@ -351,7 +351,7 @@ def snmp_property(oid):
 
             newval = self._fset(hub, *args, **kwargs)
             if isinstance(newval, tuple):
-                hub.snmp_set(oid, *tuple)
+                hub.snmp_set(oid, *newval)
             else:
                 hub.snmp_set(oid, newval, self._datatype)
             return newval
@@ -796,11 +796,13 @@ class Hub:
 
         """
     @snmp_property("1.3.6.1.4.1.4115.1.3.3.1.1.1.3.2.0")
+    # pylint: disable=R0201
     def network_access(self, snmp_value):
         """Whether the hub has got network access."""
         return snmp_value == "1"
 
     @snmp_property("1.3.6.1.4.1.4115.1.3.4.1.1.14.0")
+    # pylint: disable=R0201
     def docsis_base_tod_status(self, snmp_value):
         """The TOD status"""
         statusmap = {
@@ -821,26 +823,31 @@ class Hub:
             return "Unknown SNMP value %s" % snmp_value
 
     @snmp_property("1.3.6.1.4.1.4115.1.3.4.1.3.8.0")
+    # pylint: disable=R0201
     def cmDoc30SetupPacketCableRegion(self, snmp_value):
         "TODO: Figure out what this is..."
         return int(snmp_value)
 
     @snmp_property("1.3.6.1.4.1.4115.1.20.1.1.1.1.0")
+    # pylint: disable=R0201
     def wan_conn_type(self, snmp_value):
         "The type of WAN connection"
         return snmp_value
 
     @snmp_property("1.3.6.1.4.1.4115.1.20.1.1.1.2.0")
+    # pylint: disable=R0201
     def wan_conn_hostname(self, snmp_value):
         "The host name the hub presents to the ISP"
         return snmp_value
 
     @snmp_property("1.3.6.1.4.1.4115.1.20.1.1.1.3.0")
+    # pylint: disable=R0201
     def wan_conn_domainname(self, snmp_value):
         "The domain name given to the hub by the ISP"
         return snmp_value
 
     @snmp_property("1.3.6.1.4.1.4115.1.20.1.1.1.4.0")
+    # pylint: disable=R0201
     def wan_mtu_size(self, snmp_value):
         """The MTU on the WAN"""
         return extract_int(snmp_value)
@@ -873,46 +880,55 @@ class Hub:
         return res
 
     @snmp_property("1.3.6.1.4.1.4115.1.20.1.1.1.7.1.3.1")
+    # pylint: disable=R0201
     def wan_current_ipaddr_ipv4(self, snmp_value):
         """The current external IP address of the hub"""
         return extract_ip(snmp_value)
 
     @snmp_property("1.3.6.1.4.1.4115.1.20.1.1.1.7.1.3.2")
+    # pylint: disable=R0201
     def wan_current_ipaddr_ipv6(self, snmp_value):
         "Current external IPv6 address of hub"
         return  extract_ipv6(snmp_value)
 
     @snmp_property("1.3.6.1.4.1.4115.1.20.1.1.1.7.1.8.1")
+    # pylint: disable=R0201
     def wan_current_netmask(self, snmp_value):
         """The WAN network mask - e.g. '255.255.248.0'"""
         return extract_ip(snmp_value)
 
     @snmp_property("1.3.6.1.4.1.4115.1.20.1.1.1.7.1.6.1")
+    # pylint: disable=R0201
     def wan_current_gw_ipv4(self, snmp_value):
         """Default gateway of the hub"""
         return extract_ip(snmp_value)
 
     @snmp_property("1.3.6.1.4.1.4115.1.20.1.1.1.7.1.6.2")
+    # pylint: disable=R0201
     def wan_current_gw_ipv6(self, snmp_value):
         "Default IPv6 gateway"
         return  extract_ipv6(snmp_value)
 
     @snmp_property("1.3.6.1.4.1.4115.1.20.1.1.1.10.1.0")
+    # pylint: disable=R0201
     def wan_user_name(self, snmp_value):
         """WAN L2TP user name"""
         return snmp_value if snmp_value else None
 
     @snmp_property("1.3.6.1.4.1.4115.1.20.1.1.1.10.2.0")
+    # pylint: disable=R0201
     def wan_password(self, snmp_value):
         """WAN L2TP password"""
         return snmp_value if snmp_value else None
 
     @snmp_property("1.3.6.1.4.1.4115.1.20.1.1.1.10.3.0")
+    # pylint: disable=R0201
     def wan_enable_idle_timeout(self, snmp_value):
         """enable/disable WAN L2TP idle timeout"""
         return snmp_value == "1"
 
     @snmp_property("1.3.6.1.4.1.4115.1.20.1.1.1.10.4.0")
+    # pylint: disable=R0201
     def wan_idle_timeout(self, snmp_value):
         """WAN L2TP idle timeout in seconds.
 
@@ -931,14 +947,17 @@ class Hub:
         return extract_ip(self.snmp_get("1.3.6.1.4.1.4115.1.20.1.1.1.10.6.0"))
 
     @snmp_property("1.3.6.1.4.1.4115.1.20.1.1.1.10.8.0")
+    # pylint: disable=R0201
     def wan_keepalive_enabled(self, snmp_value):
         return snmp_value == "1"
 
     @snmp_property("1.3.6.1.4.1.4115.1.20.1.1.1.10.9.0")
+    # pylint: disable=R0201
     def wan_keepalive_timeout(self, snmp_value):
         return extract_int(snmp_value)
 
     @snmp_property("1.3.6.1.4.1.4115.1.20.1.1.1.11.1.0")
+    # pylint: disable=R0201
     def wan_use_auto_dns(self, snmp_value):
         return snmp_value == "1"
 
@@ -961,6 +980,7 @@ class Hub:
                 for x in table_rows]
 
     @snmp_property("1.3.6.1.4.1.4115.1.20.1.1.1.13.0")
+    # pylint: disable=R0201
     def wan_if_macaddr(self, snmp_value):
         """MAC address on the WAN interface.
 
@@ -970,6 +990,7 @@ class Hub:
         return extract_mac(snmp_value)
 
     @snmp_property("1.3.6.1.4.1.4115.1.20.1.1.1.12.3.0")
+    # pylint: disable=R0201
     def wan_dhcp_duration_ipv4(self, snmp_value):
         """The number of seconds the current WAN DHCP ipv4 lease will remain valid.
 
@@ -979,6 +1000,7 @@ class Hub:
         return extract_int(snmp_value)
 
     @snmp_property("1.3.6.1.4.1.4115.1.20.1.1.1.12.4.0")
+    # pylint: disable=R0201
     def wan_dhcp_expire_ipv4(self, snmp_value):
         """The date/time the current WAN DHCP lease will expire.
 
@@ -986,6 +1008,7 @@ class Hub:
         return extract_date(snmp_value)
 
     @snmp_property("1.3.6.1.4.1.4115.1.20.1.1.1.12.7.0")
+    # pylint: disable=R0201
     def wan_dhcp_duration_ipv6(self, snmp_value):
         """The number of seconds the current WAN DHCP ipv6 lease will remain valid.
 
@@ -995,6 +1018,7 @@ class Hub:
         return extract_int(snmp_value)
 
     @snmp_property("1.3.6.1.4.1.4115.1.20.1.1.1.12.8.0")
+    # pylint: disable=R0201
     def wan_dhcp_expire_ipv6(self, snmp_value):
         """The date/time the current WAN DHCP lease will expire.
 
@@ -1002,11 +1026,13 @@ class Hub:
         return extract_date(snmp_value)
 
     @snmp_property("1.3.6.1.4.1.4115.1.20.1.1.1.12.9.0")
+    # pylint: disable=R0201
     def wan_dhcp_server_ip(self, snmp_value):
         """IP address of DHCP server that gave the hub a lease"""
         return extract_ip(snmp_value)
 
     @snmp_property("1.3.6.1.4.1.4115.1.20.1.1.1.17")
+    # pylint: disable=R0201
     def wan_ip_prov_mode(self, snmp_value):
         """eRouter initialization mode"""
         if snmp_value == 1:
@@ -1014,117 +1040,145 @@ class Hub:
         return snmp_value
 
     @snmp_property("1.3.6.1.4.1.4115.1.20.1.1.2.2.1.3.200")
+    # pylint: disable=R0201
     def lan_subnetmask(self, snmp_value):
         return extract_ip(snmp_value)
 
     @snmp_property("1.3.6.1.4.1.4115.1.20.1.1.2.2.1.5.200")
+    # pylint: disable=R0201
     def lan_gateway_ipv4(self, snmp_value):
         return extract_ip(snmp_value)
 
     @snmp_property("1.3.6.1.4.1.4115.1.20.1.1.2.2.1.7.200")
+    # pylint: disable=R0201
     def lan_gateway2_ipv4(self, snmp_value):
         return extract_ip(snmp_value)
 
     @snmp_property("1.3.6.1.4.1.4115.1.20.1.1.2.2.1.9.200")
+    # pylint: disable=R0201
     def lan_dhcp_enabled(self, snmp_value):
         return int(snmp_value) == 1
 
     @snmp_property("1.3.6.1.4.1.4115.1.20.1.1.2.2.1.11.200")
+    # pylint: disable=R0201
     def lan_dhcpv4_range_start(self, snmp_value):
+        """The first IP address of the DHCP allocation range on the LAN"""
         return extract_ip(snmp_value)
 
     @lan_dhcpv4_range_start.setter(SNMPType.STRING)
     @ipaddress(1)
-    def lan_dhcpv4_range_start(self, newvalue):
+    # pylint: disable=R0201
+    def _lan_dhcpv4_range_start(self, newvalue):
         return ipv4_to_dollar(newvalue)
 
     @snmp_property("1.3.6.1.4.1.4115.1.20.1.1.2.2.1.13.200")
+    # pylint: disable=R0201
     def lan_dhcpv4_range_end(self, snmp_value):
+        """The last IP address of the DHCP allocation range on the LAN"""
         return extract_ip(snmp_value)
 
     @lan_dhcpv4_range_end.setter(SNMPType.STRING)
     @ipaddress(1)
-    def lan_dhcpv4_range_end(self, newvalue):
+    # pylint: disable=R0201
+    def _lan_dhcpv4_range_end(self, newvalue):
         return ipv4_to_dollar(newvalue)
 
     @snmp_property("1.3.6.1.4.1.4115.1.20.1.1.2.2.1.14.200")
+    # pylint: disable=R0201
     def lan_dhcpv4_leasetime(self, snmp_value):
         """The lease time (in seconds)"""
         return extract_int(snmp_value)
 
     @lan_dhcpv4_leasetime.setter
+    # pylint: disable=R0201
     def lan_dhcpv4_leasetime(self, new_value):
         return (str(new_value), SNMPType.INT)
 
     @snmp_property("1.3.6.1.4.1.4115.1.20.1.1.2.2.1.29.200")
+    # pylint: disable=R0201
     def lan_dhcpv6_prefixlength(self, snmp_value):
         return extract_int(snmp_value)
 
     @snmp_property("1.3.6.1.4.1.4115.1.20.1.1.2.2.1.31.200")
+    # pylint: disable=R0201
     def lan_dhcpv6_range_start(self, snmp_value):
         if snmp_value == "$00000000000000000000000000000000":
             return None
         return snmp_value
 
     @snmp_property("1.3.6.1.4.1.4115.1.20.1.1.2.2.1.33.200")
+    # pylint: disable=R0201
     def lan_dhcpv6_leasetime(self, snmp_value):
         return extract_int(snmp_value)
 
     @snmp_property("1.3.6.1.4.1.4115.1.20.1.1.2.2.1.39.200")
+    # pylint: disable=R0201
     def lan_parentalcontrols_enabled(self, snmp_value):
         return snmp_value
 
     @snmp_property("1.3.6.1.4.1.4115.1.20.1.1.3.22.1.2.10001")
+    # pylint: disable=R0201
     def wifi_24ghz_essid(self, snmp_value):
         return snmp_value
 
     @snmp_property("1.3.6.1.4.1.4115.1.20.1.1.3.22.1.2.10101")
+    # pylint: disable=R0201
     def wifi_5ghz_essid(self, snmp_value):
         return snmp_value
 
     @snmp_property("1.3.6.1.4.1.4115.1.20.1.1.3.26.1.2.10001")
+    # pylint: disable=R0201
     def wifi_24ghz_password(self, snmp_value):
         return snmp_value
 
     @snmp_property("1.3.6.1.4.1.4115.1.20.1.1.3.26.1.2.10101")
+    # pylint: disable=R0201
     def wifi_5ghz_password(self, snmp_value):
         return snmp_value
 
     @snmp_property("1.3.6.1.4.1.4115.1.20.1.1.5.6.0")
+    # pylint: disable=R0201
     def language(self, snmp_value):
         return snmp_value
 
     @snmp_property("1.3.6.1.4.1.4115.1.20.1.1.5.7.0")
+    # pylint: disable=R0201
     def name(self, snmp_value):
         "The name the hub calls itself"
         return snmp_value
 
     @snmp_property("1.3.6.1.4.1.4115.1.20.1.1.5.8.0")
+    # pylint: disable=R0201
     def serial_number(self, snmp_value):
         "Serial number of the hub"
         return snmp_value
 
     @snmp_property("1.3.6.1.4.1.4115.1.20.1.1.5.9.0")
+    # pylint: disable=R0201
     def bootcode_version(self, snmp_value):
         "Presumably the IPL firmware version?"
         return snmp_value
 
     @snmp_property("1.3.6.1.4.1.4115.1.20.1.1.5.10.0")
+    # pylint: disable=R0201
     def hardware_version(self, snmp_value):
         "Hardware version of the hub"
         return snmp_value
 
     @snmp_property("1.3.6.1.4.1.4115.1.20.1.1.5.11.0")
+    # pylint: disable=R0201
     def firmware_version(self, snmp_value):
         """Software version of the hub."""
         return snmp_value
 
     @snmp_property("1.3.6.1.4.1.4115.1.20.1.1.5.14.0")
+    # pylint: disable=R0201
     def customer_id(self, snmp_value):
         "The value 8 appears to indicate Virgin Media"
         return snmp_value
 
     @snmp_property("1.3.6.1.4.1.4115.1.20.1.1.5.15.0")
+    # pylint: disable=R0201
     def current_time(self, snmp_value):
         """The current time on the hub.
 
@@ -1133,15 +1187,18 @@ class Hub:
         return extract_date(snmp_value)
 
     @snmp_property("1.3.6.1.4.1.4115.1.20.1.1.5.16.1.2.1")
+    # pylint: disable=R0201
     def auth_username(self, snmp_value):
         """The name of the admin user"""
         return snmp_value
 
     @snmp_property("1.3.6.1.4.1.4115.1.20.1.1.5.62.0")
+    # pylint: disable=R0201
     def first_install_wizard_completed(self, snmp_value):
         return snmp_value == "1"
 
     @snmp_property("1.3.6.1.4.1.4491.2.1.14.1.5.4.0")
+    # pylint: disable=R0201
     def esafeErouterInitModeCtrl(self, snmp_value):
         "TODO: Figure out what this is..."
         return int(snmp_value)
@@ -1187,6 +1244,7 @@ class Hub:
                  "9": "local_port_start",
                  "10": "local_port_end",
                  "11": "rowstatus"})
+    # pylint: disable=R0201
     def portforward_list(self, table_rows=None):
         """Get a list of port forwardings from the hub.
 
@@ -1276,9 +1334,9 @@ class PortForwardEntry(types.SimpleNamespace):
         props = snmprow._asdict()
 
         # Cast port numbers
-        for k, v in props.items():
-            if "port" in k:
-                props[k] = extract_int(v)
+        for key, val in props.items():
+            if "port" in key:
+                props[key] = extract_int(val)
 
         props["enabled"] = Boolean.from_value(props["rowstatus"])
         del props["rowstatus"]

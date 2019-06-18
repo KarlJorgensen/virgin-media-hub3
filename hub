@@ -44,7 +44,7 @@ def dump_properties(hub, props):
         print(prop, ":", getattr(hub, prop))
 
 @subcommand
-def info(hub, args):
+def info(hub, _args):
     """Show General information about the hub"""
     dump_properties(hub,
                     [
@@ -65,7 +65,7 @@ def info(hub, args):
                     ])
 
 @subcommand
-def lan_status(hub, args):
+def lan_status(hub, _args):
     """Show LAN settings"""
     dump_properties(hub,
                     [
@@ -83,7 +83,7 @@ def lan_status(hub, args):
                     ])
 
 @subcommand
-def wan_status(hub, args):
+def wan_status(hub, _args):
     """Show Wide Area Network settings"""
     dump_properties(hub,
                     [
@@ -107,7 +107,7 @@ def wan_status(hub, args):
                         ])
 
 @subcommand
-def portforward_list(hub, args):
+def portforward_list(hub, _args):
     """List current port forwardings"""
 
     fmt = "{e.proto.name:<4s} {e.ext_ports:<10s} " \
@@ -158,14 +158,14 @@ def portforward_del(hub, args):
                         ext_port_end=args.external_port)
 
 @subcommand
-def device_list(hub, args):
+def device_list(hub, _args):
     """List devices connected to the hub"""
     for dev in hub.device_list():
         print(dev)
 
 @subcommand
 @nohub
-def property_list(args):
+def property_list(_args):
     """Get a list of the known property names. Not all properties will be settable"""
     for prop in sorted(virginmedia.KNOWN_PROPERTIES):
         print(prop)
