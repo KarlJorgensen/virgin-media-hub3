@@ -284,64 +284,6 @@ class SNMPSetError(AttributeError):
         self.oid = oid
         self.response = response
 
-def unique_everseen(iterable, key=None):
-    "List unique elements, preserving order. Remember all elements ever seen."
-    # unique_everseen('AAAABBBCCDAABBB') --> A B C D
-    # unique_everseen('ABBCcAD', str.lower) --> A B C D
-    seen = set()
-    seen_add = seen.add
-    if key is None:
-        for element in itertools.filterfalse(seen.__contains__, iterable):
-            seen_add(element)
-            yield element
-    else:
-        for element in iterable:
-            k = key(element)
-            if k not in seen:
-                seen_add(k)
-                yield element
-
-def print_table(table_rows):
-    """Print a table in a nice human-readable format.
-
-    This is mostly useful for development - e.g. printing snmp
-    table_rows things, but might be useful for other things too...
-
-    """
-    column_names = list(unique_everseen([fieldname
-                                         for row in table_rows
-                                         for fieldname in row._fields]))
-    column_widths = {colname: max(len(colname),
-                                  max(map(len,
-                                          map(str,
-                                              filter(operator.truth,
-                                                     [getattr(row, colname, None)
-                                                      for row in table_rows])))))
-                     for colname in column_names}
-
-    def horiz_line(vbar="+"):
-        res = vbar
-        for column_name in column_names:
-            res += "-"
-            res += "-" * column_widths[column_name]
-            res += "-" + vbar
-        return res
-
-    def row_text(row):
-        res = '|'
-        for column_name in column_names:
-            val = str(row[column_name]) if row[column_name] else ""
-            res += ' ' + val.ljust(column_widths[column_name])
-            res += ' |'
-        return res
-
-    print(horiz_line())
-    print(row_text({c: c for c in column_names}))
-    print(horiz_line())
-    for row in table_rows:
-        print(row_text(row._asdict()))
-    print(horiz_line())
-
 WanNetwork = collections.namedtuple("WanNetwork", ['ipaddr', 'prefix', 'netmask', 'gw'])
 
 class Hub:

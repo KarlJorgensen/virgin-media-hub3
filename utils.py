@@ -6,6 +6,7 @@ change.
 
 """
 import functools
+import itertools
 
 def debug(func):
     """A function decorator that will print function calls and their results"""
@@ -19,3 +20,95 @@ def debug(func):
                                                            res=res))
         return res
     return wrapper
+
+def unique_everseen(iterable, key=None):
+    "List unique elements, preserving order. Remember all elements ever seen."
+    # unique_everseen('AAAABBBCCDAABBB') --> A B C D
+    # unique_everseen('ABBCcAD', str.lower) --> A B C D
+    seen = set()
+    seen_add = seen.add
+    if key is None:
+        for element in itertools.filterfalse(seen.__contains__, iterable):
+            seen_add(element)
+            yield element
+    else:
+        for element in iterable:
+            k = key(element)
+            if k not in seen:
+                seen_add(k)
+                yield element
+
+def format_table(table_rows):
+    """Print a list of dicts in a nice human-readable format.
+
+    This is mostly useful for development - e.g. printing snmp
+    table_rows things, but might be useful for other things too...
+    """
+    import snmp
+    if not isinstance(table_rows, list):
+        if isinstance(table_rows, dict) or isinstance(table_rows, snmp.Table):
+            table_rows = table_rows.values()
+        else:
+            raise TypeError("format_table takes a dict or list, not %s" % table_rows.__class__)
+    else:
+        raise TypeError("format_table takes a dict or list, not %s" % table_rows.__class__)
+
+    column_names = list(unique_everseen([fieldname
+                                         for row in table_rows
+                                         for fieldname in row.keys()]))
+
+    # print("Column names:", column_names)
+
+    column_widths = {colname: max([len(colname)] + \
+                                  list(map(len,
+                                           map(str,
+                                               [row[colname]
+                                                for row in table_rows
+                                                if colname in row]))))
+                     for colname in column_names}
+
+    # print("Columnn widths:", column_widths)
+
+    def horiz_line(vbar="+"):
+        res = vbar
+        for column_name in column_names:
+            res += "-"
+            res += "-" * column_widths[column_name]
+            res += "-" + vbar
+        return res
+
+    def row_text(row):
+        res = '|'
+        for column_name in column_names:
+            if column_name in row:
+                val = str(row[column_name]) if row[column_name] else ""
+            else:
+                val = ""
+            res += ' ' + val.ljust(column_widths[column_name])
+            res += ' |'
+        return res
+
+    fmt = horiz_line() + "\n"
+    fmt += row_text({c: c for c in column_names}) + "\n"
+    fmt += horiz_line() + "\n"
+
+    for row in table_rows:
+        fmt += row_text(row) + "\n"
+
+    fmt += horiz_line() + "\n"
+    return fmt
+
+if __name__ == "__main__":
+
+    print(format_table(
+        [{"country": "Denmark",
+          "language": "Danish",
+          "Lego": "quite awesome",
+          "Intellibility/Readability": 11},
+         {"country": "Sweden",
+          "language": "Swedish",
+          "Crazy": True},
+         {"language": "Python",
+          "Crazy": 0.5,
+          "Intellibility/Readability": True},
+        ]))

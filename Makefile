@@ -8,6 +8,7 @@ all : selftest pylints
 
 .PHONY: selftest
 selftest: pylints
+	./utils.py
 	./virginmedia.py
 	./hub property-list
 	./hub info
