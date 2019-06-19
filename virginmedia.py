@@ -149,62 +149,6 @@ def extract_date(vmdate):
     second = int(vmdate[13:15], base=16)
     return datetime.datetime(year, month, dom, hour, minute, second)
 
-
-KNOWN_PROPERTIES = set([
-    "auth_username",
-    "bootcode_version",
-    "current_time",
-    "customer_id",
-    "firmware_version",
-    "first_install_wizard_completed",
-    "hardware_version",
-    "lan_dhcp_enabled",
-    "lan_dhcpv4_leasetime",
-    "lan_dhcpv4_range_end",
-    "lan_dhcpv4_range_start",
-    "lan_dhcpv6_leasetime",
-    "lan_dhcpv6_prefixlength",
-    "lan_dhcpv6_range_start",
-    "lan_gateway2_ipv4",
-    "lan_gateway_ipv4",
-    "lan_parentalcontrols_enabled",
-    "lan_subnetmask",
-    "language",
-    "name",
-    "network_access",
-    "serial_number",
-    "wan_conn_domainname",
-    "wan_conn_hostname",
-    "wan_current_gw_ipv4",
-    "wan_current_gw_ipv6",
-    "wan_current_ipaddr_ipv4",
-    "wan_current_ipaddr_ipv6",
-    "wan_current_netmask",
-    "wan_dhcp_duration_ipv4",
-    "wan_dhcp_duration_ipv6",
-    "wan_dhcp_expire_ipv4",
-    "wan_dhcp_expire_ipv6",
-    "wan_dhcp_server_ip",
-    "wan_if_macaddr",
-    "wan_ip_prov_mode",
-    "wan_l2tp_enable_idle_timeout",
-    "wan_l2tp_idle_timeout",
-    "wan_l2tp_keepalive_enabled",
-    "wan_l2tp_keepalive_timeout",
-    "wan_l2tp_password",
-    "wan_l2tp_password",
-    "wan_l2tp_tunnel_addr",
-    "wan_l2tp_tunnel_hostname",
-    "wan_l2tp_username",
-    "wan_l2tp_username",
-    "wan_mtu_size",
-    "wan_use_auto_dns",
-    "wifi_24ghz_essid",
-    "wifi_24ghz_password",
-    "wifi_5ghz_essid",
-    "wifi_5ghz_password",
-])
-
 def collect_stats(func):
     """A function decorator to count how many calls are done to the func.
 
@@ -220,11 +164,6 @@ def collect_stats(func):
                                 increment=time.time()-start)
         return result
     return wrapper
-
-def listed_property(func):
-    """A function decorator which adds the function to the list of known attributes"""
-    KNOWN_PROPERTIES.add(func.__name__)
-    return func
 
 def param_check(argid, checker):
     """A function decorator that enforces that a parameter should pass _checker_.
@@ -281,7 +220,6 @@ def snmp_property(oid):
         def __init__(self, fget=None, fset=None):
             self._fget = fget
             self._fset = fset
-            self._listed = False
             self._name = None
             self._datatype = None
             self._update()
@@ -321,9 +259,6 @@ def snmp_property(oid):
             for func in filter(operator.truth, [self._fget, self._fset]):
                 self.__doc__ = func.__doc__
                 self.__name__ = func.__name__
-                if not self._listed:
-                    listed_property(func)
-                    self._listed = True
                 return
 
         def __get__(self, hub, *args, **kwargs):
@@ -623,13 +558,11 @@ class Hub:
         self._family = attrs.get("family")
 
     @property
-    @listed_property
     def modelname(self):
         """The model name of the hub"""
         return self._modelname
 
     @property
-    @listed_property
     def family(self):
         """The hardware family of he hub"""
         return self._family
@@ -774,10 +707,8 @@ class Hub:
         return result
 
     @property
-    @listed_property
     def lanIPAddress(self):
         return json.loads(self._get('getPreLoginData').content)["gwaddr"]
-
 
     max_cpe_allowed = snmp.Attribute("1.3.6.1.4.1.4115.1.3.3.1.1.1.3.1.0",
                                      snmp.IntTranslator)
@@ -831,7 +762,6 @@ class Hub:
     "The MTU on the WAN"
 
     @property
-    @listed_property
     @snmp_table("1.3.6.1.4.1.4115.1.20.1.1.1.7.1",
                 {"2": "addrtype",
                  "3": "ipaddr",
@@ -910,7 +840,6 @@ class Hub:
     "Use automatic DNS servers as specified by ISP and DHCP"
 
     @property
-    @listed_property
     @snmp_table("1.3.6.1.4.1.4115.1.20.1.1.1.11.2.1",
                 {"2": "addrtype",
                  "3": "address"})
@@ -1208,6 +1137,10 @@ class DeviceInfo:
         return "DeviceInfo(ipv4_address=%s, mac_address=%s, connected=%s, name=%s)" \
             % (self.ipv4_address, self.mac_address, self.connected, self.name)
 
+HUB_PROPERTIES = [name
+                  for name, value in Hub.__dict__.items()
+                  if not name.startswith("_") and not callable(value)]
+
 def _demo():
     with Hub() as hub:
         password = os.environ.get('HUB_PASSWORD')
@@ -1215,7 +1148,7 @@ def _demo():
             hub.login(password=password)
 
         print('Demo Properties:')
-        for name in sorted(KNOWN_PROPERTIES):
+        for name in sorted(HUB_PROPERTIES):
             try:
                 val = getattr(hub, name)
                 print('-', name, ":", val.__class__.__name__, ":", val)

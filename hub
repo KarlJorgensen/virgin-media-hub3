@@ -186,14 +186,14 @@ def device_list(hub, _args):
 @nohub
 def property_list(_args):
     """Get a list of the known property names. Not all properties will be settable"""
-    for prop in sorted(virginmedia.KNOWN_PROPERTIES):
+    for prop in sorted(virginmedia.HUB_PROPERTIES):
         print(prop)
 
 @subcommand
 @Args([
     ("property", {"nargs": "+",
                   "help": "The property to retrieve",
-                  "choices": virginmedia.KNOWN_PROPERTIES})
+                  "choices": virginmedia.HUB_PROPERTIES})
 ])
 def property_get(hub, args):
     """Get one or more properties"""
@@ -205,7 +205,7 @@ def property_get(hub, args):
     ("--skip-get", {"help": "Do not try to retrieve the property first",
                     "action": "store_true"}),
     ("property", {"help": "The name of the property to set",
-                  "choices": virginmedia.KNOWN_PROPERTIES}),
+                  "choices": virginmedia.HUB_PROPERTIES}),
     ("value", {"help": "Value to set the property to"})])
 def property_set(hub, args):
     """Set a specific property.
