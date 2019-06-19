@@ -7,6 +7,7 @@ and retrieving SNMP OIDs in a pythonic way.
 """
 import datetime
 import enum
+import textwrap
 
 class Enum(enum.Enum):
     """A convenience wrapper around the Enum class.
@@ -80,6 +81,7 @@ class RawAttribute:
         self._datatype = datatype
         self._value = value
         self._value_gotten = (value is not None)
+        self.__doc__ = "SNMP Attribute {0}, assumed to be {1}".format(oid, datatype.name)
 
     @property
     def oid(self):
@@ -259,9 +261,15 @@ class Attribute(RawAttribute):
 
     The translator will map the SNMP values to and from 'human' values
     """
-    def __init__(self, oid, translator=NullTranslator, value=None):
+    def __init__(self, oid, translator=NullTranslator, value=None, doc=None):
         RawAttribute.__init__(self, oid, datatype=translator.type, value=value)
         self._translator = translator
+        if doc:
+            self.__doc__ = textwrap.dedent(doc) + "\n\nCorresponds to SNMP attribute {0}, translated by {1}" \
+                .format(oid, translator.__name__)
+        else:
+            self.__doc__ = "SNMP Attribute {0}, as translated by {1}" \
+                .format(oid, translator.__name__)
 
     def __get__(self, instance, owner):
         return self._translator.human(RawAttribute.__get__(self, instance, owner))

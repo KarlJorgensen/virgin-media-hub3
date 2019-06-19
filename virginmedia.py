@@ -8,7 +8,6 @@ work for other varieties too.
 
 import base64
 import collections
-import datetime
 import functools
 import itertools
 import json
@@ -48,21 +47,6 @@ class AccessDenied(IOError):
     def __init__(self, msg):
         IOError.__init__(self, msg)
 
-def extract_int(strvalue, zero_is_none=True):
-    """Extract an integer from a string.
-
-    This is almost like the int() function - except that this one
-    knows how to handle input values of None or the empty string.
-
-    For convenience, it can also convert zero-valued results into None
-    """
-    if strvalue is None or strvalue == "":
-        return None
-    ival = int(strvalue)
-    if zero_is_none and ival == 0:
-        return None
-    return ival
-
 def extract_ip(hexvalue, zero_is_none=True):
     """Extract an IP address to a sensible format.
 
@@ -76,16 +60,6 @@ def extract_ip(hexvalue, zero_is_none=True):
     if ipaddr == "0.0.0.0" and zero_is_none:
         return None
     return ipaddr
-
-def ipv4_to_dollar(address):
-    """Translates an IP address to the router's representation.
-
-    The router encodes IPv4 addresses in hex, prefixed by a dollar
-    sign, e.g. "$c2a80464" => 192.168.4.100
-    """
-    def tohex(decimal):
-        return "{0:0>2s}".format(hex(int(decimal))[2:].lower())
-    return "$" + ''.join(map(tohex, address.split('.')))
 
 def extract_ipv6(hexvalue, zero_is_none=True):
     """Extract an IPv6 address to a sensible format
@@ -111,43 +85,6 @@ def extract_ip_generic(hexvalue, addrtype, zero_is_none=True):
         return extract_ipv6(hexvalue, zero_is_none)
 
     return "Unknown:{hexvalue=%s, addrtype=%s}" % (hexvalue, addrtype)
-
-def extract_mac(mac):
-    """Extract a mac address from the hub response.
-
-    The hub represents mac addresses as e.g. "$787b8a6413f5" - i.e. a
-    dollar sign followed by 12 hex digits, which we need to transform
-    to the traditional mac address representation.
-
-    """
-    res = mac[1:3]
-    for idx in range(3, 13, 2):
-        res += ':' + mac[idx:idx+2]
-    return res
-
-def extract_date(vmdate):
-    """
-    Dates (such as the DHCP lease expiry time) are encoded somewhat stranger
-    than even IP addresses:
-
-    E.g. "$07e2030e10071100" is:
-         0x07e2 : year = 2018
-             0x03 : month = March
-               0x0e : day-of-month = 14
-                 0x10 : hour = 16 (seems to at least use 24hr clock!)
-                   0x07 : minute = 07
-                     0x11 : second = 17
-                       0x00 : junk
-    """
-    if vmdate is None or vmdate in ["", "$0000000000000000"]:
-        return None
-    year = int(vmdate[1:5], base=16)
-    month = int(vmdate[5:7], base=16)
-    dom = int(vmdate[7:9], base=16)
-    hour = int(vmdate[9:11], base=16)
-    minute = int(vmdate[11:13], base=16)
-    second = int(vmdate[13:15], base=16)
-    return datetime.datetime(year, month, dom, hour, minute, second)
 
 def collect_stats(func):
     """A function decorator to count how many calls are done to the func.
@@ -433,7 +370,13 @@ class Hub:
         if kwargs:
             self.login(**kwargs)
 
-    language = snmp.Attribute("1.3.6.1.4.1.4115.1.20.1.1.5.6.0")
+    language = snmp.Attribute("1.3.6.1.4.1.4115.1.20.1.1.5.6.0",
+                              doc="""\
+                              Hub interface language.
+
+                              On the Virgin Media hub, setting this
+                              appears to have no effect.  """)
+
     name = snmp.Attribute("1.3.6.1.4.1.4115.1.20.1.1.5.7.0")
     serial_number = snmp.Attribute("1.3.6.1.4.1.4115.1.20.1.1.5.8.0")
     bootcode_version = snmp.Attribute("1.3.6.1.4.1.4115.1.20.1.1.5.9.0")
@@ -674,11 +617,12 @@ class Hub:
 
     @collect_stats
     def __del__(self):
+        """Logs out of the hub"""
         self.logout()
 
     @collect_stats
     def snmp_walk(self, oid):
-        """Perfor an SNMP Walk from the given OID.
+        """Perform an SNMP Walk from the given OID.
 
         The resulting data will be returned as a dict, where the keys
         are OIDs and the values are their corresponding values.
@@ -951,7 +895,7 @@ class Hub:
         """
         mac_prefix = "1.3.6.1.4.1.4115.1.20.1.1.2.4.2.1.4.200.1.4"
         for oid, mac in list(self.snmp_walk(mac_prefix).items()):
-            yield DeviceInfo(self, oid[len(mac_prefix)+1:], extract_mac(mac))
+            yield DeviceInfo(self, oid[len(mac_prefix)+1:], snmp.MacAddressTranslator.human(mac))
 
     def get_device(self, ipv4_address):
         """Get information for the given device
@@ -965,7 +909,7 @@ class Hub:
         mac = self.snmp_get("1.3.6.1.4.1.4115.1.20.1.1.2.4.2.1.4.200.1.4.%s" % ipv4_address)
         if not mac:
             return None
-        return DeviceInfo(self, ipv4_address, extract_mac(mac))
+        return DeviceInfo(self, ipv4_address, snmp.MacAddressTranslator.human(mac))
 
 
     @snmp_table("1.3.6.1.4.1.4115.1.20.1.1.4.12.1",
@@ -1012,7 +956,9 @@ class Hub:
         doset(4, pfentry.ext_port_end, snmp.Type.PORT)
         doset(5, pfentry.proto.value, snmp.Type.INT)
         doset(6, pfentry.local_addr_type.value, snmp.Type.INT)
-        doset(7, ipv4_to_dollar(pfentry.local_addr).upper().replace('$', '%24'), snmp.Type.STRING)
+        doset(7,
+              snmp.IPv4Translator.snmp(pfentry.local_addr).upper().replace('$', '%24'),
+              snmp.Type.STRING)
         doset(9, pfentry.local_port_start, snmp.Type.PORT)
         doset(10, pfentry.local_port_end, snmp.Type.PORT)
         doset(11, 1, snmp.Type.INT)
@@ -1071,7 +1017,7 @@ class PortForwardEntry(types.SimpleNamespace):
         # Cast port numbers
         for key, val in props.items():
             if "port" in key:
-                props[key] = extract_int(val)
+                props[key] = snmp.IntTranslator.human(val)
 
         props["enabled"] = snmp.Boolean.from_value(props["rowstatus"])
         del props["rowstatus"]

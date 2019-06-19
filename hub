@@ -236,6 +236,9 @@ def property_set(hub, args):
 def snmp_get(hub, args):
     """Retrieve an SNMP property from the hub.
 
+    This is mostly useful for developers. The output of this command
+    may vary between versions.
+
     """
     args.oid = args.oid.strip('.')
     print("{o} = {v}".format(o=args.oid, v=hub.snmp_get(args.oid)))
@@ -247,6 +250,9 @@ def snmp_get(hub, args):
              "e.g. '1.3.6.1.4.1.4115.1.20.1.1.5.10.0'"})])
 def snmp_walk(hub, args):
     """Do an SNMP walk on the hub.
+
+    This is mostly useful for developers. The output of this command
+    may vary between versions.
 
     """
     args.oid = args.oid.strip('.')
