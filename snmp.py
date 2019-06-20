@@ -329,10 +329,11 @@ class RowBase(TransportProxy):
     __repr__ = __str__
 
 class Table(TransportProxyDict):
-    def __init__(self, transport, table_oid, column_mapping):
+    def __init__(self, transport, table_oid, column_mapping, walk_result=None):
         super().__init__(transport)
 
-        walk_result = transport.snmp_walk(table_oid)
+        if not walk_result:
+            walk_result = transport.snmp_walk(table_oid)
 
         def column_id(oid):
             return oid[len(table_oid)+1:].split('.')[0]
