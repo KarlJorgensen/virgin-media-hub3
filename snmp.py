@@ -102,11 +102,11 @@ class NullTranslator:
     """A translator which does nothing"""
     snmp_datatype = DataType.STRING
     @staticmethod
-    def snmp(human_value):
+    def snmp(python_value):
         "Returns the input value"
-        return human_value
+        return python_value
     @staticmethod
-    def human(snmp_value):
+    def pyvalue(snmp_value):
         "Returns the input value"
         return snmp_value
 
@@ -114,23 +114,23 @@ class BoolTranslator:
     "Translates python boolean values to/from the router's representation"
     snmp_datatype = DataType.INT
     @staticmethod
-    def snmp(human_value):
-        if isinstance(human_value, str) and human_value.lower() == "false":
+    def snmp(python_value):
+        if isinstance(python_value, str) and python_value.lower() == "false":
             return "2"
-        return "1" if human_value else "2"
+        return "1" if python_value else "2"
     @staticmethod
-    def human(snmp_value):
+    def pyvalue(snmp_value):
         return snmp_value == "1"
 
 class IPVersionTranslator:
     snmp_datatype = DataType.STRING
 
     @staticmethod
-    def snmp(human_value):
-        return IPVersion[human_value].value
+    def snmp(python_value):
+        return IPVersion[python_value].value
 
     @staticmethod
-    def human(snmp_value):
+    def pyvalue(snmp_value):
         return IPVersion(snmp_value).name
 
 class IntTranslator:
@@ -142,10 +142,10 @@ class IntTranslator:
     """
     snmp_datatype = DataType.INT
     @staticmethod
-    def snmp(human_value):
-        return str(int(human_value))
+    def snmp(python_value):
+        return str(int(python_value))
     @staticmethod
-    def human(snmp_value):
+    def pyvalue(snmp_value):
         if snmp_value == "":
             return 0
         return int(snmp_value)
@@ -158,13 +158,13 @@ class MacAddressTranslator:
     """
     snmp_datatype = DataType.STRING
     @staticmethod
-    def human(snmp_value):
+    def pyvalue(snmp_value):
         res = snmp_value[1:3]
         for idx in range(3, 13, 2):
             res += ':' + snmp_value[idx:idx+2]
         return res
     @staticmethod
-    def snmp(human_value):
+    def snmp(python_value):
         raise NotImplementedError()
 
 class IPv4Translator:
@@ -177,17 +177,17 @@ class IPv4Translator:
     snmp_datatype = DataType.STRING
 
     @staticmethod
-    def snmp(human_value):
+    def snmp(python_value):
         "Translates an ipv4 address to something the hub understands"
-        if human_value is None:
+        if python_value is None:
             return "$00000000"
         def tohex(decimal):
             return "{0:0>2s}".format(hex(int(decimal))[2:].lower())
-        return "$" + ''.join(map(tohex, human_value.split('.')))
+        return "$" + ''.join(map(tohex, python_value.split('.')))
 
     @staticmethod
-    def human(snmp_value):
-        "Translates a hub-representation of an ipv4 address to human-readable form"
+    def pyvalue(snmp_value):
+        "Translates a hub-representation of an ipv4 address to a python-friendly form"
         if snmp_value in ["", "$00000000"]:
             return None
         ipaddr = (str(int(snmp_value[1:3], base=16))
@@ -204,11 +204,11 @@ class IPv6Translator:
     snmp_datatype = DataType.STRING
 
     @staticmethod
-    def snmp(human_value):
+    def snmp(python_value):
         raise NotImplementedError()
 
     @staticmethod
-    def human(snmp_value):
+    def pyvalue(snmp_value):
         if snmp_value == "$00000000000000000000000000000000":
             return None
         res = snmp_value[1:5]
@@ -232,7 +232,7 @@ class DateTimeTranslator:
     """
     snmp_datatype = DataType.STRING
     @staticmethod
-    def human(snmp_value):
+    def pyvalue(snmp_value):
         if snmp_value is None or snmp_value in ["", "$0000000000000000"]:
             return None
         year = int(snmp_value[1:5], base=16)
@@ -244,13 +244,13 @@ class DateTimeTranslator:
         return datetime.datetime(year, month, dom, hour, minute, second)
 
     @staticmethod
-    def snmp(human_value):
+    def snmp(python_value):
         raise NotImplementedError()
 
 class Attribute(RawAttribute):
     """A generic SNMP Attribute which can use a translator.
 
-    The translator will map the SNMP values to and from 'human' values
+    The translator will map the SNMP values to/from Python values
     """
     def __init__(self, oid, translator=NullTranslator, value=None, doc=None):
         RawAttribute.__init__(self, oid, datatype=translator.snmp_datatype, value=value)
@@ -264,7 +264,7 @@ class Attribute(RawAttribute):
                 .format(oid, translator.__name__)
 
     def __get__(self, instance, owner):
-        return self._translator.human(RawAttribute.__get__(self, instance, owner))
+        return self._translator.pyvalue(RawAttribute.__get__(self, instance, owner))
 
     def __set__(self, instance, value):
         return RawAttribute.__set__(self, instance, self._translator.snmp(value))

@@ -856,7 +856,7 @@ class Hub:
         """
         mac_prefix = "1.3.6.1.4.1.4115.1.20.1.1.2.4.2.1.4.200.1.4"
         for oid, mac in list(self.snmp_walk(mac_prefix).items()):
-            yield DeviceInfo(self, oid[len(mac_prefix)+1:], snmp.MacAddressTranslator.human(mac))
+            yield DeviceInfo(self, oid[len(mac_prefix)+1:], snmp.MacAddressTranslator.pyvalue(mac))
 
     def get_device(self, ipv4_address):
         """Get information for the given device
@@ -870,7 +870,7 @@ class Hub:
         mac = self.snmp_get("1.3.6.1.4.1.4115.1.20.1.1.2.4.2.1.4.200.1.4.%s" % ipv4_address)
         if not mac:
             return None
-        return DeviceInfo(self, ipv4_address, snmp.MacAddressTranslator.human(mac))
+        return DeviceInfo(self, ipv4_address, snmp.MacAddressTranslator.pyvalue(mac))
 
 
     @snmp_table("1.3.6.1.4.1.4115.1.20.1.1.4.12.1",
@@ -978,7 +978,7 @@ class PortForwardEntry(types.SimpleNamespace):
         # Cast port numbers
         for key, val in props.items():
             if "port" in key:
-                props[key] = snmp.IntTranslator.human(val)
+                props[key] = snmp.IntTranslator.pyvalue(val)
 
         props["enabled"] = snmp.Boolean(props["rowstatus"])
         del props["rowstatus"]
