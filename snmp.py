@@ -334,11 +334,6 @@ class Table(TransportProxyDict):
 
         walk_result = transport.snmp_walk(table_oid)
 
-        # print("table oid", table_oid)
-        # print("Walk result:")
-        # pprint.pprint(walk_result)
-        # print()
-
         def column_id(oid):
             return oid[len(table_oid)+1:].split('.')[0]
 
@@ -361,46 +356,23 @@ class Table(TransportProxyDict):
             result_dict[this_row_id][column_mapping[this_column_id]['name']] = \
                 (oid, raw_value, column_mapping[this_column_id])
 
-        # print("result_dict:")
-        # pprint.pprint(result_dict)
-        # print()
-
         # Then go through the result, and create a pseudo object for each row
         for rowkey, row in result_dict.items():
-            # print(">> Start of rowkey", rowkey)
             class_dict = {mapping["name"]: Attribute(oid=oid,
                                                      value=raw_value,
                                                      doc=mapping.get('doc'),
                                                      translator=mapping.get('translator',
                                                                             NullTranslator))
                           for oid, raw_value, mapping in row.values()}
-            # print("class_dict:")
-            # pprint.pprint(class_dict)
-            # print()
 
             RowTemplate = type('RowTemplate', (RowBase,), class_dict)
 
             therow = RowTemplate(self, class_dict)
-            # print("therow:")
-            # pprint.pprint(therow)
 
             self[rowkey] = therow
-            # print("<< End of rowkey", rowkey)
-
-        # print("="*50)
-        # print()
-
-        # if DONE:
-        #     raise NotImplementedError()
-        # DONE=True
-        # pprint.pprint(self)
-        # print("="*50)
-        # print("="*50)
 
     def format(self):
         return utils.format_table(self.aslist())
 
     def aslist(self):
         return self.values()
-
-DONE = False
