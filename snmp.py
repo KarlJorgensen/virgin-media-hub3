@@ -7,7 +7,9 @@ and retrieving SNMP OIDs in a pythonic way.
 """
 import datetime
 import enum
+import re
 import textwrap
+#import warnings
 
 import utils
 
@@ -167,7 +169,7 @@ class IntTranslator(Translator):
     snmp_datatype = DataType.INT
     @staticmethod
     def snmp(python_value):
-        if python_value == None:
+        if python_value is None:
             return ""
         return str(int(python_value))
     @staticmethod
@@ -192,6 +194,9 @@ class MacAddressTranslator(Translator):
     def snmp(python_value):
         raise NotImplementedError()
 
+_IPV4_SNMP_RE = re.compile(r"\$[0-9a-fA-F]{8}")
+_IPV4_PY_RE = re.compile(r"[0-9]{1,3}(\.[0-9]{1,3}){3}")
+
 class IPv4Translator(Translator):
     """Handles translation of IPv4 addresses to/from the hub.
 
@@ -203,6 +208,9 @@ class IPv4Translator(Translator):
         "Translates an ipv4 address to something the hub understands"
         if python_value is None:
             return "$00000000"
+        if not _IPV4_PY_RE.fullmatch(python_value):
+            raise ValueError("PY Value '%s' does not look like a proper IPv4 Address"
+                             % python_value)
         def tohex(decimal):
             return "{0:0>2s}".format(hex(int(decimal))[2:].lower())
         return "$" + ''.join(map(tohex, python_value.split('.')))
@@ -212,11 +220,15 @@ class IPv4Translator(Translator):
         "Translates a hub-representation of an ipv4 address to a python-friendly form"
         if snmp_value in ["", "$00000000"]:
             return None
+        if not _IPV4_SNMP_RE.fullmatch(snmp_value):
+            raise ValueError("SNMP Value '%s' does not like a proper IPv4 address" % snmp_value)
         ipaddr = (str(int(snmp_value[1:3], base=16))
                   + '.' + str(int(snmp_value[3:5], base=16))
                   + '.' + str(int(snmp_value[5:7], base=16))
                   + '.' + str(int(snmp_value[7:9], base=16)))
         return ipaddr
+
+_IPV6_SNMP_RE = re.compile(r"\$[0-9a-fA-F]{32}")
 
 class IPv6Translator(Translator):
     """
@@ -229,12 +241,32 @@ class IPv6Translator(Translator):
 
     @staticmethod
     def pyvalue(snmp_value):
-        if snmp_value == "$00000000000000000000000000000000":
+        if snmp_value in ["", "$00000000000000000000000000000000"]:
             return None
+        if not _IPV6_SNMP_RE.fullmatch(snmp_value):
+            raise ValueError("SNMP Value '%s' does not look like a proper IPv6 address"
+                             % snmp_value)
         res = snmp_value[1:5]
         for chunk in range(5, 30, 4):
             res += ':' + snmp_value[chunk:chunk+4]
         return res
+
+class IPAddressTranslator(Translator):
+    """Translates to/from IP address. It will understand both IPv4 and IPv6 addresses"""
+    @staticmethod
+    def snmp(python_value):
+        try:
+            return IPv4Translator.snmp(python_value)
+        except ValueError:
+#            warnings.warn("python value '%s' was not an IPv4 address" % python_value)
+            return IPv6Translator.snmp(python_value)
+    @staticmethod
+    def pyvalue(snmp_value):
+        try:
+            return IPv4Translator.pyvalue(snmp_value)
+        except ValueError:
+#            warnings.warn("SNMP value '%s' was not an IPv4 address" % snmp_value)
+            return IPv6Translator.pyvalue(snmp_value)
 
 class DateTimeTranslator(Translator):
     """

@@ -708,8 +708,7 @@ class Hub:
     "WAN L2TP idle timeout in seconds"
 
     wan_l2tp_tunnel_addr = snmp.Attribute("1.3.6.1.4.1.4115.1.20.1.1.1.10.6.0",
-                                          snmp.IPv4Translator)
-    # TODO: This is not _necessarily_ an IPv4 address...
+                                          snmp.IPAddressTranslator)
 
     wan_l2tp_tunnel_hostname = snmp.Attribute("1.3.6.1.4.1.4115.1.20.1.1.1.10.7.0")
     "Host name of the tunnel server. Either hostname or IP address is required."
@@ -744,21 +743,50 @@ class Hub:
 
     @property
     def wan_current_table(self):
+        """Table contains information for a specific Wan IP address.
+
+        In some environments, there may be both an IPv6 and IPv6
+        address or multiple IPv6 addresses.
+
+        The size of this table is usually limited to 4 entries
+
+        """
         return snmp.Table(self,
                           "1.3.6.1.4.1.4115.1.20.1.1.1.7.1",
                           {
                               "1": {"name": "IPIndex"},
-                              "2": {"name": "IPAddrType", "translator": snmp.IPVersionTranslator},
-                              "3": {"name": "IPAddr"},
-                              "4": {"name": "Prefix", "translator": snmp.IntTranslator},
-                              "5": {"name": "GWType", "translator": snmp.IPVersionTranslator},
-                              "6": {"name": "GW"},
-                              "7": {"name": "IPType"},
-                              "8": {"name": "NetMask", "translator": snmp.IPv4Translator},
-                              "9": {"name": "PrefixDelegationV6", "translator": snmp.IPv6Translator},
-                              "10": {"name": "PrefixDelegationV6Len", "translator": snmp.IntTranslator},
-                              "11": {"name": "PreferredLifetimeV6", "translator": snmp.IntTranslator},
-                              "12": {"name": "ValidLifetimeV6", "translator": snmp.IntTranslator},
+                              "2": {"name": "IPAddrType",
+                                    "translator": snmp.IPVersionTranslator,
+                                    "doc": "Static IP address type"},
+                              "3": {"name": "IPAddr",
+                                    "translator": snmp.IPAddressTranslator,
+                                    "doc": "Static IP addressfor Wan connection"},
+                              "4": {"name": "Prefix",
+                                    "translator": snmp.IntTranslator,
+                                    "doc": "Netmask (Prefix)"},
+                              "8": {"name": "NetMask",
+                                    "translator": snmp.IPv4Translator,
+                                    "doc": "Netmask if it is IPv4"},
+                              "5": {"name": "GWType",
+                                    "translator": snmp.IPVersionTranslator,
+                                    "doc": "Gateway Address type"},
+                              "6": {"name": "GW",
+                                    "translator": snmp.IPAddressTranslator,
+                                    "doc": "Gateway address"},
+                              # "7": {"name": "IPType",
+                              #       "translator": snmp.IPVersionTranslator,
+                              #       "doc": "Type of IP address. This appears to be unreliable..."},
+                              "9": {"name": "PrefixDelegationV6",
+                                    "translator": snmp.IPv6Translator,
+                                    "doc": "The length for the prefix to be delegated to attached CPEs"},
+                              "10": {"name": "PrefixDelegationV6Len",
+                                     "translator": snmp.IntTranslator},
+                              "11": {"name": "PreferredLifetimeV6",
+                                     "translator": snmp.IntTranslator,
+                                     "doc": "The preferred lifetime for the assigned IPv6 address of the router"},
+                              "12": {"name": "ValidLifetimeV6",
+                                     "translator": snmp.IntTranslator,
+                                     "doc": "The valid lifetime for the assigned IPv6 address of the router"},
                           })
 
     wan_if_macaddr = snmp.Attribute("1.3.6.1.4.1.4115.1.20.1.1.1.13.0",
@@ -795,11 +823,11 @@ class Hub:
     lan_subnetmask = snmp.Attribute("1.3.6.1.4.1.4115.1.20.1.1.2.2.1.3.200",
                                     snmp.IPv4Translator)
 
-    lan_gateway_ipv4 = snmp.Attribute("1.3.6.1.4.1.4115.1.20.1.1.2.2.1.5.200",
-                                      snmp.IPv4Translator)
+    lan_gateway = snmp.Attribute("1.3.6.1.4.1.4115.1.20.1.1.2.2.1.5.200",
+                                 snmp.IPAddressTranslator)
 
-    lan_gateway2_ipv4 = snmp.Attribute("1.3.6.1.4.1.4115.1.20.1.1.2.2.1.7.200",
-                                       snmp.IPv4Translator)
+    lan_gateway2 = snmp.Attribute("1.3.6.1.4.1.4115.1.20.1.1.2.2.1.7.200",
+                                  snmp.IPAddressTranslator)
 
     lan_dhcp_enabled = snmp.Attribute("1.3.6.1.4.1.4115.1.20.1.1.2.2.1.9.200",
                                       snmp.BoolTranslator)
