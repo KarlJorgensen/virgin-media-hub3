@@ -5,7 +5,6 @@ This module implements the underlying convenience classes for setting
 and retrieving SNMP OIDs in a pythonic way.
 
 """
-import dataclasses
 import datetime
 import enum
 import textwrap
@@ -20,7 +19,7 @@ class IPVersion(enum.Enum):
     GodKnows = "4"
 
 @enum.unique
-class Type(enum.Enum):
+class DataType(enum.Enum):
     """SNMP Data Types.
 
     ...I think...
@@ -71,7 +70,7 @@ class RawAttribute:
 
     @property
     def datatype(self):
-        """The Data Type - one of the Type enums"""
+        """The Data Type - one of the DataType enums"""
         return self._datatype
 
     def refresh(self, instance):
@@ -101,7 +100,7 @@ class RawAttribute:
 
 class NullTranslator:
     """A translator which does nothing"""
-    type = Type.STRING
+    snmp_datatype = DataType.STRING
     @staticmethod
     def snmp(human_value):
         "Returns the input value"
@@ -113,7 +112,7 @@ class NullTranslator:
 
 class BoolTranslator:
     "Translates python boolean values to/from the router's representation"
-    type = Type.INT
+    snmp_datatype = DataType.INT
     @staticmethod
     def snmp(human_value):
         if isinstance(human_value, str) and human_value.lower() == "false":
@@ -124,7 +123,7 @@ class BoolTranslator:
         return snmp_value == "1"
 
 class IPVersionTranslator:
-    type = Type.STRING
+    snmp_datatype = DataType.STRING
 
     @staticmethod
     def snmp(human_value):
@@ -141,7 +140,7 @@ class IntTranslator:
     is nice to have them typecast correctly.
 
     """
-    type = Type.INT
+    snmp_datatype = DataType.INT
     @staticmethod
     def snmp(human_value):
         return str(int(human_value))
@@ -157,7 +156,7 @@ class MacAddressTranslator:
     dollar sign followed by 12 hex digits, which we need to transform
     to the traditional mac address representation.
     """
-    type = Type.STRING
+    snmp_datatype = DataType.STRING
     @staticmethod
     def human(snmp_value):
         res = snmp_value[1:3]
@@ -175,7 +174,7 @@ class IPv4Translator:
     e.g. "$c2a80464" => 192.168.4.100
     """
 
-    type = Type.STRING
+    snmp_datatype = DataType.STRING
 
     @staticmethod
     def snmp(human_value):
@@ -202,7 +201,7 @@ class IPv6Translator:
         The router encodes IPv6 address in hex, prefixed by a dollar sign
     """
 
-    type = Type.STRING
+    snmp_datatype = DataType.STRING
 
     @staticmethod
     def snmp(human_value):
@@ -231,7 +230,7 @@ class DateTimeTranslator:
                      0x11 : second = 17
                        0x00 : junk
     """
-    type = Type.STRING
+    snmp_datatype = DataType.STRING
     @staticmethod
     def human(snmp_value):
         if snmp_value is None or snmp_value in ["", "$0000000000000000"]:
@@ -254,7 +253,7 @@ class Attribute(RawAttribute):
     The translator will map the SNMP values to and from 'human' values
     """
     def __init__(self, oid, translator=NullTranslator, value=None, doc=None):
-        RawAttribute.__init__(self, oid, datatype=translator.type, value=value)
+        RawAttribute.__init__(self, oid, datatype=translator.snmp_datatype, value=value)
         self._translator = translator
         if doc:
             self.__doc__ = textwrap.dedent(doc) + \

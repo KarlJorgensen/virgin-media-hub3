@@ -519,7 +519,7 @@ class Hub:
         """
         oid_value = oid
         if value is not None:
-            if datatype == snmp.Type.STRING:
+            if datatype == snmp.DataType.STRING:
                 oid_value += '=' + str(value).replace('$', '%24')
             else:
                 oid_value += '=' + str(value)
@@ -542,7 +542,7 @@ class Hub:
         """Tells the hub to make the previous saved settings take effect."""
         if not self._unapplied_settings:
             return
-        self.snmp_set("1.3.6.1.4.1.4115.1.20.1.1.9.0", 1, snmp.Type.INT)
+        self.snmp_set("1.3.6.1.4.1.4115.1.20.1.1.9.0", 1, snmp.DataType.INT)
         self._unapplied_settings = False
 
     def __str__(self):
@@ -912,17 +912,17 @@ class Hub:
 
         # The order might look odd, but this is the same order as the
         # web interface does it...
-        doset(11, 5, snmp.Type.INT) # 5 seems to be a special value here indicating "creation" ?
-        doset(3, pfentry.ext_port_start, snmp.Type.PORT)
-        doset(4, pfentry.ext_port_end, snmp.Type.PORT)
-        doset(5, pfentry.proto.value, snmp.Type.INT)
-        doset(6, pfentry.local_addr_type.value, snmp.Type.INT)
+        doset(11, 5, snmp.DataType.INT) # 5 seems to be a special value here indicating "creation" ?
+        doset(3, pfentry.ext_port_start, snmp.DataType.PORT)
+        doset(4, pfentry.ext_port_end, snmp.DataType.PORT)
+        doset(5, pfentry.proto.value, snmp.DataType.INT)
+        doset(6, pfentry.local_addr_type.value, snmp.DataType.INT)
         doset(7,
               snmp.IPv4Translator.snmp(pfentry.local_addr).upper().replace('$', '%24'),
-              snmp.Type.STRING)
-        doset(9, pfentry.local_port_start, snmp.Type.PORT)
-        doset(10, pfentry.local_port_end, snmp.Type.PORT)
-        doset(11, 1, snmp.Type.INT)
+              snmp.DataType.STRING)
+        doset(9, pfentry.local_port_start, snmp.DataType.PORT)
+        doset(10, pfentry.local_port_end, snmp.DataType.PORT)
+        doset(11, 1, snmp.DataType.INT)
         self.apply_settings()
 
     def portforward_del(self, proto, ext_port_start, ext_port_end):
@@ -938,7 +938,7 @@ class Hub:
                     self.snmp_set("1.3.6.1.4.1.4115.1.20.1.1.4.12.1.11.{0}" \
                                   .format(oldentry.row_idx),
                                   6, # 6 seems to be a special value indicating removal?
-                                  snmp.Type.INT)
+                                  snmp.DataType.INT)
         finally:
             self.apply_settings()
 
