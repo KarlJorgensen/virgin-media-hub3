@@ -44,15 +44,6 @@ def format_table(table_rows):
     This is mostly useful for development - e.g. printing snmp
     table_rows things, but might be useful for other things too...
     """
-    import snmp
-    if not isinstance(table_rows, list):
-        if isinstance(table_rows, dict) or isinstance(table_rows, snmp.Table):
-            table_rows = table_rows.values()
-        else:
-            raise TypeError("format_table takes a dict or list, not %s" % table_rows.__class__)
-    else:
-        raise TypeError("format_table takes a dict or list, not %s" % table_rows.__class__)
-
     column_names = list(unique_everseen([fieldname
                                          for row in table_rows
                                          for fieldname in row.keys()]))
@@ -62,9 +53,12 @@ def format_table(table_rows):
     column_widths = {colname: max([len(colname)] + \
                                   list(map(len,
                                            map(str,
-                                               [row[colname]
+                                               [getattr(row, colname)
                                                 for row in table_rows
-                                                if colname in row]))))
+                                                if hasattr(row, colname)] \
+                                               + [row[colname]
+                                                  for row in table_rows
+                                                  if isinstance(row, dict) and colname in row]))))
                      for colname in column_names}
 
     # print("Columnn widths:", column_widths)
@@ -77,11 +71,22 @@ def format_table(table_rows):
             res += "-" + vbar
         return res
 
+    def row_header(column_names):
+        res = '|'
+        for column_name in column_names:
+            res += ' ' + str(column_name).ljust(column_widths[column_name])
+            res += ' |'
+        return res
+
     def row_text(row):
         res = '|'
         for column_name in column_names:
-            if column_name in row:
-                val = str(row[column_name]) if row[column_name] else ""
+            if hasattr(row, column_name):
+                cellvalue = getattr(row, column_name)
+                val = str(cellvalue) if cellvalue is not None else ""
+            elif column_name in row.keys():
+                cellvalue = row[column_name]
+                val = str(cellvalue) if cellvalue is not None else ""
             else:
                 val = ""
             res += ' ' + val.ljust(column_widths[column_name])
@@ -89,7 +94,7 @@ def format_table(table_rows):
         return res
 
     fmt = horiz_line() + "\n"
-    fmt += row_text({c: c for c in column_names}) + "\n"
+    fmt += row_header(column_names) + "\n"
     fmt += horiz_line() + "\n"
 
     for row in table_rows:

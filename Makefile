@@ -13,6 +13,7 @@ selftest: pylints
 	./hub property-list
 	./hub info
 	./hub wan-status
+	./hub wan-iplist
 	./hub lan-status
 	./hub wifi-status
 	./hub portforward-list

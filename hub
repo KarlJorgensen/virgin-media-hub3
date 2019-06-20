@@ -16,6 +16,7 @@ def subcommand(func):
     SUBCOMMANDS.append(func)
     return func
 
+# pylint: disable=R0903
 class Args:
     """A function decorator that adds arguments to a subcommand.
 
@@ -258,6 +259,11 @@ def snmp_walk(hub, args):
     args.oid = args.oid.strip('.')
     res = hub.snmp_walk(args.oid)
     print(json.dumps(res, sort_keys=True, indent=2))
+
+@subcommand
+def wan_iplist(hub, _args):
+    """Prints the current external IP addresses of the hub"""
+    print(hub.wan_current_table.format())
 
 def main():
     """Main function. Obviously!"""

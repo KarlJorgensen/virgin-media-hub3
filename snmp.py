@@ -5,41 +5,22 @@ This module implements the underlying convenience classes for setting
 and retrieving SNMP OIDs in a pythonic way.
 
 """
+import dataclasses
 import datetime
 import enum
 import textwrap
 
-class Enum(enum.Enum):
-    """A convenience wrapper around the Enum class.
-
-    This provides two extra methods for driving enum values from
-    either keys or values.
-
-    """
-    @classmethod
-    def from_name(cls, name):
-        """Find the enum with the given name"""
-        try:
-            return [e for e in cls if e.name == name][0]
-        except IndexError:
-            raise IndexError("Name '%s' does not exist for class %s" % (str(name), cls.__name__))
-
-    @classmethod
-    def from_value(cls, value):
-        """Find the enum with the given value"""
-        try:
-            return [e for e in cls if e.value == value][0]
-        except IndexError:
-            raise IndexError("Value '%s' does not exist for class %s" % (str(value), cls.__name__))
+import utils
 
 @enum.unique
-class IPVersion(Enum):
+class IPVersion(enum.Enum):
     "IP Address Version"
-    IPV4 = "1"
-    IPV6 = "2"
+    IPv4 = "1"
+    IPv6 = "2"
+    GodKnows = "4"
 
 @enum.unique
-class Type(Enum):
+class Type(enum.Enum):
     """SNMP Data Types.
 
     ...I think...
@@ -49,14 +30,14 @@ class Type(Enum):
     STRING = 4
 
 @enum.unique
-class Boolean(Enum):
+class Boolean(enum.Enum):
     """The hub's representation of True and False"""
     # Fixme: This is complete and utter guesswork
     TRUE = "1"
     FALSE = "0"
 
 @enum.unique
-class IPProtocol(Enum):
+class IPProtocol(enum.Enum):
     """IP IPProtocols"""
     UDP = "0"
     TCP = "1"
@@ -141,6 +122,17 @@ class BoolTranslator:
     @staticmethod
     def human(snmp_value):
         return snmp_value == "1"
+
+class IPVersionTranslator:
+    type = Type.STRING
+
+    @staticmethod
+    def snmp(human_value):
+        return IPVersion[human_value].value
+
+    @staticmethod
+    def human(snmp_value):
+        return IPVersion(snmp_value).name
 
 class IntTranslator:
     """Translates integers values to/from the router's representation.
@@ -265,7 +257,8 @@ class Attribute(RawAttribute):
         RawAttribute.__init__(self, oid, datatype=translator.type, value=value)
         self._translator = translator
         if doc:
-            self.__doc__ = textwrap.dedent(doc) + "\n\nCorresponds to SNMP attribute {0}, translated by {1}" \
+            self.__doc__ = textwrap.dedent(doc) + \
+                "\n\nCorresponds to SNMP attribute {0}, translated by {1}" \
                 .format(oid, translator.__name__)
         else:
             self.__doc__ = "SNMP Attribute {0}, as translated by {1}" \
@@ -276,3 +269,126 @@ class Attribute(RawAttribute):
 
     def __set__(self, instance, value):
         return RawAttribute.__set__(self, instance, self._translator.snmp(value))
+
+class TransportProxy:
+    """Forwards snmp_get/snmp_set calls to another class/instance."""
+    def __init__(self, transport):
+        """Create a TransportProxy which forwards to the given transport"""
+        self._transport = transport
+    def snmp_get(self, *args, **kwargs):
+        return self._transport.snmp_get(*args, *kwargs)
+    def snmp_set(self, *args, **kwargs):
+        return self._transport.snmp_set(*args, *kwargs)
+    def snmp_walk(self, *args, **kwargs):
+        return self._transport.snmp_walk(*args, *kwargs)
+
+class TransportProxyDict(TransportProxy, dict):
+    def __init__(self, transport, cells=None):
+        TransportProxy.__init__(self, transport)
+
+class RowBase(TransportProxy):
+    def __init__(self, proxy, keys):
+        super().__init__(proxy)
+        self._keys = keys
+
+    def keys(self):
+        return self._keys
+
+    def values(self):
+        return [getattr(self, name) for name in self._keys]
+
+    def __len__(self):
+        return len(self._keys)
+
+    def __getitem__(self, key):
+        return getattr(self, self._keys[key])
+
+    def __iter__(self):
+        return self.values().iter()
+
+    def __contains(self, item):
+        return item in self._keys
+
+    def __str__(self):
+        return 'RowBase(' \
+            + ', '.join([key+'="'+str(getattr(self, key))+'"'
+                         for key in self._keys]) \
+            + ')'
+    __repr__ = __str__
+
+class Table(TransportProxyDict):
+    def __init__(self, transport, table_oid, column_mapping):
+        super().__init__(transport)
+
+        walk_result = transport.snmp_walk(table_oid)
+
+        # print("table oid", table_oid)
+        # print("Walk result:")
+        # pprint.pprint(walk_result)
+        # print()
+
+        def column_id(oid):
+            return oid[len(table_oid)+1:].split('.')[0]
+
+        def row_id(oid):
+            return '.'.join(oid[len(table_oid)+1:].split('.')[1:])
+
+        # First walk through the snmpwalk, and collect up every
+        # cell. This is essentially a 2-dimensional sparse dict, with
+        # each cell being a tuple(oid, value, column_mapping_entry)
+        result_dict = dict()
+        for oid, raw_value in walk_result.items():
+            this_column_id = column_id(oid)
+            if this_column_id not in column_mapping.keys():
+                # Skip stuff not in the mappings
+                continue
+            this_row_id = row_id(oid)
+            if this_row_id not in result_dict:
+                result_dict[this_row_id] = dict()
+
+            result_dict[this_row_id][column_mapping[this_column_id]['name']] = \
+                (oid, raw_value, column_mapping[this_column_id])
+
+        # print("result_dict:")
+        # pprint.pprint(result_dict)
+        # print()
+
+        # Then go through the result, and create a pseudo object for each row
+        for rowkey, row in result_dict.items():
+            # print(">> Start of rowkey", rowkey)
+            class_dict = {mapping["name"]: Attribute(oid=oid,
+                                                     value=raw_value,
+                                                     doc=mapping.get('doc'),
+                                                     translator=mapping.get('translator',
+                                                                            NullTranslator))
+                          for oid, raw_value, mapping in row.values()}
+            # print("class_dict:")
+            # pprint.pprint(class_dict)
+            # print()
+
+            RowTemplate = type('RowTemplate', (RowBase,), class_dict)
+
+            therow = RowTemplate(self, class_dict)
+            # print("therow:")
+            # pprint.pprint(therow)
+
+            self[rowkey] = therow
+            # print("<< End of rowkey", rowkey)
+
+        # print("="*50)
+        # print()
+
+        # if DONE:
+        #     raise NotImplementedError()
+        # DONE=True
+        # pprint.pprint(self)
+        # print("="*50)
+        # print("="*50)
+
+    def format(self):
+        return utils.format_table(self.aslist())
+
+    def aslist(self):
+        return self.values()
+
+DONE = False

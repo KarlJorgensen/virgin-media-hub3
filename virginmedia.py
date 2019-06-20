@@ -79,9 +79,9 @@ def extract_ip_generic(hexvalue, addrtype, zero_is_none=True):
     The address type controls the conversion made
 
     """
-    if addrtype == snmp.IPVersion.IPV4:
+    if addrtype == snmp.IPVersion.IPv4:
         return extract_ip(hexvalue, zero_is_none)
-    if addrtype == snmp.IPVersion.IPV6:
+    if addrtype == snmp.IPVersion.IPv6:
         return extract_ipv6(hexvalue, zero_is_none)
 
     return "Unknown:{hexvalue=%s, addrtype=%s}" % (hexvalue, addrtype)
@@ -665,10 +665,10 @@ class Hub:
 
         It seems to be possible for the router to have multiple external IP addresses...
         """
-        res = [WanNetwork(extract_ip_generic(row.ipaddr, snmp.IPVersion.from_value(row.addrtype)),
+        res = [WanNetwork(extract_ip_generic(row.ipaddr, snmp.IPVersion(row.addrtype)),
                           int(row.prefix) if row.prefix is not None else None,
                           extract_ip(row.netmask) if row.netmask is not None else None,
-                          extract_ip_generic(row.gw, snmp.IPVersion.from_value(row.addrtype)))
+                          extract_ip_generic(row.gw, snmp.IPVersion(row.addrtype)))
                for row in table_rows
                if row.prefix is not None]
         return res
@@ -739,8 +739,27 @@ class Hub:
         representing an IP address.
 
         """
-        return [extract_ip_generic(x.address, snmp.IPVersion.from_value(x.addrtype))
+        return [extract_ip_generic(x.address, snmp.IPVersion(x.addrtype))
                 for x in table_rows]
+
+    @property
+    def wan_current_table(self):
+        return snmp.Table(self,
+                          "1.3.6.1.4.1.4115.1.20.1.1.1.7.1",
+                          {
+                              "1": {"name": "IPIndex"},
+                              "2": {"name": "IPAddrType", "translator": snmp.IPVersionTranslator},
+                              "3": {"name": "IPAddr"},
+                              "4": {"name": "Prefix", "translator": snmp.IntTranslator},
+                              "5": {"name": "GWType", "translator": snmp.IPVersionTranslator},
+                              "6": {"name": "GW"},
+                              "7": {"name": "IPType"},
+                              "8": {"name": "NetMask", "translator": snmp.IPv4Translator},
+                              "9": {"name": "PrefixDelegationV6", "translator": snmp.IPv6Translator},
+                              "10": {"name": "PrefixDelegationV6Len", "translator": snmp.IntTranslator},
+                              "11": {"name": "PreferredLifetimeV6", "translator": snmp.IntTranslator},
+                              "12": {"name": "ValidLifetimeV6", "translator": snmp.IntTranslator},
+                          })
 
     wan_if_macaddr = snmp.Attribute("1.3.6.1.4.1.4115.1.20.1.1.1.13.0",
                                     snmp.MacAddressTranslator)
@@ -961,15 +980,15 @@ class PortForwardEntry(types.SimpleNamespace):
             if "port" in key:
                 props[key] = snmp.IntTranslator.human(val)
 
-        props["enabled"] = snmp.Boolean.from_value(props["rowstatus"])
+        props["enabled"] = snmp.Boolean(props["rowstatus"])
         del props["rowstatus"]
 
-        props["local_addr_type"] = snmp.IPVersion.from_value(props["local_addr_type"])
+        props["local_addr_type"] = snmp.IPVersion(props["local_addr_type"])
         props["local_addr"] = extract_ip_generic(props["local_addr"],
                                                  props["local_addr_type"],
                                                  zero_is_none=False)
 
-        props["proto"] = snmp.IPProtocol.from_value(props["proto"])
+        props["proto"] = snmp.IPProtocol(props["proto"])
 
         props["ext_ports"] = cls.portsummary(props["ext_port_start"], props["ext_port_end"])
         props["local_ports"] = cls.portsummary(props["local_port_start"], props["local_port_end"])
