@@ -246,6 +246,8 @@ def snmp_get(hub, args):
 
 @subcommand
 @Args([
+    ("--byrow", {"help": "Arrange output on a row-by-row basis",
+                 "action": "store_true"}),
     ("oid", {"help": "OID of the SNMP property walk down from. " \
              "This should be given as a dot-separated number string, " \
              "e.g. '1.3.6.1.4.1.4115.1.20.1.1.5.10.0'"})])
@@ -255,10 +257,14 @@ def snmp_walk(hub, args):
     This is mostly useful for developers. The output of this command
     may vary between versions.
 
+    This will produce a json-representation of the result
     """
     args.oid = args.oid.strip('.')
-    res = hub.snmp_walk(args.oid)
-    print(json.dumps(res, sort_keys=True, indent=2))
+    walk_result = hub.snmp_walk(args.oid)
+    if args.byrow:
+        walk_result = snmp.parse_table(args.oid, walk_result)
+
+    print(json.dumps(walk_result, sort_keys=True, indent=2))
 
 @subcommand
 def wan_iplist(hub, _args):

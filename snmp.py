@@ -380,6 +380,26 @@ class RowBase(TransportProxy):
                          for key in self._keys]) \
             + ')'
 
+
+def parse_table(table_oid, walk_result):
+    """Restructure the result of an SNMP table into rows and columns
+
+    """
+    def column_id(oid):
+        return oid[len(table_oid)+1:].split('.')[0]
+
+    def row_id(oid):
+        return '.'.join(oid[len(table_oid)+1:].split('.')[1:])
+
+    result_dict = dict()
+    for oid, raw_value in walk_result.items():
+        this_column_id = column_id(oid)
+        this_row_id = row_id(oid)
+        if this_row_id not in result_dict:
+            result_dict[this_row_id] = dict()
+        result_dict[this_row_id][this_column_id] = raw_value
+    return result_dict
+
 class Table(TransportProxyDict):
     """A pythonic representation of an SNMP table
 
@@ -434,27 +454,19 @@ class Table(TransportProxyDict):
         if not walk_result:
             warnings.warn("SNMP Walk of '%s' yielded no results" % table_oid)
 
-        def column_id(oid):
-            return oid[len(table_oid)+1:].split('.')[0]
+        rawtable = parse_table(table_oid, walk_result)
 
-        def row_id(oid):
-            return '.'.join(oid[len(table_oid)+1:].split('.')[1:])
-
-        # First walk through the snmpwalk, and collect up every
-        # cell. This is essentially a 2-dimensional sparse dict, with
-        # each cell being a tuple(oid, value, column_mapping_entry)
         result_dict = dict()
-        for oid, raw_value in walk_result.items():
-            this_column_id = column_id(oid)
-            if this_column_id not in column_mapping.keys():
-                # Skip stuff not in the mappings
-                continue
-            this_row_id = row_id(oid)
-            if this_row_id not in result_dict:
-                result_dict[this_row_id] = dict()
-
-            result_dict[this_row_id][column_mapping[this_column_id]['name']] = \
-                (oid, raw_value, column_mapping[this_column_id])
+        for row_id, row in rawtable.items():
+            result_dict[row_id] = dict()
+            for column_id, raw_value in row.items():
+                if not column_id in column_mapping:
+                    continue
+                result_dict[row_id][column_id] = (table_oid + '.' + column_id + '.' + row_id,
+                                                  raw_value,
+                                                  column_mapping[column_id])
+            if not result_dict[row_id]:
+                del result_dict[row_id]
 
         # Then go through the result, and create a row object for each
         # row. Essentially, each row is a different class, as it may
@@ -485,6 +497,18 @@ class Table(TransportProxyDict):
                           % table_oid)
 
     def format(self):
+        """Get a string representation of the table for human consumption.
+
+        This is nicely ordered in auto-sized columns with headers and
+        (almost) graphics - e.g:
+
+            +-------------+--------+---------------+-----------------------------------------+
+            | IPAddr      | Prefix | NetMask       | GW                                      |
+            +-------------+--------+---------------+-----------------------------------------+
+            | 86.21.83.42 | 21     | 255.255.248.0 | 86.21.80.1                              |
+            |             | 0      |               | 0000:000c:000f:cea0:000f:caf0:0000:0000 |
+            +-------------+--------+---------------+-----------------------------------------+
+        """
         return utils.format_table(self.aslist())
 
     def aslist(self):

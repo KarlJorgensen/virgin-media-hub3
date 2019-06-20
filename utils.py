@@ -43,6 +43,15 @@ def format_table(table_rows):
 
     This is mostly useful for development - e.g. printing snmp
     table_rows things, but might be useful for other things too...
+
+    The resulting string (including newlines) can look like this:
+
+        +-------------+--------+---------------+-----------------------------------------+
+        | IPAddr      | Prefix | NetMask       | GW                                      |
+        +-------------+--------+---------------+-----------------------------------------+
+        | 86.21.83.42 | 21     | 255.255.248.0 | 86.21.80.1                              |
+        |             | 0      |               | 0000:000c:000f:cea0:000f:caf0:0000:0000 |
+        +-------------+--------+---------------+-----------------------------------------+
     """
     column_names = list(unique_everseen([fieldname
                                          for row in table_rows

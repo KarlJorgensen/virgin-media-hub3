@@ -12,6 +12,8 @@ selftest: pylints
 	./virginmedia.py
 	./hub property-list
 	./hub info
+	./hub snmp-walk 1.3.6.1.4.1.4115.1.20.1.1.1.7.1
+	./hub snmp-walk 1.3.6.1.4.1.4115.1.20.1.1.1.7.1 --byrow
 	./hub wan-status
 	./hub wan-iplist
 	./hub lan-status
