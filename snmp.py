@@ -9,7 +9,7 @@ import datetime
 import enum
 import re
 import textwrap
-#import warnings
+import warnings
 
 import utils
 
@@ -301,7 +301,11 @@ class DateTimeTranslator(Translator):
 class Attribute(RawAttribute):
     """A generic SNMP Attribute which can use a translator.
 
-    The translator will map the SNMP values to/from Python values
+    This allows us to have pythonic variables representing OID values:
+    Reads will retrieve the value from router, and writes will update
+    the route - with the translator doing the necessary translation
+    between Python values and router representation.
+
     """
     def __init__(self, oid, translator=NullTranslator, value=None, doc=None):
         RawAttribute.__init__(self, oid, datatype=translator.snmp_datatype, value=value)
@@ -377,11 +381,58 @@ class RowBase(TransportProxy):
             + ')'
 
 class Table(TransportProxyDict):
+    """A pythonic representation of an SNMP table
+
+    The python representation of the table is a dict() - not an array,
+    as each entry in the table has an ID: the ID becomes the key of
+    the resulting dict.
+
+    Each entry in the result is a (customised) RowBase class, where
+    SNMP attributes are mapped to Attribute instances: Updates to the
+    attributes will result in the hub being updated.
+
+    Although the resulting table is updateable (updates to attributes
+    in the row will result in SNMP Set calls), the table does not
+    support deletion or insertion of elements: it is of fixed size.
+
+    The column_mapping describes how to translate OID columns to
+    Python values in the resulting rows:
+
+    {
+      "1": {"name": "port_number",
+            "translator": snmp.IntTranslator,
+            "doc": "Port number for Foobar"},
+      "2": {"name": "address",
+            "translator": snmp.IPv4Translator}
+    }
+
+    The keys in the dict correspond to the SNMP OID column numbers -
+    i.e. the first part after the table_oid.
+
+    The values of each key must be a dict, where the following keys
+    are understood:
+
+    - "name": (mandatory) The resulting python attribute name. This must be a
+              valid python attribute name.
+
+    - "translator": (optional) The class/instance of a translator to
+                    map between python and SNMP representations. If
+                    none is given, the default NullTranslator will be
+                    used.
+
+    - "doc": (optional) the doc string to associate with the attribute.
+    """
     def __init__(self, transport, table_oid, column_mapping, walk_result=None):
+        """Instantiate a new table based on an SNMP walk
+
+        """
         super().__init__(transport)
 
         if not walk_result:
             walk_result = transport.snmp_walk(table_oid)
+
+        if not walk_result:
+            warnings.warn("SNMP Walk of '%s' yielded no results" % table_oid)
 
         def column_id(oid):
             return oid[len(table_oid)+1:].split('.')[0]
@@ -416,18 +467,31 @@ class Table(TransportProxyDict):
                                                      translator=mapping.get('translator',
                                                                             NullTranslator))
                           for oid, raw_value, mapping in row.values()}
+            if not class_dict:
+                # Empty rows are not interesting...
+                continue
             # A litle trick: Redo it with a new dict, so we can get
             # the order "right" - i.e. the order it is done in the
             # mappings
-            class_dict2 = {column['name']: class_dict[column['name']]
-                           for column in column_mapping.values()
-                           if column['name'] in class_dict}
+            class_dict = {column['name']: class_dict[column['name']]
+                          for column in column_mapping.values()
+                          if column['name'] in class_dict}
 
-            RowClass = type('Row', (RowBase,), class_dict2)
-            self[rowkey] = RowClass(self, class_dict2)
+            RowClass = type('Row', (RowBase,), class_dict)
+            self[rowkey] = RowClass(self, class_dict)
+
+        if len(self) == 0:
+            warnings.warn("SMTP walk of %s resulted in zero rows"
+                          % table_oid)
 
     def format(self):
         return utils.format_table(self.aslist())
 
     def aslist(self):
+        """Get the rows as a list
+
+        This will 'lose' the ID of the rows, which most of the time is
+        not a problem.
+
+        """
         return self.values()
