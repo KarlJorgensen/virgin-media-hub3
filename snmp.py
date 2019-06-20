@@ -110,7 +110,20 @@ class Translator:
         return snmp_value
 
 class NullTranslator(Translator):
-    """A translator which does nothing"""
+    """A translator which does nothing.
+
+    Except that it maps the empty string to None and back...
+    """
+    @staticmethod
+    def snmp(python_value):
+        if python_value is None:
+            return ""
+        return str(python_value)
+    @staticmethod
+    def pyvalue(snmp_value):
+        if snmp_value == "":
+            return None
+        return snmp_value
 
 class EnumTranslator(Translator):
     """A translator which translates based on Enums"""
@@ -154,11 +167,13 @@ class IntTranslator(Translator):
     snmp_datatype = DataType.INT
     @staticmethod
     def snmp(python_value):
+        if python_value == None:
+            return ""
         return str(int(python_value))
     @staticmethod
     def pyvalue(snmp_value):
         if snmp_value == "":
-            return 0
+            return None
         return int(snmp_value)
 
 class MacAddressTranslator(Translator):
@@ -312,17 +327,22 @@ class RowBase(TransportProxy):
         return getattr(self, self._keys[key])
 
     def __iter__(self):
-        return self.values().iter()
+        return self.keys().iter()
 
-    def __contains(self, item):
+    def __contains__(self, item):
         return item in self._keys
 
     def __str__(self):
-        return 'RowBase(' \
+        return self.__class__.__name__ + '(' \
             + ', '.join([key+'="'+str(getattr(self, key))+'"'
                          for key in self._keys]) \
             + ')'
-    __repr__ = __str__
+
+    def __repr__(self):
+        return self.__class__.__name__ + '(' \
+            + ', '.join([key+'="'+repr(getattr(self, key))+'"'
+                         for key in self._keys]) \
+            + ')'
 
 class Table(TransportProxyDict):
     def __init__(self, transport, table_oid, column_mapping, walk_result=None):
@@ -353,7 +373,9 @@ class Table(TransportProxyDict):
             result_dict[this_row_id][column_mapping[this_column_id]['name']] = \
                 (oid, raw_value, column_mapping[this_column_id])
 
-        # Then go through the result, and create a pseudo object for each row
+        # Then go through the result, and create a row object for each
+        # row. Essentially, each row is a different class, as it may
+        # have different attributes
         for rowkey, row in result_dict.items():
             class_dict = {mapping["name"]: Attribute(oid=oid,
                                                      value=raw_value,
@@ -362,11 +384,8 @@ class Table(TransportProxyDict):
                                                                             NullTranslator))
                           for oid, raw_value, mapping in row.values()}
 
-            RowTemplate = type('RowTemplate', (RowBase,), class_dict)
-
-            therow = RowTemplate(self, class_dict)
-
-            self[rowkey] = therow
+            RowClass = type('Row', (RowBase,), class_dict)
+            self[rowkey] = RowClass(self, class_dict)
 
     def format(self):
         return utils.format_table(self.aslist())
