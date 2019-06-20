@@ -409,15 +409,22 @@ class Table(TransportProxyDict):
         # row. Essentially, each row is a different class, as it may
         # have different attributes
         for rowkey, row in result_dict.items():
+            # Build up the columns in the row
             class_dict = {mapping["name"]: Attribute(oid=oid,
                                                      value=raw_value,
                                                      doc=mapping.get('doc'),
                                                      translator=mapping.get('translator',
                                                                             NullTranslator))
                           for oid, raw_value, mapping in row.values()}
+            # A litle trick: Redo it with a new dict, so we can get
+            # the order "right" - i.e. the order it is done in the
+            # mappings
+            class_dict2 = {column['name']: class_dict[column['name']]
+                           for column in column_mapping.values()
+                           if column['name'] in class_dict}
 
-            RowClass = type('Row', (RowBase,), class_dict)
-            self[rowkey] = RowClass(self, class_dict)
+            RowClass = type('Row', (RowBase,), class_dict2)
+            self[rowkey] = RowClass(self, class_dict2)
 
     def format(self):
         return utils.format_table(self.aslist())
