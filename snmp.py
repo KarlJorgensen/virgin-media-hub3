@@ -98,8 +98,7 @@ class RawAttribute:
     def __delete__(self, instance):
         raise NotImplementedError("Deleting SNMP values do not make sense")
 
-class NullTranslator:
-    """A translator which does nothing"""
+class Translator:
     snmp_datatype = DataType.STRING
     @staticmethod
     def snmp(python_value):
@@ -110,7 +109,10 @@ class NullTranslator:
         "Returns the input value"
         return snmp_value
 
-class EnumTranslator:
+class NullTranslator(Translator):
+    """A translator which does nothing"""
+
+class EnumTranslator(Translator):
     """A translator which translates based on Enums"""
     def __init__(self, enumclass, snmp_datatype=DataType.STRING):
         self.enumclass = enumclass
@@ -127,7 +129,7 @@ class EnumTranslator:
         return "{0}({1})".format(self.__class__.__name__, self.enumclass.__name__)
     __repr__ = __str__
 
-class BoolTranslator:
+class BoolTranslator(Translator):
     "Translates python boolean values to/from the router's representation"
     snmp_datatype = DataType.INT
     @staticmethod
@@ -139,9 +141,10 @@ class BoolTranslator:
     def pyvalue(snmp_value):
         return snmp_value == "1"
 
+# pylint: disable=invalid-name
 IPVersionTranslator = EnumTranslator(IPVersion)
 
-class IntTranslator:
+class IntTranslator(Translator):
     """Translates integers values to/from the router's representation.
 
     Generally, the router represents them as decimal strings, but it
@@ -158,13 +161,12 @@ class IntTranslator:
             return 0
         return int(snmp_value)
 
-class MacAddressTranslator:
+class MacAddressTranslator(Translator):
     """
     The hub represents mac addresses as e.g. "$787b8a6413f5" - i.e. a
     dollar sign followed by 12 hex digits, which we need to transform
     to the traditional mac address representation.
     """
-    snmp_datatype = DataType.STRING
     @staticmethod
     def pyvalue(snmp_value):
         res = snmp_value[1:3]
@@ -175,15 +177,12 @@ class MacAddressTranslator:
     def snmp(python_value):
         raise NotImplementedError()
 
-class IPv4Translator:
+class IPv4Translator(Translator):
     """Handles translation of IPv4 addresses to/from the hub.
 
     The hub encodes IPv4 addresses in hex, prefixed by a dollar sign,
     e.g. "$c2a80464" => 192.168.4.100
     """
-
-    snmp_datatype = DataType.STRING
-
     @staticmethod
     def snmp(python_value):
         "Translates an ipv4 address to something the hub understands"
@@ -204,12 +203,10 @@ class IPv4Translator:
                   + '.' + str(int(snmp_value[7:9], base=16)))
         return ipaddr
 
-class IPv6Translator:
+class IPv6Translator(Translator):
     """
         The router encodes IPv6 address in hex, prefixed by a dollar sign
     """
-
-    snmp_datatype = DataType.STRING
 
     @staticmethod
     def snmp(python_value):
@@ -224,7 +221,7 @@ class IPv6Translator:
             res += ':' + snmp_value[chunk:chunk+4]
         return res
 
-class DateTimeTranslator:
+class DateTimeTranslator(Translator):
     """
     Dates (such as the DHCP lease expiry time) are encoded somewhat stranger
     than even IP addresses:
@@ -238,7 +235,6 @@ class DateTimeTranslator:
                      0x11 : second = 17
                        0x00 : junk
     """
-    snmp_datatype = DataType.STRING
     @staticmethod
     def pyvalue(snmp_value):
         if snmp_value is None or snmp_value in ["", "$0000000000000000"]:
