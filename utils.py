@@ -112,6 +112,40 @@ def format_table(table_rows):
     fmt += horiz_line() + "\n"
     return fmt
 
+def format_by_row(table_rows):
+    """Get a string representation of a table for human consumption.
+
+    This lists each row as a sequence of lines, followed by the next
+    row etc.  This format is well suited for tables with many columns
+    and/or narrow terminals.
+
+    """
+    res = ""
+    for rownum, row in enumerate(table_rows, start=0):
+        if rownum:
+            # Blank lines between rows
+            res += "\n"
+        res += format_one_row(row)
+    return res
+
+def format_one_row(row):
+    """Produce a string representation of one row.
+
+    This will list the attributes: one per line, with the name
+    followed by the value (separated by a colon) - e.g.:
+
+        name        : Subnet 1
+        interfaces  : 9
+        vlan        : 0
+        passthrough : 2
+
+    """
+    res = ""
+    namelength = max([len(name) for name in row.keys()])
+    for name, value in row.items():
+        res += name.ljust(namelength) + " : " + str(value) + "\n"
+    return res
+
 if __name__ == "__main__":
 
     print(format_table(

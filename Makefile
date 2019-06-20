@@ -16,7 +16,7 @@ selftest: pylints
 	./hub snmp-walk 1.3.6.1.4.1.4115.1.20.1.1.1.7.1 --byrow
 	./hub wan-status
 	./hub wan-iplist
-	./hub lan-status
+	./hub lan-networks
 	./hub wifi-status
 	./hub portforward-list
 	./hub property-get hardware_version firmware_version serial_number

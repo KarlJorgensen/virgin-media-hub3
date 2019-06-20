@@ -92,22 +92,14 @@ def wan_status(hub, _args):
                         ])
 
 @subcommand
-def lan_status(hub, _args):
-    """Show LAN settings"""
-    dump_properties(hub,
-                    [
-                        "lanIPAddress",
-                        "lan_subnetmask",
-                        "lan_dhcp_enabled",
-                        "lan_gateway",
-                        "lan_dhcpv4_range_start",
-                        "lan_dhcpv4_range_end",
-                        "lan_dhcpv4_leasetime",
-                        "lan_dhcpv6_prefixlength",
-                        "lan_dhcpv6_range_start",
-                        "lan_dhcpv6_leasetime",
-                        "lan_parentalcontrols_enabled"
-                    ])
+def lan_networks(hub, _args):
+    """Information about the local LAN networks.
+
+    The router can actually handle more than one network.  A single
+    network can span multiple interfaces.
+
+    """
+    print(hub.lan_networks.format_by_row())
 
 @subcommand
 def wifi_status(hub, _args):

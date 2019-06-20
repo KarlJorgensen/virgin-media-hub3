@@ -359,6 +359,9 @@ class RowBase(TransportProxy):
     def __len__(self):
         return len(self._keys)
 
+    def items(self):
+        return [(name, getattr(self, name)) for name in self._keys]
+
     def __getitem__(self, key):
         return getattr(self, self._keys[key])
 
@@ -500,7 +503,7 @@ class Table(TransportProxyDict):
         """Get a string representation of the table for human consumption.
 
         This is nicely ordered in auto-sized columns with headers and
-        (almost) graphics - e.g:
+        (almost) graphics:
 
             +-------------+--------+---------------+-----------------------------------------+
             | IPAddr      | Prefix | NetMask       | GW                                      |
@@ -508,8 +511,22 @@ class Table(TransportProxyDict):
             | 86.21.83.42 | 21     | 255.255.248.0 | 86.21.80.1                              |
             |             | 0      |               | 0000:000c:000f:cea0:000f:caf0:0000:0000 |
             +-------------+--------+---------------+-----------------------------------------+
+
+        This format is best suited for tables with a limited number of
+        columns and/or wide terminals.
+
         """
         return utils.format_table(self.aslist())
+
+    def format_by_row(self):
+        """Get a string representation of the table for human consumption.
+
+        This lists each row as a sequence of lines, followed by the
+        next row etc.  This format is well suited for tables with many
+        columns and/or narrow terminals.
+
+        """
+        return utils.format_by_row(self.aslist())
 
     def aslist(self):
         """Get the rows as a list
