@@ -110,6 +110,23 @@ class NullTranslator:
         "Returns the input value"
         return snmp_value
 
+class EnumTranslator:
+    """A translator which translates based on Enums"""
+    def __init__(self, enumclass, snmp_datatype=DataType.STRING):
+        self.enumclass = enumclass
+        self.snmp_datatype = snmp_datatype
+
+    def snmp(self, python_value):
+        return self.enumclass[python_value]
+    def pyvalue(self, snmp_value):
+        return self.enumclass(snmp_value)
+    @property
+    def name(self):
+        self.__str__()
+    def __str__(self):
+        return "{0}({1})".format(self.__class__.__name__, self.enumclass.__name__)
+    __repr__ = __str__
+
 class BoolTranslator:
     "Translates python boolean values to/from the router's representation"
     snmp_datatype = DataType.INT
@@ -122,16 +139,7 @@ class BoolTranslator:
     def pyvalue(snmp_value):
         return snmp_value == "1"
 
-class IPVersionTranslator:
-    snmp_datatype = DataType.STRING
-
-    @staticmethod
-    def snmp(python_value):
-        return IPVersion[python_value].value
-
-    @staticmethod
-    def pyvalue(snmp_value):
-        return IPVersion(snmp_value).name
+IPVersionTranslator = EnumTranslator(IPVersion)
 
 class IntTranslator:
     """Translates integers values to/from the router's representation.
@@ -255,13 +263,18 @@ class Attribute(RawAttribute):
     def __init__(self, oid, translator=NullTranslator, value=None, doc=None):
         RawAttribute.__init__(self, oid, datatype=translator.snmp_datatype, value=value)
         self._translator = translator
+        try:
+            translator_name = translator.__name__
+        except AttributeError:
+            translator_name = translator.name
+
         if doc:
             self.__doc__ = textwrap.dedent(doc) + \
                 "\n\nCorresponds to SNMP attribute {0}, translated by {1}" \
-                .format(oid, translator.__name__)
+                .format(oid, translator_name)
         else:
             self.__doc__ = "SNMP Attribute {0}, as translated by {1}" \
-                .format(oid, translator.__name__)
+                .format(oid, translator_name)
 
     def __get__(self, instance, owner):
         return self._translator.pyvalue(RawAttribute.__get__(self, instance, owner))
