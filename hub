@@ -93,6 +93,11 @@ def wan_status(hub, _args):
                         ])
 
 @subcommand
+def wan_iplist(hub, _args):
+    """Prints the current external IP addresses of the hub"""
+    print(hub.wan_current_table.format())
+
+@subcommand
 def lan_networks(hub, _args):
     """Information about the local LAN networks.
 
@@ -245,11 +250,6 @@ def snmp_walk(hub, args):
         walk_result = snmp.parse_table(args.oid, walk_result)
 
     print(json.dumps(walk_result, sort_keys=True, indent=2))
-
-@subcommand
-def wan_iplist(hub, _args):
-    """Prints the current external IP addresses of the hub"""
-    print(hub.wan_current_table.format())
 
 def main():
     """Main function. Obviously!"""
