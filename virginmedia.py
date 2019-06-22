@@ -773,7 +773,8 @@ class Hub:
                 #       "doc": "Type of IP address. This appears to be unreliable..."},
                 "9": {"name": "PrefixDelegationV6",
                       "translator": snmp.IPv6Translator,
-                      "doc": "The prefix, or initial bits of the address, given to the router to delegate to its attached CPEs"},
+                      "doc": "The prefix, or initial bits of the address, given "
+                      "to the router to delegate to its attached CPEs"},
                 "10": {"name": "PrefixDelegationV6Len",
                        "translator": snmp.IntTranslator,
                        "doc": "The length for the prefix to be delegated to attached CPEs"},
