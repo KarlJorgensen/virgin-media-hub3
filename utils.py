@@ -38,8 +38,18 @@ def unique_everseen(iterable, key=None):
                 seen_add(k)
                 yield element
 
+
+def human(obj):
+    if hasattr(obj, '__human__'):
+        return obj.__human__()
+    return str(obj)
+
 def format_table(table_rows):
-    """Print a list of dicts in a nice human-readable format.
+    """Print a table in a nice human-readable format.
+
+    The table is expected to be a dict, where each key is the row ID,
+    and the value is a dict. Each row in turn is also a dict, with the
+    key as the column name.
 
     This is mostly useful for development - e.g. printing snmp
     table_rows things, but might be useful for other things too...
@@ -52,22 +62,24 @@ def format_table(table_rows):
         | 86.21.83.42 | 21     | 255.255.248.0 | 86.21.80.1                              |
         |             | 0      |               | 0000:000c:000f:cea0:000f:caf0:0000:0000 |
         +-------------+--------+---------------+-----------------------------------------+
+
     """
+    def column_values(colname):
+        return map(human,
+                   [row[colname] if row[colname] is not None else ""
+                    for row in table_rows.values()
+                    if colname in row ])
+
     column_names = list(unique_everseen([fieldname
-                                         for row in table_rows
-                                         for fieldname in row.keys()]))
+                                         for row in table_rows.values()
+                                         for fieldname in row.keys()
+                                         if any(column_values(fieldname))
+    ]))
 
     # print("Column names:", column_names)
 
     column_widths = {colname: max([len(colname)] + \
-                                  list(map(len,
-                                           map(str,
-                                               [getattr(row, colname)
-                                                for row in table_rows
-                                                if hasattr(row, colname)] \
-                                               + [row[colname]
-                                                  for row in table_rows
-                                                  if isinstance(row, dict) and colname in row]))))
+                                  list(map(len, column_values(colname))))
                      for colname in column_names}
 
     # print("Columnn widths:", column_widths)
@@ -83,21 +95,15 @@ def format_table(table_rows):
     def row_header(column_names):
         res = '|'
         for column_name in column_names:
-            res += ' ' + str(column_name).ljust(column_widths[column_name])
+            res += ' ' + human(column_name).ljust(column_widths[column_name])
             res += ' |'
         return res
 
     def row_text(row):
         res = '|'
         for column_name in column_names:
-            if hasattr(row, column_name):
-                cellvalue = getattr(row, column_name)
-                val = str(cellvalue) if cellvalue is not None else ""
-            elif column_name in row.keys():
-                cellvalue = row[column_name]
-                val = str(cellvalue) if cellvalue is not None else ""
-            else:
-                val = ""
+            cellvalue = row.get(column_name)
+            val = human(cellvalue) if cellvalue is not None else ""
             res += ' ' + val.ljust(column_widths[column_name])
             res += ' |'
         return res
@@ -106,7 +112,8 @@ def format_table(table_rows):
     fmt += row_header(column_names) + "\n"
     fmt += horiz_line() + "\n"
 
-    for row in table_rows:
+    for rowid, row in table_rows.items():
+        # TODO: Show the row ID?
         fmt += row_text(row) + "\n"
 
     fmt += horiz_line() + "\n"
@@ -115,20 +122,24 @@ def format_table(table_rows):
 def format_by_row(table_rows):
     """Get a string representation of a table for human consumption.
 
+    The table is expected to be a dict, where each key is the row ID,
+    and the value is a dict. Each row in turn is also a dict, with the
+    key as the column name.
+
     This lists each row as a sequence of lines, followed by the next
     row etc.  This format is well suited for tables with many columns
     and/or narrow terminals.
 
     """
     res = ""
-    for rownum, row in enumerate(table_rows, start=0):
+    for rownum, (rowkey, row) in enumerate(table_rows.items(), start=0):
         if rownum:
             # Blank lines between rows
             res += "\n"
-        res += format_one_row(row)
+        res += format_one_row(rowkey, row)
     return res
 
-def format_one_row(row):
+def format_one_row(rowkey, row):
     """Produce a string representation of one row.
 
     This will list the attributes: one per line, with the name
@@ -140,23 +151,23 @@ def format_one_row(row):
         passthrough : 2
 
     """
-    res = ""
+    res = "Row: " + rowkey + "\n"
     namelength = max([len(name) for name in row.keys()])
     for name, value in row.items():
-        res += name.ljust(namelength) + " : " + str(value) + "\n"
+        res += "  " + name.ljust(namelength) + " : " + human(value) + "\n"
     return res
 
 if __name__ == "__main__":
 
     print(format_table(
-        [{"country": "Denmark",
-          "language": "Danish",
-          "Lego": "quite awesome",
-          "Intellibility/Readability": 11},
-         {"country": "Sweden",
-          "language": "Swedish",
-          "Crazy": True},
-         {"language": "Python",
-          "Crazy": 0.5,
-          "Intellibility/Readability": True},
-        ]))
+        {"1": {"country": "Denmark",
+               "language": "Danish",
+               "Lego": "quite awesome",
+               "Intellibility/Readability": 11},
+         "2": {"country": "Sweden",
+               "language": "Swedish",
+               "Crazy": True},
+         "8": {"language": "Python",
+               "Crazy": 0.5,
+               "Intellibility/Readability": True},
+        }))

@@ -20,6 +20,9 @@ class IPVersion(enum.Enum):
     IPv6 = "2"
     GodKnows = "4"
 
+    def __human__(self):
+        return self.name
+
 @enum.unique
 class DataType(enum.Enum):
     """SNMP Data Types.
@@ -43,6 +46,9 @@ class IPProtocol(enum.Enum):
     UDP = "0"
     TCP = "1"
     BOTH = "2"
+
+    def __human__(self):
+        return self.name
 
 class RawAttribute:
     """An abstraction of an SNMP attribute.
@@ -363,7 +369,12 @@ class RowBase(TransportProxy):
         return [(name, getattr(self, name)) for name in self._keys]
 
     def __getitem__(self, key):
-        return getattr(self, self._keys[key])
+        return getattr(self, key)
+
+    def get(self, key, default=None):
+        if key in self._keys:
+            return self[key]
+        return default
 
     def __iter__(self):
         return self.keys().iter()
@@ -516,7 +527,7 @@ class Table(TransportProxyDict):
         columns and/or wide terminals.
 
         """
-        return utils.format_table(self.aslist())
+        return utils.format_table(self)
 
     def format_by_row(self):
         """Get a string representation of the table for human consumption.
@@ -526,7 +537,7 @@ class Table(TransportProxyDict):
         columns and/or narrow terminals.
 
         """
-        return utils.format_by_row(self.aslist())
+        return utils.format_by_row(self)
 
     def aslist(self):
         """Get the rows as a list
