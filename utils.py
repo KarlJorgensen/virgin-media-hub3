@@ -40,6 +40,15 @@ def unique_everseen(iterable, key=None):
 
 
 def human(obj):
+    """Equivalent to str(), but more humane
+
+    This will attempt to give a 'human' value of the object - which is
+    usually subtly different from str().
+
+    If the object does not define a '__human__' method, it will resort
+    to the normal str()
+
+    """
     if hasattr(obj, '__human__'):
         return obj.__human__()
     return str(obj)
