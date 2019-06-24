@@ -7,6 +7,7 @@ import json
 import os
 
 import snmp
+import utils
 import virginmedia
 
 SUBCOMMANDS = []
@@ -122,11 +123,7 @@ def wifi_status(hub, _args):
 def portforward_list(hub, _args):
     """List current port forwardings"""
 
-    fmt = "{e.proto.name:<4s} {e.ext_ports:<10s} " \
-        "=> {e.local_addr:>15s}:{e.local_ports:<10s} {e.desc}"
-
-    for pfentry in hub.portforward_list():
-        print(fmt.format(e=pfentry))
+    print(utils.format_by_row(hub.portforwards))
 
 @subcommand
 @Args([
@@ -145,29 +142,20 @@ def portforward_add(hub, args):
     external interface) on that port to some port internally.
 
     """
-    pfentry = virginmedia.PortForwardEntry(
-        local_addr_type=snmp.IPVersion.IPV4,
-        local_addr=args.internal_ip,
-        proto=snmp.IPProtocol.from_name(args.protocol),
+    hub.portforward_add(
+        proto=snmp.IPProtocol[args.protocol],
         ext_port_start=args.external_port,
-        ext_port_end=args.external_port,
         local_port_start=args.internal_port,
-        local_port_end=args.internal_port,
-        )
-    hub.portforward_add(pfentry)
+        local_addr=args.internal_ip)
 
 @subcommand
 @Args([
-    ("protocol", {"help":"Protocol to forward",
-                  "choices": [p.name for p in snmp.IPProtocol]}),
-    ("external_port", {"type": int,
-                       "help": "The external port number to map"})])
+    ("entry", {"help": "Row number of entry to remove"})
+    ])
 def portforward_del(hub, args):
     """Remove a port forwarding entry.
     """
-    hub.portforward_del(proto=snmp.IPProtocol.from_name(args.protocol),
-                        ext_port_start=args.external_port,
-                        ext_port_end=args.external_port)
+    hub.portforward_del(args.entry)
 
 @subcommand
 def device_list(hub, _args):

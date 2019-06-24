@@ -14,6 +14,7 @@ import json
 import operator
 import os
 import random
+import socket
 import textwrap
 import time
 import types
@@ -584,8 +585,6 @@ class Hub:
         #
         jsondata = "\n".join([x for x in jsondata.split("\n") if x != "Error in OID formatting!"])
 
-        # print "snmp_walk of %s:" % oid
-        # print jsondata
         result = json.loads(jsondata)
         # Strip off the final ANNOYING "1" entry!
         if result.get("1") == "Finish":
@@ -1004,126 +1003,113 @@ class Hub:
         return DeviceInfo(self, ipv4_address, snmp.MacAddressTranslator.pyvalue(mac))
 
 
-    @snmp_table("1.3.6.1.4.1.4115.1.20.1.1.4.12.1",
-                {"1": "index",
-                 "2": "desc",
-                 "3": "ext_port_start",
-                 "4": "ext_port_end",
-                 "5": "proto",
-                 "6": "local_addr_type",
-                 "7": "local_addr",
-                 "9": "local_port_start",
-                 "10": "local_port_end",
-                 "11": "rowstatus"})
-    # pylint: disable=R0201
-    def portforward_list(self, table_rows=None):
-        """Get a list of port forwardings from the hub.
+    @property
+    def portforwards(self):
+        """The port forwarding table from the hub
+
+        Traffic arriving from the WAN will be forwarded to the internal
+        servers as per the mapping.
 
         This is not a lightweight operations due to the speed of the
         hub...
 
         """
-        return [PortForwardEntry.from_snmp(x) for x in table_rows]
+        mapping = \
+            {
+                # "1": {"name": "index"},
+                "11": {"name": "rowstatus",
+                       "doc": "Row status to add/remove rows",
+                       "translator": snmp.RowStatusTranslator,
+                       "readback_after_write": False},
+                "5": {"name": "proto",
+                      "translator": snmp.IPProtocolTranslator},
+                "3": {"name": "ext_port_start",
+                      "translator": snmp.PortTranslator},
+                "4": {"name": "ext_port_end",
+                      "translator": snmp.PortTranslator},
+                "6": {"name": "local_addr_type",
+                      "translator": snmp.IPVersionTranslator},
+                "7": {"name": "local_addr",
+                      "translator": snmp.IPAddressTranslator},
+                "9": {"name": "local_port_start",
+                      "translator": snmp.PortTranslator},
+                "10": {"name": "local_port_end",
+                       "translator": snmp.PortTranslator}
+            }
+        return snmp.Table(self, "1.3.6.1.4.1.4115.1.20.1.1.4.12.1", mapping)
 
+    def portforward_add(self,
+                        ext_port_start,
+                        ext_port_end=None,
+                        proto=snmp.IPProtocol.TCP,
+                        local_addr_type=snmp.IPVersion.IPv4,
+                        local_addr=None,
+                        local_port_start=None,
+                        local_port_end=None):
+        """Add a new (static) port forwarding entry.
 
-    def portforward_add(self, pfentry):
-        oldlist = self.portforward_list()
+        """
+        if not isinstance(proto, snmp.IPProtocol):
+            raise TypeError("proto arg to portforward_add must be an IP Protocol"
+                            " - not %s" % proto.__class__)
+        if not isinstance(ext_port_start, int):
+            raise TypeError("ext_port_start arg to portforward_add must be an int"
+                            " - not %s" % ext_port_start.__class__)
+        if local_addr is None:
+            local_addr = socket.gethostbyname(socket.gethostname())
+            if local_addr.startswith("127.0."):
+                raise ValueError("No local_addr passed and unable to find local ip... sorry.")
+        # TODO: Check types of other parameters?
 
-        new_idx = max(map(int, [x.row_idx for x in oldlist]))
-        if new_idx is None:
-            new_idx = 1
+        if ext_port_end is None:
+            ext_port_end = ext_port_start
+        if local_port_start is None:
+            local_port_start = ext_port_start
+        if local_port_end is None:
+            local_port_end = ext_port_end
+
+        pflist = self.portforwards
+
+        for pfentry in pflist.values():
+            # TODO: This does not work if one is BOTH...
+            if proto == pfentry.proto \
+               and (pfentry.ext_port_start <= ext_port_start <= pfentry.ext_port_end
+                    or pfentry.ext_port_start <= ext_port_end <= pfentry.ext_port_end) \
+                and pfentry.rowstatus == snmp.RowStatus.ACTIVE:
+                raise ValueError("New PF entry overlaps with existing ones")
+
+        if pflist:
+            row_key = str(max(map(int, pflist.keys()))+1)
         else:
-            new_idx += 1
+            row_key = "1"
 
-        def doset(column, val, datatype):
-            self.snmp_set("1.3.6.1.4.1.4115.1.20.1.1.4.12.1.{1}.{0}" \
-                          .format(new_idx, column),
-                          val,
-                          datatype)
+        newrow = pflist.new_row(
+            row_key,
+            rowstatus=snmp.RowStatus.CREATE_AND_WAIT,
+            proto=proto,
+            ext_port_start=ext_port_start,
+            ext_port_end=ext_port_end,
+            local_addr_type=local_addr_type,
+            local_addr=local_addr,
+            local_port_start=local_port_start,
+            local_port_end=local_port_end
+        )
 
         # The order might look odd, but this is the same order as the
         # web interface does it...
-        doset(11, 5, snmp.DataType.INT) # 5 seems to be a special value here indicating "creation" ?
-        doset(3, pfentry.ext_port_start, snmp.DataType.PORT)
-        doset(4, pfentry.ext_port_end, snmp.DataType.PORT)
-        doset(5, pfentry.proto.value, snmp.DataType.INT)
-        doset(6, pfentry.local_addr_type.value, snmp.DataType.INT)
-        doset(7,
-              snmp.IPv4Translator.snmp(pfentry.local_addr).upper().replace('$', '%24'),
-              snmp.DataType.STRING)
-        doset(9, pfentry.local_port_start, snmp.DataType.PORT)
-        doset(10, pfentry.local_port_end, snmp.DataType.PORT)
-        doset(11, 1, snmp.DataType.INT)
+        newrow.rowstatus = snmp.RowStatus.ACTIVE
         self.apply_settings()
 
-    def portforward_del(self, proto, ext_port_start, ext_port_end):
+    def portforward_del(self, entry):
         """Remove a given port forwarding entry from the hub.
 
         If the port forwarding entry is not found, it is silently ignored.
         """
-        try:
-            for oldentry in self.portforward_list():
-                if oldentry.ext_port_start == ext_port_start \
-                   and oldentry.ext_port_end == ext_port_end  \
-                   and oldentry.proto == proto:
-                    self.snmp_set("1.3.6.1.4.1.4115.1.20.1.1.4.12.1.11.{0}" \
-                                  .format(oldentry.row_idx),
-                                  6, # 6 seems to be a special value indicating removal?
-                                  snmp.DataType.INT)
-        finally:
-            self.apply_settings()
+        pflist = self.portforwards
 
-class PortForwardEntry(types.SimpleNamespace):
-    """Object to represent a port forwarding rule.
-
-    """
-    @classmethod
-    def portsummary(cls, start, end):
-        """Summarise a port range.
-
-            If the start and end are the same, then we only want to show
-            the single port number
-
-        """
-        if start == end:
-            return str(start)
-        return "{0}-{1}".format(start, end)
-
-    @classmethod
-    def from_snmp(cls, snmprow):
-        """Create a PortForwardEntry from an SNMP table row.
-
-        For convenience, this creates two extra attributes: ext_ports
-        and local_ports which contain string representations of the
-        port range for human consumption:
-
-        - If only one port is being forwarded, it will simply contain
-          that.
-
-        - If a port range is being forwarded, it will contain the
-          start and end port numbers separated by a hyphen.
-
-        """
-        props = snmprow._asdict()
-
-        # Cast port numbers
-        for key, val in props.items():
-            if "port" in key:
-                props[key] = snmp.IntTranslator.pyvalue(val)
-
-        props["enabled"] = snmp.Boolean(props["rowstatus"])
-        del props["rowstatus"]
-
-        props["local_addr_type"] = snmp.IPVersion(props["local_addr_type"])
-        props["local_addr"] = extract_ip_generic(props["local_addr"],
-                                                 props["local_addr_type"],
-                                                 zero_is_none=False)
-
-        props["proto"] = snmp.IPProtocol(props["proto"])
-
-        props["ext_ports"] = cls.portsummary(props["ext_port_start"], props["ext_port_end"])
-        props["local_ports"] = cls.portsummary(props["local_port_start"], props["local_port_end"])
-        return cls(**props)
+        pflist[entry].rowstatus = snmp.RowStatus.DESTROY
+        del pflist[entry]
+        self.apply_settings()
 
 class DeviceInfo:
     """Information about a device known to a hub
@@ -1195,8 +1181,7 @@ def _demo():
                 raise
 
         print("Port Forwardings")
-        for portforward in hub.portforward_list():
-            print("-", portforward)
+        print(hub.portforwards.format())
 
         print("Device List")
         for dev in [x for x in hub.device_list() if x.connected]:

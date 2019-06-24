@@ -4,6 +4,8 @@
 This module implements the underlying convenience classes for setting
 and retrieving SNMP OIDs in a pythonic way.
 
+See also: https://tools.ietf.org/html/rfc3781
+
 """
 import datetime
 import enum
@@ -50,6 +52,19 @@ class IPProtocol(enum.Enum):
     def __human__(self):
         return self.name
 
+class AttributeStatus(enum.Enum):
+    """Current status of attributes.
+
+    This is used for indicating whether the cached value is valid,
+    needs writing or has been read already
+
+    """
+    OK = 1
+    UNSET = 2
+    "We have yet to read it, and we have no value to write"
+    NEEDS_WRITE = 2
+    NEEDS_READ = 3
+
 class RawAttribute:
     """An abstraction of an SNMP attribute.
 
@@ -64,12 +79,25 @@ class RawAttribute:
     you probably want to use the Attribute class, as this can do
     translation.
     """
-    def __init__(self, oid, datatype, value=None):
+    def __init__(self,
+                 oid,
+                 datatype,
+                 status=AttributeStatus.NEEDS_READ,
+                 value=None,
+                 instance=None,
+                 readback_after_write=True):
         self._oid = oid
         self._datatype = datatype
+        self._status = status
         self._value = value
-        self._value_gotten = (value is not None)
-        self.__doc__ = "SNMP Attribute {0}, assumed to be {1}".format(oid, datatype.name)
+        self._readback_after_write = readback_after_write
+        self.__doc__ = "SNMP Attribute {0}, assumed to be datatype {1}".format(oid, datatype.name)
+        if self._status == AttributeStatus.NEEDS_WRITE and instance is None:
+            raise TypeError("When creating attributes with NEEDS_WRITE, "
+                            "instance value is mandatory")
+
+        if self._status == AttributeStatus.NEEDS_WRITE:
+            self._write(instance, value)
 
     @property
     def oid(self):
@@ -81,40 +109,55 @@ class RawAttribute:
         """The Data Type - one of the DataType enums"""
         return self._datatype
 
-    def refresh(self, instance):
+    def reread(self, instance):
         """Re-read the value from the hub"""
         self._value = instance.snmp_get(self._oid)
-        self._value_gotten = True
+        self._status = AttributeStatus.OK
 
     def __get__(self, instance, owner):
-        if not self._value_gotten:
-            self.refresh(instance)
+        if self._status == AttributeStatus.NEEDS_READ:
+            self.reread(instance)
+        elif self._status == AttributeStatus.UNSET:
+            raise AttributeError("OID '{0}' has not yet been set".format(self._oid))
         return self._value
 
-    def __set__(self, instance, value):
+    def _write(self, instance, value):
         instance.snmp_set(self._oid, value, self._datatype)
-        readback = instance.snmp_get(self._oid)
-        if readback != value:
-            raise ValueError("{hub} did not accept a value of '{value}' for {oid}: "
-                             "It read back as '{rb}'!?"
-                             .format(hub=instance,
-                                     value=value,
-                                     oid=self._oid,
-                                     rb=readback))
-        self._value = readback
+        if self._readback_after_write:
+            readback = instance.snmp_get(self._oid)
+            if str(readback) != str(value):
+                raise ValueError("hub did not accept a value of '{value}' for {oid}: "
+                                 "It read back as '{rb}'!?"
+                                 .format(value=value,
+                                         oid=self._oid,
+                                         rb=readback))
+        self._value = value
+        self._status = AttributeStatus.OK
+
+    __set__ = _write
 
     def __delete__(self, instance):
         raise NotImplementedError("Deleting SNMP values do not make sense")
 
+    def __str__(self):
+        return "{s.__class__.__name__}({s._oid}, {s._datatype}, {s._status}, {s._value}" \
+            .format(s=self)
+
 class Translator:
+    """Base class for translators.
+
+    It is a translators job to translate between SNMP values and
+    Python values - both ways.
+
+    """
     snmp_datatype = DataType.STRING
     @staticmethod
     def snmp(python_value):
-        "Returns the input value"
+        "Returns the python equivalent of the given SNMP value"
         return python_value
     @staticmethod
     def pyvalue(snmp_value):
-        "Returns the input value"
+        "Returns the SNMP equivalent of the given python value"
         return snmp_value
 
 class NullTranslator(Translator):
@@ -135,16 +178,23 @@ class NullTranslator(Translator):
 
 class EnumTranslator(Translator):
     """A translator which translates based on Enums"""
-    def __init__(self, enumclass, snmp_datatype=DataType.STRING):
+    def __init__(self, enumclass, snmp_datatype=DataType.STRING, doc=None):
         self.enumclass = enumclass
         self.snmp_datatype = snmp_datatype
+        if doc:
+            self.__doc__ = doc
 
     def snmp(self, python_value):
-        return self.enumclass[python_value]
+        if not isinstance(python_value, self.enumclass):
+            python_value = self.enumclass[str(python_value)]
+
+        return python_value.value
+
     def pyvalue(self, snmp_value):
         return self.enumclass(snmp_value)
     @property
     def name(self):
+        """The string name of the python constant"""
         self.__str__()
     def __str__(self):
         return "{0}({1})".format(self.__class__.__name__, self.enumclass.__name__)
@@ -162,11 +212,28 @@ class BoolTranslator(Translator):
     def pyvalue(snmp_value):
         if snmp_value is None:
             raise ValueError("This could not have come from SNMP...")
+        if snmp_value is None:
+            raise ValueError("This could not have come from SNMP...")
         return snmp_value == "1"
 
 # pylint: disable=invalid-name
 IPVersionTranslator = EnumTranslator(IPVersion)
-IPProtocolTranslator = EnumTranslator(IPProtocol)
+
+def _dummy_for_doctest():
+    """Translates to/from IP versions
+
+    >>> IPVersionTranslator.pyvalue("1")
+    <IPVersion.IPv4: '1'>
+    >>> IPVersionTranslator.pyvalue("2").name
+    'IPv6'
+    >>> IPVersionTranslator.snmp(IPVersion.IPv4)
+    '1'
+    >>> "fooo"
+    "bar"
+    """
+    pass
+
+IPProtocolTranslator = EnumTranslator(IPProtocol, snmp_datatype=DataType.INT)
 
 class IntTranslator(Translator):
     """Translates integers values to/from the router's representation.
@@ -216,21 +283,37 @@ class IntTranslator(Translator):
             raise ValueError("This could not have come from SNMP...")
         return int(snmp_value)
 
+class PortTranslator(IntTranslator):
+    snmp_datatype = DataType.PORT
+
 class MacAddressTranslator(Translator):
     """
     The hub represents mac addresses as e.g. "$787b8a6413f5" - i.e. a
     dollar sign followed by 12 hex digits, which we need to transform
     to the traditional mac address representation.
+
+    >>> MacAddressTranslator.pyvalue('')
+
+    >>> MacAddressTranslator.snmp(None)
+    '$000000000000'
+    >>> MacAddressTranslator.pyvalue('$787b8a6413f5')
+    EUI('78-7B-8A-64-13-F5')
+    >>> MacAddressTranslator.snmp(netaddr.EUI('78-7B-8A-64-13-F5'))
+    '$787b8a6413f5'
     """
     @staticmethod
     def pyvalue(snmp_value):
-        res = snmp_value[1:3]
-        for idx in range(3, 13, 2):
-            res += ':' + snmp_value[idx:idx+2]
-        return res
+        if snmp_value is None or snmp_value in ['', '$000000000000']:
+            return None
+        if not snmp_value.startswith('$') or len(snmp_value) != 13:
+            raise ValueError("'%s' is not a sensible SNMP Mac Address"
+                             % snmp_value)
+        return netaddr.EUI(snmp_value[1:])
     @staticmethod
     def snmp(python_value):
-        raise NotImplementedError()
+        if python_value is None:
+            return '$000000000000'
+        return "${0:012x}".format(int(python_value))
 
 class IPv4Translator(Translator):
     """Handles translation of IPv4 addresses to/from the hub.
@@ -283,6 +366,12 @@ class IPv6Translator(Translator):
     6
     >>> IPv6Translator.pyvalue('$00000000000000000000000000000001').version
     6
+    >>> IPv6Translator.pyvalue('$000c0fd8400ff5580000').version
+    6
+    >>> IPv6Translator.pyvalue('$000c0fd8400ff5580000')
+    IPAddress('::c:fd8:400f:f558:0')
+    >>> IPv6Translator.snmp(netaddr.IPAddress('::c:fd8:400f:f558:0'))
+    '$0000000cfd8400ff55800'
     """
     @staticmethod
     def snmp(python_value):
@@ -300,10 +389,13 @@ class IPv6Translator(Translator):
     def pyvalue(snmp_value):
         if snmp_value in ["", "$00000000000000000000000000000000"]:
             return None
-        if not snmp_value.startswith('$') or len(snmp_value) not in [17, 33]:
+        if not snmp_value.startswith('$') or not 8 < len(snmp_value) <= 33:
             raise ValueError("Value '%s' is not an SNMP IPv6Address" % snmp_value)
 
-        return netaddr.IPAddress(int(snmp_value[1:], 16), 6)
+        res = netaddr.IPAddress(int(snmp_value[1:], 16), 6)
+        if res.version != 6:
+            raise ValueError("Value '%s' is not an SNMP IPv6Address" % snmp_value)
+        return res
 
 class IPAddressTranslator(Translator):
     """Translates to/from IP address. It will understand both IPv4 and
@@ -325,6 +417,12 @@ class IPAddressTranslator(Translator):
     IPAddress('::1')
     >>> IPAddressTranslator.pyvalue('$00000000000000000000000000000001').version
     6
+    >>> IPAddressTranslator.pyvalue('$000c0fd8400ff5580000').version
+    6
+    >>> IPAddressTranslator.pyvalue('$000c0fd8400ff5580000')
+    IPAddress('::c:fd8:400f:f558:0')
+    >>> IPAddressTranslator.snmp(netaddr.IPAddress('::c:fd8:400f:f558:0'))
+    '$0000000cfd8400ff55800'
     """
     @staticmethod
     def snmp(python_value):
@@ -339,7 +437,7 @@ class IPAddressTranslator(Translator):
     def pyvalue(snmp_value):
         if snmp_value == "":
             return None
-        if not snmp_value.startswith("$") or len(snmp_value) not in [9, 17, 33]:
+        if not snmp_value.startswith("$") or len(snmp_value) < 9:
             return ValueError("%s is not an SNMP representation of an IP address!?" % snmp_value)
         if len(snmp_value) == 9:
             return netaddr.IPAddress(int(snmp_value[1:], 16), 4)
@@ -396,6 +494,31 @@ class DateTimeTranslator(Translator):
             "{p.year:04x}{p.month:02x}{p.day:02x}" \
             "{p.hour:02x}{p.minute:02x}{p.second:02x}00".format(p=python_value)
 
+class RowStatus(enum.Enum):
+    """SNMIv2 Row Status values
+
+    As documented on https://www.webnms.com/snmp/help/snmpapi/snmpv3/table_handling/snmptables_basics.html
+    """
+    ACTIVE = "1"
+    "The conceptual row with all columns is available for use by the managed device"
+
+    NOT_IN_USE = "2"
+    "the conceptual row exists in the agent, but is unavailable for use by the managed device"
+
+    NOT_READY = "3"
+    "the conceptual row exists in the agent, one or more required columns in the row are not instantiated"
+
+    CREATE_AND_GO = "4"
+    "supplied by a manager wishing to create a new instance of a conceptual row and make it available for use"
+
+    CREATE_AND_WAIT = "5"
+    "supplied by a manager wishing to create a new instance of a conceptual row but not making it available for use"
+
+    DESTROY = "6"
+    "supplied by a manager wishing to delete all of the instances associated with an existing conceptual row"
+
+RowStatusTranslator = EnumTranslator(RowStatus, snmp_datatype=DataType.INT)
+
 class Attribute(RawAttribute):
     """A generic SNMP Attribute which can use a translator.
 
@@ -405,8 +528,14 @@ class Attribute(RawAttribute):
     between Python values and router representation.
 
     """
-    def __init__(self, oid, translator=NullTranslator, value=None, doc=None):
-        RawAttribute.__init__(self, oid, datatype=translator.snmp_datatype, value=value)
+    def __init__(self,
+                 oid,
+                 translator=NullTranslator,
+                 instance=None,
+                 value=None,
+                 status=AttributeStatus.NEEDS_READ,
+                 doc=None,
+                 readback_after_write=True):
         self._translator = translator
         try:
             translator_name = translator.__name__
@@ -421,11 +550,31 @@ class Attribute(RawAttribute):
             self.__doc__ = "SNMP Attribute {0}, as translated by {1}" \
                 .format(oid, translator_name)
 
+        if status == AttributeStatus.NEEDS_READ:
+            RawAttribute.__init__(self,
+                                  oid=oid,
+                                  datatype=translator.snmp_datatype,
+                                  instance=instance,
+                                  status=status,
+                                  readback_after_write=readback_after_write)
+        else:
+            RawAttribute.__init__(self,
+                                  oid=oid,
+                                  datatype=translator.snmp_datatype,
+                                  instance=instance,
+                                  status=status,
+                                  value=translator.snmp(value),
+                                  readback_after_write=readback_after_write)
+
     def __get__(self, instance, owner):
         return self._translator.pyvalue(RawAttribute.__get__(self, instance, owner))
 
     def __set__(self, instance, value):
         return RawAttribute.__set__(self, instance, self._translator.snmp(value))
+
+    def __str__(self):
+        return "{s.__class__.__name__}({s._oid}, {s._translator}, {s._status}, {s._value}" \
+            .format(s=self)
 
 class TransportProxy:
     """Forwards snmp_get/snmp_set calls to another class/instance."""
@@ -440,8 +589,9 @@ class TransportProxy:
         return self._transport.snmp_walk(*args, *kwargs)
 
 class TransportProxyDict(TransportProxy, dict):
-    def __init__(self, transport, cells=None):
+    def __init__(self, transport):
         TransportProxy.__init__(self, transport)
+        dict.__init__(self)
 
 class RowBase(TransportProxy):
     def __init__(self, proxy, keys):
@@ -548,11 +698,19 @@ class Table(TransportProxyDict):
 
     - "doc": (optional) the doc string to associate with the attribute.
     """
-    def __init__(self, transport, table_oid, column_mapping, walk_result=None):
+    def __init__(self,
+                 transport,
+                 table_oid,
+                 column_mapping,
+                 row_class=RowBase,
+                 walk_result=None):
         """Instantiate a new table based on an SNMP walk
 
         """
         super().__init__(transport)
+        self._oid = table_oid
+        self._row_class = row_class
+        self._column_mapping = column_mapping
 
         if not walk_result:
             walk_result = transport.snmp_walk(table_oid)
@@ -579,12 +737,17 @@ class Table(TransportProxyDict):
         # have different attributes
         for rowkey, row in result_dict.items():
             # Build up the columns in the row
-            class_dict = {mapping["name"]: Attribute(oid=oid,
-                                                     value=raw_value,
-                                                     doc=mapping.get('doc'),
-                                                     translator=mapping.get('translator',
-                                                                            NullTranslator))
-                          for oid, raw_value, mapping in row.values()}
+            class_dict = {
+                mapping["name"]: Attribute(oid=oid,
+                                           translator=mapping.get('translator', NullTranslator),
+                                           instance=self,
+                                           value=mapping.get('translator',
+                                                             NullTranslator).pyvalue(raw_value),
+                                           status=AttributeStatus.OK,
+                                           readback_after_write=mapping.get("readback_after_write", True),
+                                           doc=mapping.get('doc'))
+                for oid, raw_value, mapping in row.values()
+            }
             if not class_dict:
                 # Empty rows are not interesting...
                 continue
@@ -595,12 +758,46 @@ class Table(TransportProxyDict):
                           for column in column_mapping.values()
                           if column['name'] in class_dict}
 
-            RowClass = type('Row', (RowBase,), class_dict)
+            RowClass = type('Row', (self._row_class,), class_dict)
             self[rowkey] = RowClass(self, class_dict)
 
         if len(self) == 0:
             warnings.warn("SMTP walk of %s resulted in zero rows"
                           % table_oid)
+
+    @property
+    def oid(self):
+        return self._oid
+
+    def new_row(self, row_key, **kwargs):
+        if row_key in self:
+            raise ValueError("Key '%s' already exists in table" % row_key)
+
+        mapping_names = [mapping["name"] for mapping in self._column_mapping.values()]
+
+        for arg in kwargs:
+            if arg not in mapping_names:
+                raise TypeError("Invalid kwarg name '%s' - "
+                                "expected one of %s" % (arg, mapping_names))
+
+        rowclass_dict = {
+            mapping["name"]: Attribute(
+                oid=self.oid + '.' + column_oid + '.' + row_key,
+                doc=mapping.get('doc'),
+                instance=self,
+                value=kwargs[mapping["name"]],
+                status=AttributeStatus.NEEDS_WRITE,
+                translator=mapping.get('translator', NullTranslator),
+                readback_after_write=mapping.get('readback_after_write', True)
+            )
+            for column_oid, mapping in self._column_mapping.items()
+            if mapping["name"] in kwargs
+        }
+        RowClass = type('Row', (self._row_class,), rowclass_dict)
+        therow = RowClass(self, rowclass_dict)
+
+        self[row_key] = therow
+        return therow
 
     def format(self):
         """Get a string representation of the table for human consumption.
