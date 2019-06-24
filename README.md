@@ -31,4 +31,9 @@ you use the source:
 	./hub info
 	./hub --help
 
+For this to work, you also need to install its dependencies:
+
+- python-requests
+- python-netaddr
+
 Enjoy!

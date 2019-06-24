@@ -7,10 +7,10 @@ and retrieving SNMP OIDs in a pythonic way.
 """
 import datetime
 import enum
-import re
 import textwrap
 import warnings
 
+import netaddr
 import utils
 
 @enum.unique
@@ -160,10 +160,13 @@ class BoolTranslator(Translator):
         return "1" if python_value else "2"
     @staticmethod
     def pyvalue(snmp_value):
+        if snmp_value is None:
+            raise ValueError("This could not have come from SNMP...")
         return snmp_value == "1"
 
 # pylint: disable=invalid-name
 IPVersionTranslator = EnumTranslator(IPVersion)
+IPProtocolTranslator = EnumTranslator(IPProtocol)
 
 class IntTranslator(Translator):
     """Translates integers values to/from the router's representation.
@@ -175,13 +178,42 @@ class IntTranslator(Translator):
     snmp_datatype = DataType.INT
     @staticmethod
     def snmp(python_value):
+        """Translates an python integer to an SNMP string
+
+        This is mostly just a case of converting to the base 10 string
+        representation of the python integer.
+
+        >>> IntTranslator.snmp(None)
+        ''
+        >>> IntTranslator.snmp(1)
+        '1'
+        >>> IntTranslator.snmp(None)
+        ''
+        >>> IntTranslator.snmp(23)
+        '23'
+
+        """
         if python_value is None:
             return ""
         return str(int(python_value))
+
     @staticmethod
     def pyvalue(snmp_value):
+        """Translates an SNMP string to a python integer.
+
+        This is mostly just a case of using the int() function, with
+        the exception of the empty string.
+
+        >>> IntTranslator.pyvalue("")
+
+        >>> IntTranslator.pyvalue("7")
+        7
+
+        """
         if snmp_value == "":
             return None
+        if snmp_value is None:
+            raise ValueError("This could not have come from SNMP...")
         return int(snmp_value)
 
 class MacAddressTranslator(Translator):
@@ -200,79 +232,118 @@ class MacAddressTranslator(Translator):
     def snmp(python_value):
         raise NotImplementedError()
 
-_IPV4_SNMP_RE = re.compile(r"\$[0-9a-fA-F]{8}")
-_IPV4_PY_RE = re.compile(r"[0-9]{1,3}(\.[0-9]{1,3}){3}")
-
 class IPv4Translator(Translator):
     """Handles translation of IPv4 addresses to/from the hub.
 
-    The hub encodes IPv4 addresses in hex, prefixed by a dollar sign,
-    e.g. "$c2a80464" => 192.168.4.100
+    The hub encodes IPv4 addresses in hex, prefixed by a dollar sign.
+
+    >>> IPv4Translator.snmp(None)
+    '$00000000'
+    >>> IPv4Translator.pyvalue('')
+
+    >>> IPv4Translator.snmp('192.168.4.100')
+    '$c0a80464'
+    >>> IPv4Translator.pyvalue("$c0a80464")
+    IPAddress('192.168.4.100')
+    >>> IPv4Translator.pyvalue("$c0a80464").version
+    4
     """
     @staticmethod
     def snmp(python_value):
         "Translates an ipv4 address to something the hub understands"
         if python_value is None:
             return "$00000000"
-        if not _IPV4_PY_RE.fullmatch(python_value):
-            raise ValueError("PY Value '%s' does not look like a proper IPv4 Address"
-                             % python_value)
-        def tohex(decimal):
-            return "{0:0>2s}".format(hex(int(decimal))[2:].lower())
-        return "$" + ''.join(map(tohex, python_value.split('.')))
+        if not isinstance(python_value, netaddr.IPAddress):
+            python_value = netaddr.IPAddress(python_value, 4)
+        if python_value.version != 4:
+            raise ValueError("%s is not an IPv4 address" % python_value)
+
+        return '$' + ''.join(["{0:02x}".format(w) for w in python_value.words])
 
     @staticmethod
     def pyvalue(snmp_value):
         "Translates a hub-representation of an ipv4 address to a python-friendly form"
         if snmp_value in ["", "$00000000"]:
             return None
-        if not _IPV4_SNMP_RE.fullmatch(snmp_value):
-            raise ValueError("SNMP Value '%s' does not like a proper IPv4 address" % snmp_value)
-        ipaddr = (str(int(snmp_value[1:3], base=16))
-                  + '.' + str(int(snmp_value[3:5], base=16))
-                  + '.' + str(int(snmp_value[5:7], base=16))
-                  + '.' + str(int(snmp_value[7:9], base=16)))
-        return ipaddr
+        if not snmp_value.startswith("$") or len(snmp_value) != 9:
+            raise ValueError("Value '%s' is not an SNMP IPv4Address" % snmp_value)
 
-_IPV6_SNMP_RE = re.compile(r"\$[0-9a-fA-F]{32}")
+        return netaddr.IPAddress(int(snmp_value[1:], 16))
 
 class IPv6Translator(Translator):
-    """
-        The router encodes IPv6 address in hex, prefixed by a dollar sign
-    """
+    """The router encodes IPv6 address in hex, prefixed by a dollar sign.
 
+    >>> IPv6Translator.snmp("::1")
+    '$0000000000000001'
+    >>> IPv6Translator.pyvalue('$0000000000000001')
+    IPAddress('::1')
+    >>> IPv6Translator.pyvalue('$00000000000000000000000000000001')
+    IPAddress('::1')
+    >>> IPv6Translator.pyvalue('$0000000000000001').version
+    6
+    >>> IPv6Translator.pyvalue('$00000000000000000000000000000001').version
+    6
+    """
     @staticmethod
     def snmp(python_value):
-        raise NotImplementedError()
+        "Translates an IPv6 address to something the hub understands"
+        if python_value is None:
+            return "$00000000000000000000000000000000"
+        if not isinstance(python_value, netaddr.IPAddress):
+            python_value = netaddr.IPAddress(python_value, 6)
+        if python_value.version != 6:
+            raise ValueError("%s is not an IPv6 address" % python_value)
+
+        return '$' + ''.join(["{0:02x}".format(w) for w in python_value.words])
 
     @staticmethod
     def pyvalue(snmp_value):
         if snmp_value in ["", "$00000000000000000000000000000000"]:
             return None
-        if not _IPV6_SNMP_RE.fullmatch(snmp_value):
-            raise ValueError("SNMP Value '%s' does not look like a proper IPv6 address"
-                             % snmp_value)
-        res = snmp_value[1:5]
-        for chunk in range(5, 30, 4):
-            res += ':' + snmp_value[chunk:chunk+4]
-        return res
+        if not snmp_value.startswith('$') or len(snmp_value) not in [17, 33]:
+            raise ValueError("Value '%s' is not an SNMP IPv6Address" % snmp_value)
+
+        return netaddr.IPAddress(int(snmp_value[1:], 16), 6)
 
 class IPAddressTranslator(Translator):
-    """Translates to/from IP address. It will understand both IPv4 and IPv6 addresses"""
+    """Translates to/from IP address. It will understand both IPv4 and
+    IPv6 addresses
+
+    >>> IPAddressTranslator.snmp(None)
+    '$00000000'
+    >>> IPAddressTranslator.pyvalue('')
+
+    >>> IPAddressTranslator.snmp('192.168.4.100')
+    '$c0a80464'
+    >>> IPAddressTranslator.pyvalue("$c0a80464")
+    IPAddress('192.168.4.100')
+    >>> IPAddressTranslator.pyvalue("$c0a80464").version
+    4
+    >>> IPAddressTranslator.snmp("::1")
+    '$0000000000000001'
+    >>> IPAddressTranslator.pyvalue('$00000000000000000000000000000001')
+    IPAddress('::1')
+    >>> IPAddressTranslator.pyvalue('$00000000000000000000000000000001').version
+    6
+    """
     @staticmethod
     def snmp(python_value):
-        try:
+        if python_value is None:
+            return "$00000000"
+        python_value = netaddr.IPAddress(python_value)
+        if python_value.version == 4:
             return IPv4Translator.snmp(python_value)
-        except ValueError:
-#            warnings.warn("python value '%s' was not an IPv4 address" % python_value)
-            return IPv6Translator.snmp(python_value)
+        return IPv6Translator.snmp(python_value)
+
     @staticmethod
     def pyvalue(snmp_value):
-        try:
-            return IPv4Translator.pyvalue(snmp_value)
-        except ValueError:
-#            warnings.warn("SNMP value '%s' was not an IPv4 address" % snmp_value)
-            return IPv6Translator.pyvalue(snmp_value)
+        if snmp_value == "":
+            return None
+        if not snmp_value.startswith("$") or len(snmp_value) not in [9, 17, 33]:
+            return ValueError("%s is not an SNMP representation of an IP address!?" % snmp_value)
+        if len(snmp_value) == 9:
+            return netaddr.IPAddress(int(snmp_value[1:], 16), 4)
+        return netaddr.IPAddress(int(snmp_value[1:], 16), 6)
 
 class DateTimeTranslator(Translator):
     """
@@ -287,6 +358,19 @@ class DateTimeTranslator(Translator):
                    0x07 : minute = 07
                      0x11 : second = 17
                        0x00 : junk
+
+    >>> DateTimeTranslator.pyvalue('$07e2030e10071100')
+    datetime.datetime(2018, 3, 14, 16, 7, 17)
+    >>> DateTimeTranslator.pyvalue('$0000000000000000')
+
+    >>> DateTimeTranslator.pyvalue('')
+
+    >>> DateTimeTranslator.snmp(datetime.datetime(2018, 3, 14, 16, 7, 17))
+    '$07e2030e10071100'
+
+    >>> DateTimeTranslator.snmp(None)
+    '$0000000000000000'
+
     """
     @staticmethod
     def pyvalue(snmp_value):
@@ -302,7 +386,15 @@ class DateTimeTranslator(Translator):
 
     @staticmethod
     def snmp(python_value):
-        raise NotImplementedError()
+        if not python_value:
+            return '$0000000000000000'
+
+        if not isinstance(python_value, datetime.datetime):
+            raise TypeError("DateTimeTranslator.snmp takes a datetime.datetime arg")
+
+        return '$' + \
+            "{p.year:04x}{p.month:02x}{p.day:02x}" \
+            "{p.hour:02x}{p.minute:02x}{p.second:02x}00".format(p=python_value)
 
 class Attribute(RawAttribute):
     """A generic SNMP Attribute which can use a translator.
@@ -547,3 +639,15 @@ class Table(TransportProxyDict):
 
         """
         return self.values()
+
+def _run_tests():
+    import doctest
+    import sys
+
+    fail_count, test_count = doctest.testmod(report=True)
+    if fail_count:
+        raise SystemExit("%d out of %d doc tests failed" % (fail_count, test_count))
+    print("%s: Doc tests were all OK" % sys.argv[0])
+
+if __name__ == "__main__":
+    _run_tests()

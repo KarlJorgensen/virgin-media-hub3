@@ -7,7 +7,7 @@ all : selftest pylints
 .PHONY: clean
 
 .PHONY: selftest
-selftest: pylints
+selftest: pylints unittests
 	./utils.py
 	./virginmedia.py
 	./hub property-list
@@ -27,6 +27,11 @@ pylints: $(PYFILES:%=.%.lint)
 
 clean ::
 	rm -f $(PYFILES:%=.%.lint)
+
+.PHONY: unittests
+unittests: pylints
+	python3 ./utils.py
+	python3 ./snmp.py
 
 # pylint exit code is a bitmask - we are only interested in fatal/error here
 .%.lint : %
