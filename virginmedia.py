@@ -1071,8 +1071,7 @@ class Hub:
         pflist = self.portforwards
 
         for pfentry in pflist.values():
-            # TODO: This does not work if one is BOTH...
-            if proto == pfentry.proto \
+            if proto.overlaps(pfentry.proto) \
                and (pfentry.ext_port_start <= ext_port_start <= pfentry.ext_port_end
                     or pfentry.ext_port_start <= ext_port_end <= pfentry.ext_port_end) \
                 and pfentry.rowstatus == snmp.RowStatus.ACTIVE:

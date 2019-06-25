@@ -52,6 +52,13 @@ class IPProtocol(enum.Enum):
     def __human__(self):
         return self.name
 
+    def overlaps(self, other):
+        if not isinstance(other, IPProtocol):
+            raise TypeError("overlaps() expects an IPProtocol instance")
+        if self == other:
+            return True
+        return (self == IPProtocol.BOTH) or (other == IPProtocol.BOTH)
+
 class AttributeStatus(enum.Enum):
     """Current status of attributes.
 
