@@ -187,6 +187,20 @@ def device_list(hub, _args):
         print(dev)
 
 @subcommand
+@Args([
+    ("--quiet", dict(action="store_true"))])
+def reboot(hub, args):
+    """Instructs the hub to reboot
+
+    The virgin media hub will start to reboot - it will take a few
+    minutes before it is fully back.
+
+    """
+    hub.reboot()
+    if not args.quiet:
+        print("{0} is now rebooting. It will be down for a few minutes".format(hub))
+
+@subcommand
 @nohub
 def property_list(_args):
     """Get a list of the known property names. Not all properties will be settable"""

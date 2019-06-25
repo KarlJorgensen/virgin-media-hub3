@@ -546,6 +546,11 @@ class Hub:
         self.snmp_set("1.3.6.1.4.1.4115.1.20.1.1.9.0", 1, snmp.DataType.INT)
         self._unapplied_settings = False
 
+    def reboot(self):
+        """Instructs the hub to reboot"""
+        self.apply_settings()
+        self.snmp_set("1.3.6.1.4.1.4115.1.20.1.1.5.4.0", 1, snmp.DataType.INT)
+
     def __str__(self):
         return "Hub(hostname=%s, username=%s)" % (self._hostname, self._username)
 
