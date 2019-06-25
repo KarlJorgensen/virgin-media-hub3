@@ -60,6 +60,41 @@ def human(obj):
         return obj.__human__()
     return str(obj)
 
+def select_columns(table, columns):
+    """Extract the named columns from a dict-of-dicts.
+
+    Row order will be preserved.
+
+    Note: If the original table is a Table class, the result will no
+    longer be updateable, and only cached values can be retrieved.
+
+    """
+    res = dict()
+    for rowkey, oldrow in table.items():
+        newrow = dict()
+        for colname in columns:
+            if colname in oldrow:
+                newrow[colname] = oldrow[colname]
+        if newrow:
+            res[rowkey] = newrow
+
+    return res
+
+def sort_table(table, key):
+    """Sort the rows in the table according to the key.
+
+    The key is expected to be a function which receives the row as a
+    parameter
+
+    Note: If the original table is a Table class, the result will no
+    longer be updateable, and only cached values can be retrieved.
+
+    """
+    res = dict()
+    sorted_keys = sorted(table, key=lambda x: key(table[x]))
+    res = {keyval: table[keyval] for keyval in sorted_keys}
+    return res
+
 def format_table(table_rows):
     """Print a table in a nice human-readable format.
 

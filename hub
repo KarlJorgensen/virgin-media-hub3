@@ -142,9 +142,28 @@ def wifi_status(hub, _args):
                     ])
 
 @subcommand
-def wifi_clients(hub, _args):
+@Args([
+    ("--long", dict(help="Show the 'long' format of the table",
+                    action="store_true"))
+    ])
+def wifi_clients(hub, args):
     """List WIFI clients."""
-    print(hub.wifi_clients.format_by_row())
+    clients = hub.wifi_clients
+    if args.long:
+        print(clients.format_by_row())
+    else:
+        clients = utils.select_columns(clients,
+                                       ["hostname",
+                                        "ipaddr",
+                                        "tx_packets",
+                                        "tx_fail",
+                                        "last_tx_rate",
+                                        "rx_unicast_pkts",
+                                        "last_rx_rate",
+                                        "rssi"])
+        clients = utils.sort_table(clients,
+                                   key=lambda row: (row['hostname'].upper(), row['ipaddr']))
+        print(utils.format_table(clients))
 
 @subcommand
 def portforward_list(hub, _args):
