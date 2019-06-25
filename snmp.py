@@ -663,7 +663,6 @@ class RowBase(TransportProxy):
                          for key in self._keys]) \
             + ')'
 
-
 def parse_table(table_oid, walk_result):
     """Restructure the result of an SNMP table into rows and columns
 
@@ -873,6 +872,41 @@ class Table(TransportProxyDict):
 
         """
         return self.values()
+
+    def __delitem__(self, key):
+        if key in self and hasattr(self[key], 'rowstatus'):
+            self[key].rowstatus = RowStatus.DESTROY
+        dict.__delitem__(self, key)
+
+class PortForwardTable(Table):
+    """The port forwarding table from the hub
+
+        Traffic arriving from the WAN will be forwarded to the internal
+        servers as per the mapping.
+    """
+    def __init__(self, hub):
+        super().__init__(table_oid="1.3.6.1.4.1.4115.1.20.1.1.4.12.1",
+                         transport=hub,
+                         column_mapping={
+                             "11": dict(name="rowstatus",
+                                        doc="Row status to add/remove rows",
+                                        translator=RowStatusTranslator,
+                                        readback_after_write=False),
+                             "5": dict(name="proto",
+                                       translator=IPProtocolTranslator),
+                             "3": dict(name="ext_port_start",
+                                       translator=PortTranslator),
+                             "4": dict(name="ext_port_end",
+                                       translator=PortTranslator),
+                             "6": dict(name="local_addr_type",
+                                       translator=IPVersionTranslator),
+                             "7": dict(name="local_addr",
+                                       translator=IPAddressTranslator),
+                             "9": dict(name="local_port_start",
+                                       translator=PortTranslator),
+                             "10": dict(name="local_port_end",
+                                        translator=PortTranslator)
+                         })
 
 def _run_tests():
     import doctest

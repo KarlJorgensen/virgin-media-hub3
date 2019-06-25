@@ -152,6 +152,7 @@ def portforward_add(hub, args):
         ext_port_start=args.external_port,
         local_port_start=args.internal_port,
         local_addr=args.internal_ip)
+    hub.apply_settings()
 
 @subcommand
 @Args([
@@ -160,7 +161,14 @@ def portforward_add(hub, args):
 def portforward_del(hub, args):
     """Remove a port forwarding entry.
     """
-    hub.portforward_del(args.entry)
+    pflist = hub.portforwards
+    if args.entry not in pflist:
+        print(utils.format_by_row(pflist))
+        raise SystemExit("Port forward %s was not found" % args.entry)
+
+    del hub.portforwards[args.entry]
+    hub.apply_settings()
+    print("Port forward entry %s deleted" % args.entry)
 
 @subcommand
 def device_list(hub, _args):

@@ -1014,29 +1014,7 @@ class Hub:
         hub...
 
         """
-        mapping = \
-            {
-                # "1": {"name": "index"},
-                "11": {"name": "rowstatus",
-                       "doc": "Row status to add/remove rows",
-                       "translator": snmp.RowStatusTranslator,
-                       "readback_after_write": False},
-                "5": {"name": "proto",
-                      "translator": snmp.IPProtocolTranslator},
-                "3": {"name": "ext_port_start",
-                      "translator": snmp.PortTranslator},
-                "4": {"name": "ext_port_end",
-                      "translator": snmp.PortTranslator},
-                "6": {"name": "local_addr_type",
-                      "translator": snmp.IPVersionTranslator},
-                "7": {"name": "local_addr",
-                      "translator": snmp.IPAddressTranslator},
-                "9": {"name": "local_port_start",
-                      "translator": snmp.PortTranslator},
-                "10": {"name": "local_port_end",
-                       "translator": snmp.PortTranslator}
-            }
-        return snmp.Table(self, "1.3.6.1.4.1.4115.1.20.1.1.4.12.1", mapping)
+        return snmp.PortForwardTable(self)
 
     def portforward_add(self,
                         ext_port_start,
@@ -1094,21 +1072,7 @@ class Hub:
             local_port_end=local_port_end
         )
 
-        # The order might look odd, but this is the same order as the
-        # web interface does it...
         newrow.rowstatus = snmp.RowStatus.ACTIVE
-        self.apply_settings()
-
-    def portforward_del(self, entry):
-        """Remove a given port forwarding entry from the hub.
-
-        If the port forwarding entry is not found, it is silently ignored.
-        """
-        pflist = self.portforwards
-
-        pflist[entry].rowstatus = snmp.RowStatus.DESTROY
-        del pflist[entry]
-        self.apply_settings()
 
 class DeviceInfo:
     """Information about a device known to a hub
