@@ -228,10 +228,8 @@ def _dummy_for_doctest():
     'IPv6'
     >>> IPVersionTranslator.snmp(IPVersion.IPv4)
     '1'
-    >>> "fooo"
-    "bar"
     """
-    pass
+
 
 IPProtocolTranslator = EnumTranslator(IPProtocol, snmp_datatype=DataType.INT)
 
