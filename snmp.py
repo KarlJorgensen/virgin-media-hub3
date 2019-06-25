@@ -351,10 +351,12 @@ class IPv4Translator(Translator):
     @staticmethod
     def pyvalue(snmp_value):
         "Translates a hub-representation of an ipv4 address to a python-friendly form"
-        if snmp_value in ["", "$00000000"]:
+        if snmp_value == "":
             return None
         if not snmp_value.startswith("$") or len(snmp_value) != 9:
             raise ValueError("Value '%s' is not an SNMP IPv4Address" % snmp_value)
+        if {x for x in snmp_value[1:]} == set('0'):   # All zeros
+            return None
 
         return netaddr.IPAddress(int(snmp_value[1:], 16))
 
@@ -392,10 +394,13 @@ class IPv6Translator(Translator):
 
     @staticmethod
     def pyvalue(snmp_value):
-        if snmp_value in ["", "$00000000000000000000000000000000"]:
+        if snmp_value == "":
             return None
         if not snmp_value.startswith('$') or not 8 < len(snmp_value) <= 33:
             raise ValueError("Value '%s' is not an SNMP IPv6Address" % snmp_value)
+
+        if {x for x in snmp_value[1:]} == set('0'):   # All zeros
+            return None
 
         res = netaddr.IPAddress(int(snmp_value[1:], 16), 6)
         if res.version != 6:
@@ -409,6 +414,10 @@ class IPAddressTranslator(Translator):
     >>> IPAddressTranslator.snmp(None)
     '$00000000'
     >>> IPAddressTranslator.pyvalue('')
+
+    >>> IPAddressTranslator.pyvalue('$00000000')
+
+    >>> IPAddressTranslator.pyvalue('$00000000000000000000000000000000')
 
     >>> IPAddressTranslator.snmp('192.168.4.100')
     '$c0a80464'
@@ -445,8 +454,8 @@ class IPAddressTranslator(Translator):
         if not snmp_value.startswith("$") or len(snmp_value) < 9:
             return ValueError("%s is not an SNMP representation of an IP address!?" % snmp_value)
         if len(snmp_value) == 9:
-            return netaddr.IPAddress(int(snmp_value[1:], 16), 4)
-        return netaddr.IPAddress(int(snmp_value[1:], 16), 6)
+            return IPv4Translator.pyvalue(snmp_value)
+        return IPv6Translator.pyvalue(snmp_value)
 
 class DateTimeTranslator(Translator):
     """
