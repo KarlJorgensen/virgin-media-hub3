@@ -653,13 +653,13 @@ class RowBase(TransportProxy):
 
     def __str__(self):
         return self.__class__.__name__ + '(' \
-            + ', '.join([key+'="'+str(getattr(self, key))+'"'
+            + ', '.join(["{0}={1}".format(key, str(getattr(self, key)))
                          for key in self._keys]) \
             + ')'
 
     def __repr__(self):
         return self.__class__.__name__ + '(' \
-            + ', '.join([key+'="'+repr(getattr(self, key))+'"'
+            + ', '.join(["{0}={1}".format(key, repr(getattr(self, key)))
                          for key in self._keys]) \
             + ')'
 
