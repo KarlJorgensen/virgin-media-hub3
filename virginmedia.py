@@ -1074,6 +1074,10 @@ class Hub:
 
         newrow.rowstatus = snmp.RowStatus.ACTIVE
 
+    @property
+    def etherports(self):
+        return snmp.EtherPortTable(self)
+
 class DeviceInfo:
     """Information about a device known to a hub
 

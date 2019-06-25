@@ -908,6 +908,31 @@ class PortForwardTable(Table):
                                         translator=PortTranslator)
                          })
 
+class EtherPortTable(Table):
+    """The physical ethernet ports
+
+    """
+    def __init__(self, hub):
+        super().__init__(table_oid="1.3.6.1.4.1.4115.1.20.1.1.2.8.1",
+                         transport=hub,
+                         column_mapping={
+                             "1": dict(name="idx"),
+                             "2": dict(name="if_index"),
+                             "3": dict(name="enabled",
+                                       translator=BoolTranslator),
+                             "4": dict(name="duplex",
+                                       translator=BoolTranslator),
+                             "5": dict(name="speed_mbps",
+                                       translator=IntTranslator),
+                             "6": dict(name="auto_negotiate",
+                                       translator=BoolTranslator),
+                             "7": dict(name="haslink",
+                                       translator=BoolTranslator)
+                         })
+
+    def __delitem__(self, key):
+        raise NotImplementedError("Deleting physical ethernet ports requires more than just python")
+
 def _run_tests():
     import doctest
     import sys

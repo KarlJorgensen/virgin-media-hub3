@@ -171,6 +171,11 @@ def portforward_del(hub, args):
     print("Port forward entry %s deleted" % args.entry)
 
 @subcommand
+def ether_ports(hub, _args):
+    """List ethernet ports on the hub"""
+    print(utils.format_table(hub.etherports))
+
+@subcommand
 def device_list(hub, _args):
     """List devices connected to the hub"""
     for dev in hub.device_list():
