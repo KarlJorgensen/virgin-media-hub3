@@ -111,3 +111,4 @@ venv.bak/
 # Our own pylint stamp files
 .*.lint
 *.pcap
+router.data

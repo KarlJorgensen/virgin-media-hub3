@@ -469,6 +469,15 @@ class Hub:
                 self._username = None
                 self._password = None
 
+    def backup(self):
+        """Performs a backup of the hub
+
+        The actual backup is returned
+        """
+        resp = self._get('/backup?' + self._nonce_str)
+        resp.raise_for_status()
+        return bytearray(resp.content)
+
     @collect_stats
     def __enter__(self):
         """Context manager support: Called on the way in"""

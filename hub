@@ -69,6 +69,23 @@ def info(hub, _args):
                     ])
 
 @subcommand
+@Args([
+    ("outfile", dict(help="File name to write backup to - defaults to 'router.data'",
+                     type=argparse.FileType(mode='wb'),
+                     default='router.data',
+                     nargs='?'))])
+def backup(hub, args):
+    """Make a backup of the router configuration
+
+    The resulting file is a binary hub-proprietary file, essentially
+    only useful for restoring into the hub - the internal structure is
+    not (yet) known.
+
+    """
+    args.outfile.write(hub.backup())
+    args.outfile.close()
+
+@subcommand
 def wan_status(hub, _args):
     """Show Wide Area Network settings"""
     dump_properties(hub,

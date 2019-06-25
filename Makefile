@@ -11,6 +11,7 @@ selftest: pylints unittests
 	./utils.py
 	./virginmedia.py
 	./hub property-list
+	./hub backup
 	./hub info
 	./hub snmp-walk 1.3.6.1.4.1.4115.1.20.1.1.1.7.1
 	./hub snmp-walk 1.3.6.1.4.1.4115.1.20.1.1.1.7.1 --byrow
