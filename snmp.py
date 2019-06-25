@@ -966,6 +966,108 @@ class BSSTable(Table):
                                         translator=BoolTranslator),
                          })
 
+class LanTable(Table):
+    """Information about the local LAN networks
+
+    The router can normally handle more than one network, A single
+    network can span multiple interfaces.
+
+    """
+    def __init__(self, transport):
+        super().__init__(
+            table_oid="1.3.6.1.4.1.4115.1.20.1.1.2.2.1",
+            transport=transport,
+            column_mapping={
+                "1": dict(name="name"),
+                "27": dict(name="interfaces",
+                           doc="""\
+                            Name of the member physical network interface (or virtual network interface in the
+                            case of a wireless SSID) comprising the logical interface, aka LAN subnet. This mib
+                            object takes in an unsigned integer with the following bitmap setup: Single-Band
+                            support: 0x00000001 // ethernet 0x00000002 // usb (unsupported) 0x00000004 // moca
+                            0x00000008 // ssid1 0x00000010 // ssid2 0x00000020 // ssid3 0x00000040 // ssid4
+                            0x00000080 // ssid5 0x00000100 // ssid6 0x00000200 // ssid7 0x00000400 // ssid8
+                            Dual-Band Support: 0x00000001 // ethernet 0x00000002 // usb (unsupported)
+                            0x00000004 // moca 0x00000008 // ssid1 & ssid9 0x00000010 // ssid2 & ssid10
+                            0x00000020 // ssid3 & ssid11 0x00000040 // ssid4 & ssid12 0x00000080 // ssid5 &
+                            ssid13 0x00000100 // ssid6 & ssid14 0x00000200 // ssid7 & ssid15 0x00000400 //
+                            ssid8 & ssid16 Example of mapping the ethernet, usb, moca, and ssid1 to the primary
+                            LAN subnet: 0x0000000F = (Integer) 15 NOTE - A physical/virtual interface may not
+                            be assigned to more than one logical interface"""),
+                "8": dict(name="vlan",
+                          translator=IntTranslator,
+                          doc="VLAN ID - use zero for untagged"),
+                "21": dict(name="passthrough",
+                           doc="""\
+                            Whether or not this Lan is in pass-thru mode or bridged/NAT. To put the device into
+                            non-bridged mode with routing and NAT disabled -- pass-thru, use: passThru(1). To
+                            put the device into bridged (routed) mode with Network Address Translation (NAT)
+                            enabled use: routedNAT(2). To put the device into bridged (routed) mode with
+                            Network Address Translation (NAT) disabled use: routedNoNAT(3)"""),
+                "4": dict(name="gateway_ip_type",
+                          translator=IPVersionTranslator),
+                "5": dict(name="gateway_ip",
+                          translator=IPAddressTranslator,
+                          doc="Gateway IP address"),
+                "6": dict(name="gateway_ip2_type",
+                          translator=IPVersionTranslator),
+                "7": dict(name="gateway_ip2",
+                          translator=IPAddressTranslator,
+                          doc="Second gateway IP address"),
+                "2": dict(name="subnet_mask_type",
+                          translator=IPVersionTranslator),
+                "3": dict(name="subnet_mask",
+                          translator=IPv4Translator),
+                "9": dict(name="use_dhcp",
+                          translator=BoolTranslator,
+                          doc="enable or disable the DHCP server on this LAN"),
+                "10": dict(name="dhcp_start_ip_type",
+                           translator=IPVersionTranslator),
+                "11": dict(name="dhcp_start_ip",
+                           translator=IPAddressTranslator,
+                           doc="Start of DHCP IP range"),
+                "12": dict(name="dhcp_end_ip_type",
+                           translator=IPVersionTranslator),
+                "13": dict(name="dhcp_end_ip",
+                           translator=IPAddressTranslator,
+                           doc="End of DHCP IP range"),
+                "14": dict(name="dhcp_lease_time",
+                           translator=IntTranslator,
+                           doc="DHCP Lease time in seconds"),
+                "15": dict(name="domain_name"),
+                "19": dict(name="dns_relay_enabled",
+                           translator=BoolTranslator),
+                "25": dict(name="dns_override_enabled",
+                           translator=BoolTranslator,
+                           doc="""\
+                            If DNS override is enabled, the IP addresses in arrisRouterLanDNSTable will be
+                            passed to LAN clients via DHCP.  Otherwise, the DNS servers received by the WAN
+                            connection will be passed to the LAN clients."""),
+                "22": dict(name="firewall_enabled",
+                           translator=BoolTranslator),
+                "23": dict(name="upnp_enabled",
+                           translator=BoolTranslator),
+                "24": dict(name="aging_time",
+                           translator=IntTranslator,
+                           doc="The timeout period in seconds for aging out dynamically " \
+                           "learned forwarding information. " \
+                           "The default value of zero means do not age "),
+                "39": dict(name="parental_controls_enabled",
+                           translator=BoolTranslator),
+                "26": dict(name="nat_algs_enabled",
+                           doc="""\
+                            Specifies which NAT application layer gateway supplements are enabled on this
+                            device.  The default value for this object is for all ALG's to be enabled. Reserved
+                            bits are for ALGs that are currently not supported."""),
+                "28": dict(name="environment_control",
+                           translator=BoolTranslator,
+                           doc="""\
+                              Controls whether or not the settings which define the operating environment of
+                              the logical interface, aka LAN subnet, are changeable via the GUI. When equal to
+                              unlocked, the environment settings MAY be changed via the UI. When equal to
+                              locked, the environment settings MAY NOT be changed via the UI"""),
+            })
+
 def _run_tests():
     import doctest
     import sys
