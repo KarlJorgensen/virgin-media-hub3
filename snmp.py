@@ -289,6 +289,12 @@ class IntTranslator(Translator):
         return int(snmp_value)
 
 class PortTranslator(IntTranslator):
+    """Translates port numbers
+
+    Port numbers are integers, but are represented as a different data
+    type at the hub...
+
+    """
     snmp_datatype = DataType.PORT
 
 class MacAddressTranslator(Translator):
@@ -511,25 +517,34 @@ class DateTimeTranslator(Translator):
 class RowStatus(enum.Enum):
     """SNMIv2 Row Status values
 
-    As documented on https://www.webnms.com/snmp/help/snmpapi/snmpv3/table_handling/snmptables_basics.html
+    As documented on
+    https://www.webnms.com/snmp/help/snmpapi/snmpv3/table_handling/snmptables_basics.html
+
     """
     ACTIVE = "1"
-    "The conceptual row with all columns is available for use by the managed device"
+    """The conceptual row with all columns is available for use by the
+    managed device
+    """
 
     NOT_IN_USE = "2"
-    "the conceptual row exists in the agent, but is unavailable for use by the managed device"
+    """the conceptual row exists in the agent, but is unavailable for
+    use by the managed device"""
 
-    NOT_READY = "3"
-    "the conceptual row exists in the agent, one or more required columns in the row are not instantiated"
+    NOT_READY = """3"""
+    """the conceptual row exists in the agent, one or more required
+    columns in the row are not instantiated"""
 
-    CREATE_AND_GO = "4"
-    "supplied by a manager wishing to create a new instance of a conceptual row and make it available for use"
+    CREATE_AND_GO = """4"""
+    """supplied by a manager wishing to create a new instance of a
+    conceptual row and make it available for use"""
 
-    CREATE_AND_WAIT = "5"
-    "supplied by a manager wishing to create a new instance of a conceptual row but not making it available for use"
+    CREATE_AND_WAIT = """5"""
+    """supplied by a manager wishing to create a new instance of a
+    conceptual row but not making it available for use"""
 
-    DESTROY = "6"
-    "supplied by a manager wishing to delete all of the instances associated with an existing conceptual row"
+    DESTROY = """6"""
+    """supplied by a manager wishing to delete all of the instances
+    associated with an existing conceptual row"""
 
 RowStatusTranslator = EnumTranslator(RowStatus, snmp_datatype=DataType.INT)
 
@@ -595,12 +610,9 @@ class TransportProxy:
     def __init__(self, transport):
         """Create a TransportProxy which forwards to the given transport"""
         self._transport = transport
-    def snmp_get(self, *args, **kwargs):
-        return self._transport.snmp_get(*args, *kwargs)
-    def snmp_set(self, *args, **kwargs):
-        return self._transport.snmp_set(*args, *kwargs)
-    def snmp_walk(self, *args, **kwargs):
-        return self._transport.snmp_walk(*args, *kwargs)
+        self.snmp_get = transport.snmp_get
+        self.snmp_set = transport.snmp_set
+        self.snmp_walk = transport.snmp_walk
 
 class TransportProxyDict(TransportProxy, dict):
     def __init__(self, transport):
@@ -608,6 +620,7 @@ class TransportProxyDict(TransportProxy, dict):
         dict.__init__(self)
 
 class RowBase(TransportProxy):
+    """Base class for representing SNMP Tables"""
     def __init__(self, proxy, keys):
         super().__init__(proxy)
         self._keys = keys
@@ -758,7 +771,8 @@ class Table(TransportProxyDict):
                                            value=mapping.get('translator',
                                                              NullTranslator).pyvalue(raw_value),
                                            status=AttributeStatus.OK,
-                                           readback_after_write=mapping.get("readback_after_write", True),
+                                           readback_after_write=mapping.get("readback_after_write",
+                                                                            True),
                                            doc=mapping.get('doc'))
                 for oid, raw_value, mapping in row.values()
             }
@@ -775,15 +789,24 @@ class Table(TransportProxyDict):
             RowClass = type('Row', (self._row_class,), class_dict)
             self[rowkey] = RowClass(self, class_dict)
 
-        if len(self) == 0:
+        if not self:
             warnings.warn("SMTP walk of %s resulted in zero rows"
                           % table_oid)
 
     @property
     def oid(self):
+        """The base OID of the table, as passed to the contructor"""
         return self._oid
 
     def new_row(self, row_key, **kwargs):
+        """Creates a new row in the table
+
+        A new row may or may not have as many columns as the
+        table. The initial value of the columns should be passed using
+        keyword arguments: The row will only have the columns named as
+        keyword arguments.
+
+        """
         if row_key in self:
             raise ValueError("Key '%s' already exists in table" % row_key)
 
