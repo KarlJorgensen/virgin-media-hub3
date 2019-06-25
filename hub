@@ -49,7 +49,7 @@ def dump_properties(hub, props):
 
 @subcommand
 def info(hub, _args):
-    """Show General information about the hub"""
+    """Show General information about the hub."""
     dump_properties(hub,
                     [
                         "modelname",
@@ -75,7 +75,7 @@ def info(hub, _args):
                      default='router.data',
                      nargs='?'))])
 def backup(hub, args):
-    """Make a backup of the router configuration
+    """Make a backup of the router configuration.
 
     The resulting file is a binary hub-proprietary file, essentially
     only useful for restoring into the hub - the internal structure is
@@ -87,7 +87,7 @@ def backup(hub, args):
 
 @subcommand
 def wan_status(hub, _args):
-    """Show Wide Area Network settings"""
+    """Show Wide Area Network settings."""
     dump_properties(hub,
                     [
                         "wan_if_macaddr",
@@ -111,7 +111,7 @@ def wan_status(hub, _args):
 
 @subcommand
 def wan_iplist(hub, _args):
-    """Prints the current external IP addresses of the hub"""
+    """Prints the current external IP addresses of the hub."""
     print(hub.wan_current_table.format_by_row())
 
 @subcommand
@@ -126,7 +126,7 @@ def lan_networks(hub, _args):
 
 @subcommand
 def wifi_status(hub, _args):
-    """Show WIFI Status"""
+    """Show WIFI Status."""
     dump_properties(hub,
                     [
                         "wifi_24ghz_essid",
@@ -143,7 +143,7 @@ def wifi_status(hub, _args):
 
 @subcommand
 def portforward_list(hub, _args):
-    """List current port forwardings"""
+    """List current port forwardings."""
 
     print(utils.format_by_row(hub.portforwards))
 
@@ -158,7 +158,7 @@ def portforward_list(hub, _args):
                        "help": "The internal port number to map it to"})
 ])
 def portforward_add(hub, args):
-    """Add a port forwarding entry
+    """Add a port forwarding entry.
 
     This directs the hub to forward incoming traffic (arriving at the
     external interface) on that port to some port internally.
@@ -189,17 +189,17 @@ def portforward_del(hub, args):
 
 @subcommand
 def ether_ports(hub, _args):
-    """List ethernet ports on the hub"""
+    """List ethernet ports on the hub."""
     print(utils.format_table(hub.etherports))
 
 @subcommand
 def wifi_networks(hub, _args):
-    """List wifi networks"""
+    """List wifi networks."""
     print(utils.format_by_row(hub.bsstable))
 
 @subcommand
 def device_list(hub, _args):
-    """List devices connected to the hub"""
+    """List devices connected to the hub."""
     for dev in hub.device_list():
         print(dev)
 
@@ -207,10 +207,10 @@ def device_list(hub, _args):
 @Args([
     ("--quiet", dict(action="store_true"))])
 def reboot(hub, args):
-    """Instructs the hub to reboot
+    """Instructs the hub to reboot.
 
-    The virgin media hub will start to reboot - it will take a few
-    minutes before it is fully back.
+    The hub will start to reboot - it will take a few minutes before
+    it is fully back.
 
     """
     hub.reboot()
@@ -220,7 +220,11 @@ def reboot(hub, args):
 @subcommand
 @nohub
 def property_list(_args):
-    """Get a list of the known property names. Not all properties will be settable"""
+    """Get a list of the known property names.
+
+    Not all properties will be settable.
+
+    """
     for prop in sorted(virginmedia.HUB_PROPERTIES):
         print(prop)
 
@@ -231,7 +235,7 @@ def property_list(_args):
                   "choices": virginmedia.HUB_PROPERTIES})
 ])
 def property_get(hub, args):
-    """Get one or more properties"""
+    """Get one or more properties."""
     for prop in args.property:
         print(getattr(hub, prop))
 
@@ -245,7 +249,9 @@ def property_get(hub, args):
 def property_set(hub, args):
     """Set a specific property.
 
-    Note that not all properties are settable."""
+    Note that not all properties are settable.
+
+    """
     if not args.skip_get:
         oldvalue = getattr(hub, args.property)
 
@@ -289,7 +295,7 @@ def snmp_get(hub, args):
               "nargs": "?"})
 ])
 def snmp_set(hub, args):
-    """Set an SNMP attribute
+    """Set an SNMP attribute.
 
     This is mostly useful for developers, as it requires knowledge of
     SNMP and the relevant MIBs.
@@ -347,9 +353,9 @@ def main():
                         help="Timeout for HTTP requests to the router in seconds. "
                         "Defaults to 10 seconds.",
                         type=int)
-    subparsers = parser.add_subparsers(help="sub-command help")
+    subparsers = parser.add_subparsers(description="The subcommands specify what should be done")
 
-    for cmd in SUBCOMMANDS:
+    for cmd in sorted(SUBCOMMANDS, key=lambda x: x.__name__):
         cmd_parser = subparsers.add_parser(cmd.__name__.lower().replace('_', '-'),
                                            help=cmd.__doc__)
 
