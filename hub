@@ -95,7 +95,7 @@ def wan_status(hub, _args):
 @subcommand
 def wan_iplist(hub, _args):
     """Prints the current external IP addresses of the hub"""
-    print(hub.wan_current_table.format())
+    print(hub.wan_current_table.format_by_row())
 
 @subcommand
 def lan_networks(hub, _args):
