@@ -142,6 +142,11 @@ def wifi_status(hub, _args):
                     ])
 
 @subcommand
+def wifi_clients(hub, _args):
+    """List WIFI clients."""
+    print(hub.wifi_clients.format_by_row())
+
+@subcommand
 def portforward_list(hub, _args):
     """List current port forwardings."""
 

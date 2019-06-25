@@ -237,7 +237,6 @@ def _dummy_for_doctest():
     '1'
     """
 
-
 IPProtocolTranslator = EnumTranslator(IPProtocol, snmp_datatype=DataType.INT)
 
 class IntTranslator(Translator):
@@ -1067,6 +1066,60 @@ class LanTable(Table):
                               unlocked, the environment settings MAY be changed via the UI. When equal to
                               locked, the environment settings MAY NOT be changed via the UI"""),
             })
+
+class WifiClientTable(Table):
+    """Information about the currently connected WIFI clients
+
+    """
+    def __init__(self, transport):
+        super().__init__(
+            table_oid="1.3.6.1.4.1.4115.1.20.1.1.3.42.1",
+            transport=transport,
+            column_mapping={
+                "1": dict(name="index"),
+                "2": dict(name="ip_version",
+                          translator=IPVersionTranslator),
+                "3": dict(name="ipaddr",
+                          translator=IPAddressTranslator),
+                "5": dict(name="hostname"),
+                "6": dict(name="mac",
+                          translator=MacAddressTranslator),
+                "7": dict(name="manufacturer"),
+                "8": dict(name="status"),
+                "9": dict(name="first_seen",
+                          translator=DateTimeTranslator),
+                "10": dict(name="last_seen",
+                           translator=DateTimeTranslator),
+                "11": dict(name="idle_seconds",
+                           translator=IntTranslator),
+                "12": dict(name="connected_secs",
+                           translator=IntTranslator),
+                "13": dict(name="state"),
+                "14": dict(name="flags"),
+                "15": dict(name="tx_packets",
+                           translator=IntTranslator,
+                           doc="# of packets transmitted from this device since it was connected"),
+                "16": dict(name="tx_fail",
+                           translator=IntTranslator,
+                           doc="# of packet xmit failures from this device since it was connected"),
+                "17": dict(name="unicast_pkts",
+                           translator=IntTranslator,
+                           doc="# of unicast packets from this device since it was last connected"),
+                "18": dict(name="multicast_pkts",
+                           translator=IntTranslator,
+                           doc="# of multicast packets from this device since it was last connected"),
+                "19": dict(name="last_tx_rate",
+                           translator=IntTranslator,
+                           doc="Reception rate of the last packet transmitted by this wireless device in kbps/sec"),
+                "20": dict(name="last_rx_rate",
+                           translator=IntTranslator,
+                           doc="Reception rate of the last packet received by this wireless device in kbps/sec"),
+                "21": dict(name="supported_rates",
+                           doc="Supported rate set for this device"),
+                "22": dict(name="rssi",
+                           doc="Received Signal Strength Indicator - higher values (towards +infinity) are better")
+            })
+
 
 def _run_tests():
     import doctest
