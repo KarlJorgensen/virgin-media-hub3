@@ -249,6 +249,30 @@ def snmp_get(hub, args):
 
 @subcommand
 @Args([
+    ("oid", {"help": "OID of the SNMP property to retrieve. " \
+             "This should be given as a dot-separated number string, " \
+             "e.g. '1.3.6.1.4.1.4115.1.20.1.1.5.10.0'"}),
+    ("value", {"help": "The value to set it to. Is will be the raw string as sent to the hub"}),
+    ("type", {"help": "SNMP Data type (I think)",
+              "choices": snmp.DataType.__members__.keys(),
+              "nargs": "?"})
+])
+def snmp_set(hub, args):
+    """Set an SNMP attribute
+
+    This is mostly useful for developers, as it requires knowledge of
+    SNMP and the relevant MIBs.
+
+    """
+    args.oid = args.oid.strip('.')
+    if args.type is not None:
+        args.type = snmp.DataType[args.type]
+
+    res = hub.snmp_set(args.oid, value=args.value, datatype=args.type)
+    print("Result:", res)
+
+@subcommand
+@Args([
     ("--byrow", {"help": "Arrange output on a row-by-row basis",
                  "action": "store_true"}),
     ("oid", {"help": "OID of the SNMP property walk down from. " \
