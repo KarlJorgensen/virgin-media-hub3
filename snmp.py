@@ -933,6 +933,39 @@ class EtherPortTable(Table):
     def __delitem__(self, key):
         raise NotImplementedError("Deleting physical ethernet ports requires more than just python")
 
+class BSSTable(Table):
+    """Wifi networks"""
+    def __init__(self, hub):
+        super().__init__(table_oid="1.3.6.1.4.1.4115.1.20.1.1.3.22.1",
+                         transport=hub,
+                         column_mapping={
+                             "1": dict(name="mac",
+                                       translator=MacAddressTranslator),
+                             "2": dict(name="ssid"),
+                             "3": dict(name="active",
+                                       translator=BoolTranslator),
+                             "4": dict(name="ssid_broadcast",
+                                       translator=BoolTranslator),
+                             "5": dict(name="security_mode"),
+                             "6": dict(name="access_mode"),
+                             "7": dict(name="network_isolate",
+                                       translator=BoolTranslator),
+                             "8": dict(name="mac_access_count",
+                                       translator=IntTranslator),
+                             "10": dict(name="arp_audit_interval",
+                                        translator=IntTranslator),
+                             "11": dict(name="max_wifi_clients",
+                                        translator=IntTranslator),
+                             "12": dict(name="wmm_enable",
+                                        translator=BoolTranslator),
+                             "13": dict(name="wmm_apsd"),
+                             "14": dict(name="active_timeout",
+                                        translator=DateTimeTranslator),
+                             "15": dict(name="default_ssid"),
+                             "16": dict(name="sta_steering",
+                                        translator=BoolTranslator),
+                         })
+
 def _run_tests():
     import doctest
     import sys

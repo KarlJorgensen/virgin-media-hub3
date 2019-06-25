@@ -1078,6 +1078,10 @@ class Hub:
     def etherports(self):
         return snmp.EtherPortTable(self)
 
+    @property
+    def bsstable(self):
+        return snmp.BSSTable(self)
+
 class DeviceInfo:
     """Information about a device known to a hub
 
