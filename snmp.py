@@ -1082,7 +1082,7 @@ class WifiClientTable(Table):
                 "3": dict(name="ipaddr",
                           translator=IPAddressTranslator),
                 "5": dict(name="hostname"),
-                "6": dict(name="mac",
+                "6": dict(name="macaddr",
                           translator=MacAddressTranslator),
                 "7": dict(name="manufacturer"),
                 "8": dict(name="status"),

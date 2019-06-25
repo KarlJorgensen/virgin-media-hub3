@@ -149,20 +149,38 @@ def wifi_status(hub, _args):
 def wifi_clients(hub, args):
     """List WIFI clients."""
     clients = hub.wifi_clients
+
+    print("There are {0:d} distinct WIFI clients (across {1:d} IP addresses):"
+          .format(len(list(utils.unique_everseen([x.macaddr
+                                                  for x in clients.values()]))),
+                  len(list(utils.unique_everseen([x.ipaddr
+                                                  for x in clients.values()])))))
     if args.long:
         print(clients.format_by_row())
     else:
         clients = utils.select_columns(clients,
-                                       ["hostname",
+                                       ["macaddr",
+                                        "hostname",
                                         "ipaddr",
                                         "tx_packets",
                                         "tx_fail",
-                                        "last_tx_rate",
                                         "rx_unicast_pkts",
                                         "last_rx_rate",
                                         "rssi"])
+        best_rssi = max([row['rssi'] for row in clients.values()])
+        worst_rssi = min([row['rssi'] for row in clients.values()])
+        scale = 10
+
+        def rss_scale(rssi):
+            val = int(scale * (rssi - worst_rssi) / (best_rssi - worst_rssi) + 0.5)
+            return "*" * val
+
+        for row in clients.values():
+            row['signal'] = rss_scale(row['rssi'])
+
         clients = utils.sort_table(clients,
-                                   key=lambda row: (row['hostname'].upper(), row['ipaddr']))
+                                   key=lambda row: (row['macaddr'],
+                                                    row['ipaddr']))
         print(utils.format_table(clients))
 
 @subcommand
@@ -218,7 +236,7 @@ def ether_ports(hub, _args):
 
 @subcommand
 def wifi_networks(hub, _args):
-    """List wifi networks."""
+    """List WIFI networks."""
     print(utils.format_by_row(hub.bsstable))
 
 @subcommand
