@@ -1118,6 +1118,7 @@ class WifiClientTable(Table):
                 "21": dict(name="supported_rates",
                            doc="Supported rate set for this device"),
                 "22": dict(name="rssi",
+                           translator=IntTranslator,
                            doc="Received Signal Strength Indicator - higher values (towards +infinity) are better")
             })
 
