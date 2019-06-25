@@ -47,3 +47,4 @@ MIBs:
 - https://mibs.observium.org/mib/ARRIS-ROUTER-DEVICE-MIB/
 - https://mibs.observium.org/mib/ARRIS-CM-DOC30-DEVICE-MIB/
 - http://www.bowe.id.au/michael/isp/docsis/mibs/arris-docsis3/moca_11.mib
+- https://mibs.observium.org/mib/ESAFE-MIB/
