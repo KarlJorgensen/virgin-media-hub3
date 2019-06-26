@@ -197,10 +197,10 @@ def portforward_list(hub, args):
     else:
         pflist = utils.sort_table(pflist,
                                   key=lambda x: (x['ext_port_start']))
-        def portsummary(a, b):
-            if a == b:
-                return a
-            return "{0}-{1}".format(a, b)
+        def portsummary(start, end):
+            if start == end:
+                return start
+            return "{0}-{1}".format(start, end)
 
         pflist = utils.select_columns(pflist,
                                       ["rowstatus",
