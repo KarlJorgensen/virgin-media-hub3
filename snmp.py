@@ -15,18 +15,20 @@ import warnings
 import netaddr
 import utils
 
+class HumaneEnum(enum.Enum):
+    """An enum.Enum which declares __human__"""
+    def __human__(self):
+        return self.name
+
 @enum.unique
-class IPVersion(enum.Enum):
+class IPVersion(HumaneEnum):
     "IP Address Version"
     IPv4 = "1"
     IPv6 = "2"
     GodKnows = "4"
 
-    def __human__(self):
-        return self.name
-
 @enum.unique
-class DataType(enum.Enum):
+class DataType(HumaneEnum):
     """SNMP Data Types.
 
     ...I think...
@@ -36,14 +38,14 @@ class DataType(enum.Enum):
     STRING = 4
 
 @enum.unique
-class Boolean(enum.Enum):
+class Boolean(HumaneEnum):
     """The hub's representation of True and False"""
     # Fixme: This is complete and utter guesswork
     TRUE = "1"
     FALSE = "0"
 
 @enum.unique
-class IPProtocol(enum.Enum):
+class IPProtocol(HumaneEnum):
     """IP IPProtocols"""
     UDP = "0"
     TCP = "1"
@@ -59,7 +61,7 @@ class IPProtocol(enum.Enum):
             return True
         return (self == IPProtocol.BOTH) or (other == IPProtocol.BOTH)
 
-class AttributeStatus(enum.Enum):
+class AttributeStatus(HumaneEnum):
     """Current status of attributes.
 
     This is used for indicating whether the cached value is valid,
@@ -513,7 +515,7 @@ class DateTimeTranslator(Translator):
             "{p.year:04x}{p.month:02x}{p.day:02x}" \
             "{p.hour:02x}{p.minute:02x}{p.second:02x}00".format(p=python_value)
 
-class RowStatus(enum.Enum):
+class RowStatus(HumaneEnum):
     """SNMIv2 Row Status values
 
     As documented on

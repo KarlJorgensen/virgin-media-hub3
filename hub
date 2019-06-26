@@ -184,10 +184,44 @@ def wifi_clients(hub, args):
         print(utils.format_table(clients))
 
 @subcommand
-def portforward_list(hub, _args):
+@Args([
+    ("--long", dict(help="Show the 'long' format of the table",
+                    action="store_true"))
+    ])
+def portforward_list(hub, args):
     """List current port forwardings."""
 
-    print(utils.format_by_row(hub.portforwards))
+    pflist = hub.portforwards
+    if args.long:
+        print(utils.format_by_row(pflist))
+    else:
+        pflist = utils.sort_table(pflist,
+                                  key=lambda x: (x['ext_port_start']))
+        def portsummary(a, b):
+            if a == b:
+                return a
+            return "{0}-{1}".format(a, b)
+
+        pflist = utils.select_columns(pflist,
+                                      ["rowstatus",
+                                       "proto",
+                                       "ext_port_start",
+                                       "ext_port_end",
+                                       "local_addr",
+                                       "local_port_start",
+                                       "local_port_end"])
+        pflist = utils.filter_table(pflist,
+                                    rowstatus=snmp.RowStatus.ACTIVE)
+        for row in pflist.values():
+            row['ext_ports'] = portsummary(row['ext_port_start'], row['ext_port_end'])
+            row['local_ports'] = portsummary(row['local_port_start'], row['local_port_end'])
+
+        pflist = utils.select_columns(pflist,
+                                      ["proto",
+                                       "ext_ports",
+                                       "local_addr",
+                                       "local_ports"])
+        print(utils.format_table(pflist))
 
 @subcommand
 @Args([
