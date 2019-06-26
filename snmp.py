@@ -38,28 +38,31 @@ class DataType(HumaneEnum):
     STRING = 4
 
 @enum.unique
-class Boolean(HumaneEnum):
-    """The hub's representation of True and False"""
-    # Fixme: This is complete and utter guesswork
-    TRUE = "1"
-    FALSE = "0"
-
-@enum.unique
 class IPProtocol(HumaneEnum):
     """IP IPProtocols"""
     UDP = "0"
     TCP = "1"
     BOTH = "2"
 
-    def __human__(self):
-        return self.name
-
     def overlaps(self, other):
+        """Indicates whether there is any overlap between the 2 IPProtocols.
+
+        >>> IPProtocol.UDP.overlaps(IPProtocol.UDP)
+        True
+        >>> IPProtocol.UDP.overlaps(IPProtocol.TCP)
+        False
+        >>> IPProtocol.TCP.overlaps(IPProtocol.UDP)
+        False
+        >>> IPProtocol.BOTH.overlaps(IPProtocol.TCP)
+        True
+        >>> IPProtocol.TCP.overlaps(IPProtocol.BOTH)
+        True
+        """
         if not isinstance(other, IPProtocol):
             raise TypeError("overlaps() expects an IPProtocol instance")
         if self == other:
             return True
-        return (self == IPProtocol.BOTH) or (other == IPProtocol.BOTH)
+        return IPProtocol.BOTH in [self, other]
 
 class AttributeStatus(HumaneEnum):
     """Current status of attributes.
@@ -1101,27 +1104,34 @@ class WifiClientTable(Table):
                 "14": dict(name="flags"),
                 "15": dict(name="tx_packets",
                            translator=IntTranslator,
-                           doc="# of packets transmitted from this device since it was connected"),
+                           doc="# of packets transmitted from this device "
+                           "since it was connected"),
                 "16": dict(name="tx_fail",
                            translator=IntTranslator,
-                           doc="# of packet xmit failures from this device since it was connected"),
+                           doc="# of packet xmit failures from this device "
+                           "since it was connected"),
                 "17": dict(name="rx_unicast_pkts",
                            translator=IntTranslator,
-                           doc="# of unicast packets from this device since it was last connected"),
+                           doc="# of unicast packets from this device "
+                           "since it was last connected"),
                 "18": dict(name="rx_multicast_pkts",
                            translator=IntTranslator,
-                           doc="# of multicast packets from this device since it was last connected"),
+                           doc="# of multicast packets from this device "
+                           "since it was last connected"),
                 "19": dict(name="last_tx_rate",
                            translator=IntTranslator,
-                           doc="Reception rate of the last packet transmitted by this wireless device in kbps/sec"),
+                           doc="Reception rate of the last packet transmitted "
+                           "by this wireless device in kbps/sec"),
                 "20": dict(name="last_rx_rate",
                            translator=IntTranslator,
-                           doc="Reception rate of the last packet received by this wireless device in kbps/sec"),
+                           doc="Reception rate of the last packet received by "
+                           "this wireless device in kbps/sec"),
                 "21": dict(name="supported_rates",
                            doc="Supported rate set for this device"),
                 "22": dict(name="rssi",
                            translator=IntTranslator,
-                           doc="Received Signal Strength Indicator - higher values (towards +infinity) are better")
+                           doc="Received Signal Strength Indicator - "
+                           "higher values (towards +infinity) are better")
             })
 
 

@@ -294,7 +294,6 @@ class Hub:
 
     """
     def __init__(self, hostname='192.168.0.1', http_timeout=30, **kwargs):
-
         self._credential = None
         self._url = 'http://' + hostname
         self._hostname = hostname
@@ -1002,10 +1001,12 @@ class Hub:
 
     @property
     def etherports(self):
+        """List of ethernet ports on the hub"""
         return snmp.EtherPortTable(self)
 
     @property
     def bsstable(self):
+        """List of WIFI networks"""
         return snmp.BSSTable(self)
 
 class DeviceInfo:
