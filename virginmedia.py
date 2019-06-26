@@ -87,22 +87,6 @@ def extract_ip_generic(hexvalue, addrtype, zero_is_none=True):
 
     return "Unknown:{hexvalue=%s, addrtype=%s}" % (hexvalue, addrtype)
 
-def collect_stats(func):
-    """A function decorator to count how many calls are done to the func.
-
-    it also collects timing information
-    """
-    @functools.wraps(func)
-    def wrapper(*args, **kwargs):
-        self = args[0]
-        self._increment_counter(func.__name__ + ':calls')
-        start = time.time()
-        result = func(*args, **kwargs)
-        self._increment_counter(func.__name__ + ':secs',
-                                increment=time.time()-start)
-        return result
-    return wrapper
-
 def param_check(argid, checker):
     """A function decorator that enforces that a parameter should pass _checker_.
 
@@ -305,7 +289,6 @@ class Hub:
             "_n": "%05d" % random.randint(10000, 99999)
             }
         self._nonce_str = "_n=%s&_=%s" % (self._nonce["_n"], self._nonce["_"])
-        self.counters = {}
         self._modelname = None
         self._family = None
         self._unapplied_settings = False
@@ -330,13 +313,6 @@ class Hub:
     wifi_5ghz_essid = snmp.Attribute("1.3.6.1.4.1.4115.1.20.1.1.3.22.1.2.10101")
     wifi_5ghz_password = snmp.Attribute("1.3.6.1.4.1.4115.1.20.1.1.3.26.1.2.10101")
 
-    def _increment_counter(self, name, increment=1):
-        """Increase a counter increment (usually) 1.
-
-        If the counter does not exist yet, it will be created"""
-        self.counters[name] = self.counters.get(name, 0) + increment
-
-    @collect_stats
     def _get(self, url, retry401=5, retry500=3, **kwargs):
         """Shorthand for requests.get.
 
@@ -359,14 +335,12 @@ class Hub:
                 resp = requests.get(self._url + '/' + url,
                                     timeout=self.http_timeout,
                                     **kwargs)
-            self._increment_counter('received_http_' + str(resp.status_code))
             if resp.status_code == 401:
                 retry401 -= 1
                 if retry401 > 0 and self.is_loggedin:
                     warnings.warn("Got http status %s - Retrying after logging in again" \
                                   %(resp.status_code))
                     self.login(username=self._username, password=self._password)
-                    self._increment_counter('_get_retries_401')
                     continue
             if resp.status_code == 500:
                 retry500 -= 1
@@ -375,9 +349,6 @@ class Hub:
                                   % (resp.status_code, sleep))
                     time.sleep(sleep)
                     sleep *= 2
-                    self._increment_counter('_get_retries_500')
-                    self._increment_counter('_get_retries_500_sleep_secs',
-                                            increment=sleep)
                     continue
             break
         resp.raise_for_status()
@@ -385,14 +356,12 @@ class Hub:
             raise AccessDenied(url)
         return resp
 
-    @collect_stats
     def _params(self, keyvalues):
         res = {}
         res.update(self._nonce)
         res.update(keyvalues)
         return res
 
-    @collect_stats
     def login(self, username=None, password="admin"):
         """Log into the router.
 
@@ -457,7 +426,6 @@ class Hub:
         """True if we have authenticated to the hub"""
         return self._credential is not None
 
-    @collect_stats
     def logout(self):
         """Logs out from the hub"""
         if self.is_loggedin:
@@ -477,12 +445,10 @@ class Hub:
         resp.raise_for_status()
         return bytearray(resp.content)
 
-    @collect_stats
     def __enter__(self):
         """Context manager support: Called on the way in"""
         return self
 
-    @collect_stats
     def __exit__(self, exc_type, exc_value, traceback):
         """Context manager support: Called on the way out"""
         try:
@@ -493,13 +459,11 @@ class Hub:
                 raise
         return False
 
-    @collect_stats
     def snmp_get(self, oid):
         """Retrieves a single SNMP value from the hub"""
         resp = self.snmp_gets(oids=[oid])
         return resp[oid]
 
-    @collect_stats
     def snmp_gets(self, oids):
         """Retrieves multiple OIDs from the hub.
 
@@ -516,7 +480,6 @@ class Hub:
             raise
         return resp
 
-    @collect_stats
     def snmp_set(self, oid, value=None, datatype=None):
         """Set the value of a given OID on the hub
 
@@ -571,12 +534,10 @@ class Hub:
         """
         return self._credential is not None
 
-    @collect_stats
     def __del__(self):
         """Logs out of the hub"""
         self.logout()
 
-    @collect_stats
     def snmp_walk(self, oid):
         """Perform an SNMP Walk from the given OID.
 
@@ -1084,10 +1045,6 @@ def _demo():
         print("Device List")
         for dev in [x for x in hub.device_list() if x.connected]:
             print("-", dev)
-
-        print("Session counters:")
-        for counter in sorted(hub.counters):
-            print('-', counter, hub.counters[counter])
 
 if __name__ == '__main__':
     _demo()
