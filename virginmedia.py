@@ -694,21 +694,8 @@ class Hub:
     "Use automatic DNS servers as specified by ISP and DHCP"
 
     @property
-    @snmp_table("1.3.6.1.4.1.4115.1.20.1.1.1.11.2.1",
-                {"2": "addrtype",
-                 "3": "address"})
-    def dns_servers(self, table_rows):
-        """DNS servers used by the hub.
-
-        This will probably also be the DNS servers the hub hands out
-        in DHCP responses.
-
-        The return value will be a list of strings - each string
-        representing an IP address.
-
-        """
-        return [extract_ip_generic(x.address, snmp.IPVersion(x.addrtype))
-                for x in table_rows]
+    def dns_servers(self):
+        return snmp.DNSServerTable(self)
 
     @property
     def wan_current_table(self):

@@ -1134,6 +1134,19 @@ class WifiClientTable(Table):
                            "higher values (towards +infinity) are better")
             })
 
+class DNSServerTable(Table):
+    """List of DNS servers known/used by the hub"""
+    def __init__(self, transport):
+        super().__init__(
+            table_oid="1.3.6.1.4.1.4115.1.20.1.1.1.11.2.1",
+            transport=transport,
+            column_mapping={
+                "1": dict(name="index",
+                          translator=IntTranslator),
+                "2": dict(name="ip_version",
+                          translator=IPVersionTranslator),
+                "3": dict(name="ipaddr",
+                          translator=IPAddressTranslator)})
 
 def _run_tests():
     import doctest
