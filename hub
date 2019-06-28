@@ -269,9 +269,17 @@ def ether_ports(hub, _args):
     print(utils.format_table(hub.etherports))
 
 @subcommand
-def wifi_networks(hub, _args):
+@Args([
+    ("--long", dict(help="Show the 'long' format of the table",
+                    action="store_true"))
+    ])
+def wifi_networks(hub, args):
     """List WIFI networks."""
-    print(utils.format_by_row(hub.bsstable))
+    networks = hub.bsstable
+    if args.long:
+        print(utils.format_by_row(networks))
+    else:
+        print(utils.format_table(networks))
 
 @subcommand
 def device_list(hub, _args):
