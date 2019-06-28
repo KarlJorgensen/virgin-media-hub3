@@ -698,6 +698,17 @@ class Hub:
         return snmp.DNSServerTable(self)
 
     @property
+    def lan_clients(self):
+        """Information about LAN clients.
+
+        This includes both wired and wireless clients.
+
+        Retrieving this list can take 10 seconds or more...
+
+        """
+        return snmp.LanClientTable(self)
+
+    @property
     def wan_current_table(self):
         """Table contains information for a specific Wan IP address.
 

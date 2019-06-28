@@ -302,19 +302,22 @@ class PortTranslator(IntTranslator):
     snmp_datatype = DataType.PORT
 
 class MacAddressTranslator(Translator):
-    """
-    The hub represents mac addresses as e.g. "$787b8a6413f5" - i.e. a
+    """The hub represents mac addresses as e.g. "$787b8a6413f5" - i.e. a
     dollar sign followed by 12 hex digits, which we need to transform
     to the traditional mac address representation.
+
+    For convenience, the dialect of the mac address is set to
+    'mac_unix_expanded'
 
     >>> MacAddressTranslator.pyvalue('')
 
     >>> MacAddressTranslator.snmp(None)
     '$000000000000'
     >>> MacAddressTranslator.pyvalue('$787b8a6413f5')
-    EUI('78-7B-8A-64-13-F5')
+    EUI('78:7b:8a:64:13:f5')
     >>> MacAddressTranslator.snmp(netaddr.EUI('78-7B-8A-64-13-F5'))
     '$787b8a6413f5'
+
     """
     @staticmethod
     def pyvalue(snmp_value):
@@ -323,7 +326,10 @@ class MacAddressTranslator(Translator):
         if not snmp_value.startswith('$') or len(snmp_value) != 13:
             raise ValueError("'%s' is not a sensible SNMP Mac Address"
                              % snmp_value)
-        return netaddr.EUI(snmp_value[1:])
+        mac = netaddr.EUI(snmp_value[1:])
+        mac.dialect = netaddr.mac_unix_expanded
+        return mac
+
     @staticmethod
     def snmp(python_value):
         if python_value is None:
@@ -1071,6 +1077,68 @@ class LanTable(Table):
                               unlocked, the environment settings MAY be changed via the UI. When equal to
                               locked, the environment settings MAY NOT be changed via the UI"""),
             })
+
+class ClientType(HumaneEnum):
+    """Client types in the LanClientTable"""
+
+    UNKNOWN = "0"
+    "No client should use this value"
+
+    DYNAMIC = "1"
+    """The client IP address is in DHCPv6 or DHCPv6 lease file, but it
+    is not configured as Reserved client on WebGUI)"""
+
+    STATIC = "5"
+    """If the client is online, and we can't find the client information
+    in DHCPv4 or DHCPv6 lease file and it is not configured as
+    Reserved client on WebGUI, then we put it types to static. Notice
+    IPv6 stateless client and link local client would also tagged as
+    this type)
+
+    """
+    DYNAMIC_RESERVED = "6"
+    "The Reserved client configured on WebGUI"
+
+ClientTypeTranslator = EnumTranslator(ClientType)
+
+class LanClientTable(Table):
+    """Information about LAN clients.
+
+    This includes both wired and wireless clients.
+
+    Retrieving this list can take 10 seconds or more...
+    """
+    def __init__(self, transport):
+        super().__init__(
+            table_oid="1.3.6.1.4.1.4115.1.20.1.1.2.4.2.1",
+            transport=transport,
+            column_mapping={
+                "1": dict(name="addrtype",
+                          translator=IPVersionTranslator),
+                "2": dict(name="ipaddr",
+                          translator=IPAddressTranslator),
+                "3": dict(name="hostname"),
+                "4": dict(name="mac_address",
+                          translator=MacAddressTranslator),
+                "6": dict(name="adapter_type"),
+                "7": dict(name="client_type",
+                          translator=ClientTypeTranslator),
+                "9": dict(name="lease_end",
+                          translator=DateTimeTranslator),
+                "13": dict(name="rowstatus",
+                           translator=RowStatusTranslator),
+                "14": dict(name="online",
+                           translator=BoolTranslator),
+                "15": dict(name="comment"),
+                # "17": dict(name="manufacturer"),
+                "18": dict(name="serialno"),
+                "19": dict(name="product_class"),
+                "20": dict(name="device_name"),
+                "24": dict(name="last_change_secs",
+                           translator=IntTranslator),
+                "25": dict(name="connected_secs",
+                           translator=IntTranslator)
+                })
 
 class WifiClientTable(Table):
     """Information about the currently connected WIFI clients

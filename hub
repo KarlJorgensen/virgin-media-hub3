@@ -280,6 +280,14 @@ def device_list(hub, _args):
         print(dev)
 
 @subcommand
+def lan_clients(hub, _args):
+    """List known LAN clients."""
+    clients = utils.sort_table(hub.lan_clients, key=lambda x: x.mac_address)
+    print("There are %d known clients:" % len(clients))
+    print(utils.format_table(clients))
+    print("Note: This list includes both wired and wireless clients")
+
+@subcommand
 @Args([
     ("--quiet", dict(action="store_true"))])
 def reboot(hub, args):
