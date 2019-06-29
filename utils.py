@@ -80,6 +80,26 @@ def select_columns(table, columns):
 
     return res
 
+def unselect_columns(table, columns):
+    """Return a new table without the listed columns
+
+    Row order will be preserved.
+
+    Note: If the original table is a Table class, the result will no
+    longer be updateable, and only cached values can be retrieved.
+
+    """
+    res = dict()
+    for rowkey, oldrow in table.items():
+        newrow = dict()
+        for colname in oldrow.keys():
+            if colname not in columns:
+                newrow[colname] = oldrow[colname]
+        if newrow:
+            res[rowkey] = newrow
+
+    return res
+
 def filter_table(table, **kwargs):
     """Filter rows in tables
 

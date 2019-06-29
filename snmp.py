@@ -1014,16 +1014,16 @@ class LanTable(Table):
                             put the device into bridged (routed) mode with Network Address Translation (NAT)
                             enabled use: routedNAT(2). To put the device into bridged (routed) mode with
                             Network Address Translation (NAT) disabled use: routedNoNAT(3)"""),
-                "4": dict(name="gateway_ip_type",
+                "4": dict(name="gw_ip_type",
                           translator=IPVersionTranslator),
-                "5": dict(name="gateway_ip",
+                "5": dict(name="gw_ip",
                           translator=IPAddressTranslator,
                           doc="Gateway IP address"),
-                "6": dict(name="gateway_ip2_type",
-                          translator=IPVersionTranslator),
-                "7": dict(name="gateway_ip2",
-                          translator=IPAddressTranslator,
-                          doc="Second gateway IP address"),
+                # "6": dict(name="gw_ip2_type",
+                #           translator=IPVersionTranslator),
+                # "7": dict(name="gw_ip2",
+                #           translator=IPAddressTranslator,
+                #           doc="Second gateway IP address"),
                 "2": dict(name="subnet_mask_type",
                           translator=IPVersionTranslator),
                 "3": dict(name="subnet_mask",
@@ -1045,31 +1045,31 @@ class LanTable(Table):
                            translator=IntTranslator,
                            doc="DHCP Lease time in seconds"),
                 "15": dict(name="domain_name"),
-                "19": dict(name="dns_relay_enabled",
+                "19": dict(name="dns_relay",
                            translator=BoolTranslator),
-                "25": dict(name="dns_override_enabled",
+                "25": dict(name="dns_override",
                            translator=BoolTranslator,
                            doc="""\
                             If DNS override is enabled, the IP addresses in arrisRouterLanDNSTable will be
                             passed to LAN clients via DHCP.  Otherwise, the DNS servers received by the WAN
                             connection will be passed to the LAN clients."""),
-                "22": dict(name="firewall_enabled",
+                "22": dict(name="firewall",
                            translator=BoolTranslator),
-                "23": dict(name="upnp_enabled",
+                "23": dict(name="upnp",
                            translator=BoolTranslator),
                 "24": dict(name="aging_time",
                            translator=IntTranslator,
                            doc="The timeout period in seconds for aging out dynamically " \
                            "learned forwarding information. " \
                            "The default value of zero means do not age "),
-                "39": dict(name="parental_controls_enabled",
+                "39": dict(name="parental_controls",
                            translator=BoolTranslator),
-                "26": dict(name="nat_algs_enabled",
+                "26": dict(name="nat_algs",
                            doc="""\
                             Specifies which NAT application layer gateway supplements are enabled on this
                             device.  The default value for this object is for all ALG's to be enabled. Reserved
                             bits are for ALGs that are currently not supported."""),
-                "28": dict(name="environment_control",
+                "28": dict(name="env_control",
                            translator=BoolTranslator,
                            doc="""\
                               Controls whether or not the settings which define the operating environment of

@@ -115,14 +115,28 @@ def wan_iplist(hub, _args):
     print(hub.wan_current_table.format_by_row())
 
 @subcommand
-def lan_networks(hub, _args):
+@Args([
+    ("--long", dict(help="Show the 'long' format of the table",
+                    action="store_true"))
+    ])
+def lan_networks(hub, args):
     """Information about the local LAN networks.
 
     The router can actually handle more than one network.  A single
     network can span multiple interfaces.
 
     """
-    print(hub.lan_networks.format_by_row())
+    networks = hub.lan_networks
+    if args.long:
+        print(utils.format_by_row(networks))
+    else:
+        networks = utils.unselect_columns(networks,
+                                          ['gw_ip_type',
+                                           'subnet_mask_type',
+                                           'dhcp_start_ip_type',
+                                           'dhcp_end_ip_type',
+                                           'env_control'])
+        print(utils.format_table(networks))
 
 @subcommand
 def wifi_status(hub, _args):
