@@ -36,6 +36,7 @@ To hack around with the source code, you will need:
 
 Interesting other stuff:
 
+- https://community.virginmedia.com/t5/Networking-and-WiFi/bd-p/Wireless : Virgin Media community
 - https://wikidevi.com/wiki/Virgin_Media_Super_Hub_3
 - Hacking an Arris Cablemodem : https://blog.korelogic.com/blog/2016/02/12
 - Teardown: https://www.mobile-computer-repairs.co.uk/blog/topic/29/routers/Arris-TG2492
