@@ -457,7 +457,8 @@ def main():
                         default=os.environ.get("HUB_PASSWORD"))
     parser.add_argument("--timeout",
                         help="Timeout for HTTP requests to the router in seconds. "
-                        "Defaults to 10 seconds.",
+                        "Defaults to 30 seconds.",
+                        default=30,
                         type=int)
     subparsers = parser.add_subparsers(description="The subcommands specify what should be done")
 
