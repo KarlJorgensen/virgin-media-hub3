@@ -110,9 +110,23 @@ def wan_status(hub, _args):
                         ])
 
 @subcommand
-def wan_iplist(hub, _args):
+@Args([
+    ("--long", dict(help="Show the 'long' format of the table",
+                    action="store_true"))
+    ])
+def wan_networks(hub, args):
     """Prints the current external IP addresses of the hub."""
-    print(hub.wan_current_table.format_by_row())
+    networks = utils.filter_table(hub.wan_networks,
+                                  lambda k, v: v.addr_type in [snmp.IPVersion.IPv4,
+                                                               snmp.IPVersion.IPv6])
+
+    if args.long:
+        print(utils.format_by_row(networks))
+    else:
+        networks = utils.unselect_columns(networks,
+                                          ['gw_ip_type',
+                                           'netmask'])
+        print(utils.format_table(networks))
 
 @subcommand
 @Args([
@@ -131,11 +145,8 @@ def lan_networks(hub, args):
         print(utils.format_by_row(networks))
     else:
         networks = utils.unselect_columns(networks,
-                                          ['gw_ip_type',
-                                           'subnet_mask_type',
-                                           'dhcp_start_ip_type',
-                                           'dhcp_end_ip_type',
-                                           'env_control'])
+                                          ['gw_addr_type',
+                                           'netmask'])
         print(utils.format_table(networks))
 
 @subcommand
@@ -225,7 +236,7 @@ def portforward_list(hub, args):
                                        "local_port_start",
                                        "local_port_end"])
         pflist = utils.filter_table(pflist,
-                                    rowstatus=snmp.RowStatus.ACTIVE)
+                                    lambda k, v: v['rowstatus'] == snmp.RowStatus.ACTIVE)
         for row in pflist.values():
             row['ext_ports'] = portsummary(row['ext_port_start'], row['ext_port_end'])
             row['local_ports'] = portsummary(row['local_port_start'], row['local_port_end'])

@@ -17,7 +17,7 @@ selftest: pylints unittests
 	./hub snmp-walk 1.3.6.1.4.1.4115.1.20.1.1.1.7.1 --byrow
 	./hub ether-ports
 	./hub wan-status
-	./hub wan-iplist
+	./hub wan-networks
 	./hub lan-networks
 	./hub wifi-status
 	./hub portforward-list

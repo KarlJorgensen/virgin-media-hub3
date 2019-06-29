@@ -1216,6 +1216,58 @@ class DNSServerTable(Table):
                 "3": dict(name="ipaddr",
                           translator=IPAddressTranslator)})
 
+class WanNetworksTable(Table):
+    """List of WAN networks
+
+    In some environments, there may be both an IPv6 and IPv6 address
+    or multiple IPv6 addresses.
+
+    The size of this table is usually limited to 4 entries
+    """
+    def __init__(self, transport):
+        super().__init__(
+            table_oid="1.3.6.1.4.1.4115.1.20.1.1.1.7.1",
+            transport=transport,
+            column_mapping={
+                "1": dict(name="Index"),
+                "2": dict(name="addr_type",
+                          translator=IPVersionTranslator,
+                          doc="Static IP address type"),
+                "3": dict(name="ipaddr",
+                          translator=IPAddressTranslator,
+                          doc="Static IP addressfor Wan connection"),
+                "4": dict(name="prefix",
+                          translator=IntTranslator,
+                          doc="Netmask (Prefix)"),
+                "8": dict(name="netmask",
+                          translator=IPv4Translator,
+                          doc="Netmask if it is IPv4"),
+                "5": dict(name="gw_ip_type",
+                          translator=IPVersionTranslator,
+                          doc="Gateway Address type"),
+                "6": dict(name="gw",
+                          translator=IPAddressTranslator,
+                          doc="Gateway address"),
+                # "7": dict(name="iptype",
+                #           translator=IPVersionTranslator,
+                #           doc="Type of IP address. This appears to be unreliable..."),
+                "9": dict(name="prefix_delegation",
+                          translator=IPv6Translator,
+                          doc="The prefix, or initial bits of the address, given "
+                          "to the router to delegate to its attached CPEs"),
+                "10": dict(name="prefix_delegation_len",
+                           translator=IntTranslator,
+                           doc="The length for the prefix to be delegated to attached CPEs"),
+                "11": dict(name="preferredlifetimev6",
+                           translator=IntTranslator,
+                           doc="The preferred lifetime for the assigned IPv6 address "
+                           "of the router"),
+                "12": dict(name="validlifetimev6",
+                           translator=IntTranslator,
+                           doc="The valid lifetime for the assigned IPv6 address "
+                           "of the router")
+            })
+
 def _run_tests():
     import doctest
     import sys

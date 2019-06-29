@@ -100,26 +100,24 @@ def unselect_columns(table, columns):
 
     return res
 
-def filter_table(table, **kwargs):
+def filter_table(table, selector):
     """Filter rows in tables
 
-    Only rows which match the kwargs criteria will be returned.
+    Only rows for which the selector is returning True(ness) will be
+    included in the result.
+
+    The selector will receive two args: key (for the row) and the row.
 
     Row order will be preserved.
 
     Note: If the original table is a Table class, the result will no
     longer be updateable, and only cached values can be retrieved.
+
     """
     res = dict()
     for rowkey, row in table.items():
-        include_it = True
-        for name, value in kwargs.items():
-            if row[name] != value:
-                include_it = False
-                break
-        if not include_it:
-            continue
-        res[rowkey] = row
+        if selector(rowkey, row):
+            res[rowkey] = row
     return res
 
 def sort_table(table, key):
