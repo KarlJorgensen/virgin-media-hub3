@@ -206,58 +206,6 @@ def snmp_property(oid):
     return Decorator
 
 
-def snmp_table(top_oid, columns):
-    """A function decorator which does a walk of an snmp table
-
-    The function gets passed an extra keyword argument: table_rows,
-    which is an array of namespace objects, where the columns can be
-    referenced by name.
-
-    The unique row ID for each row gets assigned to the 'row_idx'
-    value in the namespace object.
-
-    The "columns" parameter to the decorator describes the columns: It
-    is expected to be a dicts, where the key is the (partial) OID
-    number of the column, and the value indicates the column name.
-
-    columns = {"1": "columnname1"
-               "2": "columnname2"}
-
-    if the SNMP walk returns columns not listed in the dict, they will
-    be ignored.
-
-    """
-    def real_wrapper(func):
-        def col_num(walked_oid):
-            return walked_oid[len(top_oid)+1:].split('.')[0]
-
-        def row_num(walked_oid):
-            return int(walked_oid[len(top_oid)+1:].split('.')[1])
-
-        rowcls = collections.namedtuple('SNMPRow',
-                                        field_names=list(columns.values()) + ['row_idx'],
-                                        defaults=itertools.repeat(None, len(columns)+1))
-
-        @functools.wraps(func)
-        def wrapper(*args, **kwargs):
-            self = args[0]
-            results = [x for x in self.snmp_walk(top_oid).items()
-                       if col_num(x[0]) in columns]
-            results.sort(key=lambda x: (row_num(x[0]), col_num(x[0])))
-
-            tabrows = []
-            for (dummy, val) in itertools.groupby(results,
-                                                  lambda x: row_num(x[0])):
-                therow = rowcls(**{columns[col_num(ccc[0])]: ccc[1]
-                                   for ccc in val})._replace(row_idx=dummy)
-                tabrows.append(therow)
-
-            kwargs['table_rows'] = tabrows
-            return func(*args, **kwargs)
-        return wrapper
-    return real_wrapper
-
-
 class SNMPSetError(AttributeError):
     """Gets raised when the hub refuses an SNMP Set"""
     def __init__(self, hub, oid, response):
