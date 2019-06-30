@@ -21,8 +21,8 @@ def subcommand(func):
 class Args:
     """A function decorator that adds arguments to a subcommand.
 
-    It should be passed an array of (args, kwargs) - these will be
-    used (eventually) call ArgumentParser.add_argument()
+    It should be passed an array of (tuple, dict) entries - these will
+    be used (eventually) call ArgumentParser.add_argument(args, kwargs)
 
     """
     def __init__(self, args):
@@ -111,8 +111,8 @@ def wan_status(hub, _args):
 
 @subcommand
 @Args([
-    ("--long", dict(help="Show the 'long' format of the table",
-                    action="store_true"))
+    (("--long", "-l"), dict(help="Show the 'long' format of the table",
+                            action="store_true"))
     ])
 def wan_networks(hub, args):
     """Prints the current external IP addresses of the hub."""
@@ -130,8 +130,8 @@ def wan_networks(hub, args):
 
 @subcommand
 @Args([
-    ("--long", dict(help="Show the 'long' format of the table",
-                    action="store_true"))
+    (("--long", "-l"), dict(help="Show the 'long' format of the table",
+                            action="store_true"))
     ])
 def lan_networks(hub, args):
     """Information about the local LAN networks.
@@ -168,8 +168,8 @@ def wifi_status(hub, _args):
 
 @subcommand
 @Args([
-    ("--long", dict(help="Show the 'long' format of the table",
-                    action="store_true"))
+    (("--long", "-l"), dict(help="Show the 'long' format of the table",
+                            action="store_true"))
     ])
 def wifi_clients(hub, args):
     """List WIFI clients."""
@@ -210,8 +210,8 @@ def wifi_clients(hub, args):
 
 @subcommand
 @Args([
-    ("--long", dict(help="Show the 'long' format of the table",
-                    action="store_true"))
+    (("--long", "-l"), dict(help="Show the 'long' format of the table",
+                            action="store_true"))
     ])
 def portforward_list(hub, args):
     """List current port forwardings."""
@@ -295,8 +295,8 @@ def ether_ports(hub, _args):
 
 @subcommand
 @Args([
-    ("--long", dict(help="Show the 'long' format of the table",
-                    action="store_true"))
+    (("--long", "-l"), dict(help="Show the 'long' format of the table",
+                            action="store_true"))
     ])
 def wifi_networks(hub, args):
     """List WIFI networks."""
@@ -322,7 +322,7 @@ def lan_clients(hub, _args):
 
 @subcommand
 @Args([
-    ("--quiet", dict(action="store_true"))])
+    (("--quiet", "-q"), dict(action="store_true"))])
 def reboot(hub, args):
     """Instructs the hub to reboot.
 
@@ -454,7 +454,7 @@ def main():
     parser.add_argument("--host", "-H",
                         help="IP Address/dns name of the hub. "
                         "Uses the HUB environment variable as a default value"
-                        "- and 192.168.0.1 if that is not set",
+                        " - and 192.168.0.1 if that is not set",
                         default=os.environ.get("HUB", "192.168.0.1"))
     parser.add_argument("--username", "-u",
                         help="User name to login as. "
@@ -464,7 +464,8 @@ def main():
     parser.add_argument("--password", "-p",
                         help="Password to authenticate on the hub. "
                         "Uses the HUB_PASSWORD environment variable if not specified. "
-                        "If not password is given, no login will be attempted",
+                        "If no password is given, no login will be attempted, and "
+                        "some commands may fail as a result",
                         default=os.environ.get("HUB_PASSWORD"))
     parser.add_argument("--timeout",
                         help="Timeout for HTTP requests to the router in seconds. "
@@ -479,7 +480,10 @@ def main():
 
         if hasattr(cmd, 'args'):
             for arg in cmd.args:
-                cmd_parser.add_argument(arg[0], **arg[1])
+                if isinstance(arg[0], str):
+                    cmd_parser.add_argument(arg[0], **arg[1])
+                else:
+                    cmd_parser.add_argument(*arg[0], **arg[1])
         cmd_parser.set_defaults(func=cmd)
 
     args = parser.parse_args()
