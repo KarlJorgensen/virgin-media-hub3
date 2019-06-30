@@ -279,6 +279,7 @@ class EtherPortTable(snmp.Table):
         raise NotImplementedError("Deleting physical ethernet ports requires more than just python")
 
 class AccessMode(snmp.HumaneEnum):
+    """Defines which wifi clients will be allowed to connect"""
     ALLOW_ANY = "1"
     WHITELIST = "2"
     """Only stations whose MAC address appears in the
@@ -420,6 +421,7 @@ class PortForwardTable(snmp.Table):
                          })
 
 class TODStatus(snmp.HumaneEnum):
+    """NTP status for the hub"""
     NOT_PROVISIONED = "0"
     MISSING_SERVER_ADDRESS1 = "1"
     MISSING_SERVER_ADDRESS2 = "2"
