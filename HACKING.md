@@ -34,6 +34,16 @@ To hack around with the source code, you will need:
   requests. Alternatively, use tcpdump and/or wireshark to capture and
   analyze the traffic.
 
+
+This repository makes use of a couple of git hooks. These are not
+mandatory, but they help keep things tidy. To get your environment set
+up right please invoke
+
+  ./prep-for-development.sh
+
+when you have done the git clone.
+
+
 Interesting other stuff:
 
 - https://community.virginmedia.com/t5/Networking-and-WiFi/bd-p/Wireless : Virgin Media community

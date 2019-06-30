@@ -6,11 +6,10 @@ all : selftest pylints
 
 .PHONY: clean
 
+# A deeper selftest. Even if they succeed, the output should be
+# eyeballed by a developer.
 .PHONY: selftest
 selftest: pylints unittests
-	./utils.py
-	./arris.py
-	./snmp.py
 	./virginmedia.py
 	./hub property-list
 	./hub backup
@@ -32,19 +31,15 @@ pylints: $(PYFILES:%=.%.lint)
 clean ::
 	rm -f $(PYFILES:%=.%.lint)
 
+# Unit tests that do not require access to an actual Virgin Media Hub
 .PHONY: unittests
 unittests: pylints
 	python3 ./utils.py
 	python3 ./snmp.py
+	python3 ./arris.py
+	./hub --help
 
 # pylint exit code is a bitmask - we are only interested in fatal/error here
 .%.lint : %
 	pylint3 --reports=n --output-format=parseable $< ; test $$(( $$? & 3 )) -eq 0
 	touch $@
-
-router.dat : perms
-	./configure | ./encode > router.dat
-
-.PHONY : perms
-perms:
-	chmod +x configure encode decode
