@@ -152,7 +152,8 @@ def lan_networks(hub, args):
                                           ['subnet_mask_type',
                                            'gw_ip_type',
                                            'dhcp_start_ip_type',
-                                           'dhcp_end_ip_type'])
+                                           'dhcp_end_ip_type',
+                                           'env_control'])
         print(utils.format_table(networks))
 
 @subcommand
