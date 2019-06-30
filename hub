@@ -45,7 +45,12 @@ def nohub(func):
 def dump_properties(hub, props):
     """Print the listed properties on stdout, nicely formatted"""
     for prop in props:
-        print(prop, ":", getattr(hub, prop))
+        res = getattr(hub, prop)
+        if isinstance(res, snmp.Table):
+            print(prop, ":")
+            print(utils.format_table(res))
+        else:
+            print(prop, ":", getattr(hub, prop))
 
 @subcommand
 def info(hub, _args):

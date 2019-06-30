@@ -23,6 +23,7 @@ import requests
 
 import arris
 import snmp
+import utils
 
 class LoginFailed(IOError):
     """Exception that indicates that logging in failed.
@@ -914,7 +915,11 @@ def _demo():
         for name in sorted(HUB_PROPERTIES):
             try:
                 val = getattr(hub, name)
-                print('-', name, ":", val.__class__.__name__, ":", val)
+                if isinstance(val, snmp.Table):
+                    print('-', name, '(', val.__class__.__name__, ") :")
+                    print(utils.format_table(val))
+                else:
+                    print('-', name, ":", val.__class__.__name__, ":", val)
             except Exception:
                 print("Problem with property", name)
                 raise
