@@ -592,6 +592,16 @@ class Hub:
                                   snmp.IPAddressTranslator)
     ddns_current_status = snmp.Attribute("1.3.6.1.4.1.4115.1.20.1.1.4.18.8.0")
 
+    @property
+    def mso_log(self):
+        """MSO Log
+
+         A log of configuration changes that are not done by the
+        user. Assumed to be the MSO remotely or a technician.
+
+        """
+        return arris.MSOLogTable(self)
+
 HUB_PROPERTIES = [name
                   for name, value in Hub.__dict__.items()
                   if not name.startswith("_") and not callable(value)]

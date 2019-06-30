@@ -496,6 +496,23 @@ class TODStatus(snmp.HumaneEnum):
 # pylint: disable=invalid-name
 TODStatusTranslator = snmp.EnumTranslator(TODStatus)
 
+class MSOLogTable(snmp.Table):
+    """MSO Log
+
+     A table of where each row represents an entry in the MSO change
+    log. This is a log of configuration changes that are not done by
+    the user. Assumed to be the MSO remotely or a technician.
+
+    """
+    def __init__(self, transport):
+        super().__init__(table_oid="1.3.6.1.4.1.4115.1.20.1.1.5.19.2.1.1",
+                         transport=transport,
+                         column_mapping={
+                             "2": dict(name="stamp",
+                                       translator=snmp.DateTimeTranslator),
+                             "3": dict(name="text")
+                             })
+
 def _run_tests():
     import doctest
     import sys

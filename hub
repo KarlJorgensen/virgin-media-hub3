@@ -511,6 +511,18 @@ def ddns_status(hub, _args):
                         "ddns_current_status"
                         ])
 
+@subcommand
+def mso_log(hub, args):
+    """Show MSO log.
+
+    The MSO log is a log of configuration changes that are not done by
+    the user. Assumed to be the MSO remotely or a technician.
+
+    """
+    log = hub.mso_log
+    for entry in log.values():
+        print(entry.stamp, entry.text)
+
 def main():
     """Main function. Obviously!"""
 
