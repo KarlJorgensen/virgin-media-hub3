@@ -579,7 +579,10 @@ class Attribute(RawAttribute):
         try:
             translator_name = translator.__name__
         except AttributeError:
-            translator_name = translator.name
+            try:
+                translator_name = translator.__class__.__name__
+            except AttributeError:
+                translator_name = translator.name
 
         if doc:
             self.__doc__ = textwrap.dedent(doc) + \

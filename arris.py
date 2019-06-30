@@ -1,6 +1,8 @@
 #!/usr/bin/python
 """Arris specific SNMP support"""
 
+import enum
+
 import snmp
 
 class ClientType(snmp.HumaneEnum):
@@ -93,6 +95,34 @@ class DNSServerTable(snmp.Table):
                 "3": dict(name="ipaddr",
                           translator=snmp.IPAddressTranslator)})
 
+class Interfaces(enum.IntFlag):
+    """Bitmask for interfaces"""
+    ETHERNET = 0x00000001
+    USB = 0x00000002
+    MOCA = 0x00000004  # apparantly unsupported on TG2492LG-85/10
+    SSID1 = 0x00000008
+    SSID2 = 0x00000010
+    SSID3 = 0x00000020
+    SSID4 = 0x00000040
+    SSID5 = 0x00000080
+    SSID6 = 0x00000100
+    SSID7 = 0x00000200
+    SSID8 = 0x00000400
+
+class BitmaskTranslator(snmp.Translator):
+    """Translates an SNMP bitmask to/from a python set"""
+
+    def __init__(self, enumclass):
+        self._enumclass = enumclass
+
+    def snmp(self, python_value):
+        if isinstance(python_value, self._enumclass):
+            return str(python_value.value)
+        raise TypeError
+
+    def pyvalue(self, snmp_value):
+        return self._enumclass(int(snmp_value))
+
 class LanTable(snmp.Table):
     """Information about the local LAN networks
 
@@ -107,20 +137,8 @@ class LanTable(snmp.Table):
             column_mapping={
                 "1": dict(name="name"),
                 "27": dict(name="interfaces",
-                           doc="""\
-                            Name of the member physical network interface (or virtual network interface in the
-                            case of a wireless SSID) comprising the logical interface, aka LAN subnet. This mib
-                            object takes in an unsigned integer with the following bitmap setup: Single-Band
-                            support: 0x00000001 // ethernet 0x00000002 // usb (unsupported) 0x00000004 // moca
-                            0x00000008 // ssid1 0x00000010 // ssid2 0x00000020 // ssid3 0x00000040 // ssid4
-                            0x00000080 // ssid5 0x00000100 // ssid6 0x00000200 // ssid7 0x00000400 // ssid8
-                            Dual-Band Support: 0x00000001 // ethernet 0x00000002 // usb (unsupported)
-                            0x00000004 // moca 0x00000008 // ssid1 & ssid9 0x00000010 // ssid2 & ssid10
-                            0x00000020 // ssid3 & ssid11 0x00000040 // ssid4 & ssid12 0x00000080 // ssid5 &
-                            ssid13 0x00000100 // ssid6 & ssid14 0x00000200 // ssid7 & ssid15 0x00000400 //
-                            ssid8 & ssid16 Example of mapping the ethernet, usb, moca, and ssid1 to the primary
-                            LAN subnet: 0x0000000F = (Integer) 15 NOTE - A physical/virtual interface may not
-                            be assigned to more than one logical interface"""),
+                           translator=BitmaskTranslator(Interfaces),
+                           doc="physical network interfaces for this logical network"),
                 "8": dict(name="vlan",
                           translator=snmp.IntTranslator,
                           doc="VLAN ID - use zero for untagged"),
