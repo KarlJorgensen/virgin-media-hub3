@@ -359,7 +359,11 @@ def property_list(_args):
 def property_get(hub, args):
     """Get one or more properties."""
     for prop in args.property:
-        print(getattr(hub, prop))
+        propvalue = getattr(hub, prop)
+        if isinstance(propvalue, snmp.Table):
+            print(utils.format_table(propvalue))
+        else:
+            print(utils.human(getattr(hub, prop)))
 
 @subcommand
 @Args([
