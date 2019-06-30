@@ -9,7 +9,6 @@ work for other varieties too.
 import base64
 import collections
 import functools
-import itertools
 import json
 import operator
 import os
@@ -22,6 +21,7 @@ import warnings
 
 import requests
 
+import arris
 import snmp
 
 class LoginFailed(IOError):
@@ -574,7 +574,7 @@ class Hub:
         The size of this table is usually limited to 4 entries
 
         """
-        return snmp.WanNetworksTable(self)
+        return arris.WanNetworksTable(self)
 
     wan_current_ipaddr_ipv4 = snmp.Attribute("1.3.6.1.4.1.4115.1.20.1.1.1.7.1.3.1",
                                              snmp.IPv4Translator)
@@ -629,7 +629,7 @@ class Hub:
 
     @property
     def dns_servers(self):
-        return snmp.DNSServerTable(self)
+        return arris.DNSServerTable(self)
 
     @property
     def lan_clients(self):
@@ -640,7 +640,7 @@ class Hub:
         Retrieving this list can take 10 seconds or more...
 
         """
-        return snmp.LanClientTable(self)
+        return arris.LanClientTable(self)
 
     wan_if_macaddr = snmp.Attribute("1.3.6.1.4.1.4115.1.20.1.1.1.13.0",
                                     snmp.MacAddressTranslator)
@@ -681,12 +681,12 @@ class Hub:
         network can span multiple interfaces.
 
         """
-        return snmp.LanTable(self)
+        return arris.LanTable(self)
 
     @property
     def wifi_clients(self):
         """List of WIFI clients"""
-        return snmp.WifiClientTable(self)
+        return arris.WifiClientTable(self)
 
     lan_subnetmask = snmp.Attribute("1.3.6.1.4.1.4115.1.20.1.1.2.2.1.3.200",
                                     snmp.IPv4Translator)
@@ -780,7 +780,7 @@ class Hub:
         hub...
 
         """
-        return snmp.PortForwardTable(self)
+        return arris.PortForwardTable(self)
 
     def portforward_add(self,
                         ext_port_start,
@@ -843,12 +843,12 @@ class Hub:
     @property
     def etherports(self):
         """List of ethernet ports on the hub"""
-        return snmp.EtherPortTable(self)
+        return arris.EtherPortTable(self)
 
     @property
     def bsstable(self):
         """List of WIFI networks"""
-        return snmp.BSSTable(self)
+        return arris.BSSTable(self)
 
 class DeviceInfo:
     """Information about a device known to a hub

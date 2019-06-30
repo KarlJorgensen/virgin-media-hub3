@@ -1,6 +1,6 @@
 #!/usr/bin/make -f
 
-PYFILES=utils.py snmp.py virginmedia.py hub
+PYFILES=utils.py arris.py snmp.py virginmedia.py hub
 
 all : selftest pylints
 
@@ -9,6 +9,8 @@ all : selftest pylints
 .PHONY: selftest
 selftest: pylints unittests
 	./utils.py
+	./arris.py
+	./snmp.py
 	./virginmedia.py
 	./hub property-list
 	./hub backup
