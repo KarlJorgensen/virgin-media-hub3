@@ -149,8 +149,10 @@ def lan_networks(hub, args):
         print(utils.format_by_row(networks))
     else:
         networks = utils.unselect_columns(networks,
-                                          ['gw_addr_type',
-                                           'netmask'])
+                                          ['subnet_mask_type',
+                                           'gw_ip_type',
+                                           'dhcp_start_ip_type',
+                                           'dhcp_end_ip_type'])
         print(utils.format_table(networks))
 
 @subcommand
