@@ -508,11 +508,12 @@ def main():
                         "Defaults to 30 seconds.",
                         default=30,
                         type=int)
-    subparsers = parser.add_subparsers(description="The subcommands specify what should be done")
+    subparsers = parser.add_subparsers(description="The subcommands specify what should be done:")
 
     for cmd in sorted(SUBCOMMANDS, key=lambda x: x.__name__):
         cmd_parser = subparsers.add_parser(cmd.__name__.lower().replace('_', '-'),
-                                           help=cmd.__doc__)
+                                           help=cmd.__doc__.split('\n')[0],
+                                           description=cmd.__doc__)
 
         if hasattr(cmd, 'args'):
             for arg in cmd.args:
