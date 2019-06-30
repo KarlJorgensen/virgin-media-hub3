@@ -314,13 +314,35 @@ def wifi_networks(hub, args):
         print(utils.format_table(networks))
 
 @subcommand
-def clients(hub, _args):
+@Args([
+    (("--all", "-a"), dict(help="Also show offline clients",
+                           action="store_true"))])
+def clients(hub, args):
     """List known clients.
 
-    Lists the internal device - both wired and wireless ones.
+    Lists the clients on the internal LANs - both wired and wireless.
+
+    Beware that extracting this information from the hub can take a
+    long time - 90 seconds is not unheard of.
+
     """
     client_list = utils.sort_table(hub.clients, key=lambda x: x.mac_address)
-    print("There are %d known clients:" % len(client_list))
+    client_list = utils.unselect_columns(client_list, ['rowstatus',
+                                                       'device_name',
+                                                       'last_change_secs',
+                                                       'connected_secs'])
+    client_count = len(list(utils.unique_everseen([e['mac_address']
+                                                   for e in client_list.values()])))
+    online_count = len(list(utils.unique_everseen([e['mac_address']
+                                                   for e in client_list.values()
+                                                   if e['online']])))
+    if not args.all:
+        client_list = utils.unselect_columns(
+            utils.filter_table(client_list,
+                               lambda k, v: v['online']),
+            ['online'])
+    print("There are {0:d} known clients - {1:d} clients online)"
+          .format(client_count, online_count))
     print(utils.format_table(client_list))
     print("Note: This list includes both wired and wireless clients")
 
