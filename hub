@@ -272,7 +272,9 @@ def portforward_add(hub, args):
     external interface) on that port to some port internally.
 
     """
-    hub.portforward_add(
+    pflist = hub.portforwards
+
+    pflist.append(
         proto=snmp.IPProtocol[args.protocol],
         ext_port_start=args.external_port,
         local_port_start=args.internal_port,

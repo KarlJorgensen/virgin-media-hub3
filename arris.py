@@ -2,6 +2,7 @@
 """Arris specific SNMP support"""
 
 import enum
+import socket
 
 import snmp
 
@@ -422,6 +423,62 @@ class PortForwardTable(snmp.Table):
                              "10": dict(name="local_port_end",
                                         translator=snmp.PortTranslator)
                          })
+
+    def append(self,
+               ext_port_start,
+               ext_port_end=None,
+               proto=snmp.IPProtocol.TCP,
+               local_addr_type=snmp.IPVersion.IPv4,
+               local_addr=None,
+               local_port_start=None,
+               local_port_end=None):
+        """Add a new (static) port forwarding entry.
+
+        """
+        if not isinstance(proto, snmp.IPProtocol):
+            raise TypeError("proto arg to portforward_add must be an IP Protocol"
+                            " - not %s" % proto.__class__)
+        if not isinstance(ext_port_start, int):
+            raise TypeError("ext_port_start arg to portforward_add must be an int"
+                            " - not %s" % ext_port_start.__class__)
+        if local_addr is None:
+            local_addr = socket.gethostbyname(socket.gethostname())
+            if local_addr.startswith("127.0."):
+                raise ValueError("No local_addr passed and unable to find local ip... sorry.")
+        # TODO: Check types of other parameters?
+
+        if ext_port_end is None:
+            ext_port_end = ext_port_start
+        if local_port_start is None:
+            local_port_start = ext_port_start
+        if local_port_end is None:
+            local_port_end = ext_port_end
+
+        for pfentry in self.values():
+            if proto.overlaps(pfentry.proto) \
+               and (pfentry.ext_port_start <= ext_port_start <= pfentry.ext_port_end
+                    or pfentry.ext_port_start <= ext_port_end <= pfentry.ext_port_end) \
+                and pfentry.rowstatus == snmp.RowStatus.ACTIVE:
+                raise ValueError("New PortForwardTable entry overlaps with existing ones")
+
+        if self.keys():
+            row_key = str(max(map(int, self.keys()))+1)
+        else:
+            row_key = "1"
+
+        newrow = self.new_row(
+            row_key,
+            rowstatus=snmp.RowStatus.CREATE_AND_WAIT,
+            proto=proto,
+            ext_port_start=ext_port_start,
+            ext_port_end=ext_port_end,
+            local_addr_type=local_addr_type,
+            local_addr=local_addr,
+            local_port_start=local_port_start,
+            local_port_end=local_port_end
+        )
+
+        newrow.rowstatus = snmp.RowStatus.ACTIVE
 
 class TODStatus(snmp.HumaneEnum):
     """NTP status for the hub"""
