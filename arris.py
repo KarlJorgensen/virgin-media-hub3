@@ -385,6 +385,20 @@ class PortForwardTable(snmp.Table):
                                         translator=snmp.PortTranslator)
                          })
 
+class TODStatus(snmp.HumaneEnum):
+    NOT_PROVISIONED = "0"
+    MISSING_SERVER_ADDRESS1 = "1"
+    MISSING_SERVER_ADDRESS2 = "2"
+    MISSING_SERVER_ADDRESS3 = "3"
+    STARTING_REQUEST = "4"
+    REQUEST_FAILED = "5"
+    NO_RESPONSE_RECEIVED = "6"
+    INVALID_DATA_FORMAT = "7"
+    RETRIEVED = "8"
+    FAILED = "9"
+
+# pylint: disable=invalid-name
+TODStatusTranslator = snmp.EnumTranslator(TODStatus)
 
 def _run_tests():
     import doctest

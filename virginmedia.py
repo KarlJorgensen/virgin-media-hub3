@@ -8,7 +8,6 @@ work for other varieties too.
 
 import base64
 import collections
-import functools
 import json
 import operator
 import os
@@ -452,27 +451,6 @@ class Hub:
                                     snmp.BoolTranslator)
     """Whether the hub has got network access."""
 
-    @snmp_property("1.3.6.1.4.1.4115.1.3.4.1.1.14.0")
-    # pylint: disable=R0201
-    def docsis_base_tod_status(self, snmp_value):
-        """The TOD status"""
-        statusmap = {
-            "0": "Not Provisioned",
-            "1": "Missing Server Address",
-            "2": "Missing Server Address",
-            "3": "Missing Server Address",
-            "4": "Starting Request",
-            "5": "Request Failed",
-            "6": "No Response Received",
-            "7": "Invalid Data Format",
-            "8": "Retrieved",
-            "9": "Failed"
-            }
-        try:
-            return statusmap[snmp_value]
-        except KeyError:
-            return "Unknown SNMP value %s" % snmp_value
-
     @snmp_property("1.3.6.1.4.1.4115.1.3.4.1.3.8.0")
     # pylint: disable=R0201
     def cmDoc30SetupPacketCableRegion(self, snmp_value):
@@ -659,11 +637,18 @@ class Hub:
 
     current_time = snmp.Attribute("1.3.6.1.4.1.4115.1.20.1.1.5.15.0",
                                   snmp.DateTimeTranslator)
-    "The current time on the hub."
+    """The current time on the hub.
+
+    This may or may not be accurate, depending on
+    current_time_status.
+
+    """
+
+    current_time_status = snmp.Attribute("1.3.6.1.4.1.4115.1.3.4.1.1.14.0",
+                                         arris.TODStatusTranslator)
 
     auth_username = snmp.Attribute("1.3.6.1.4.1.4115.1.20.1.1.5.16.1.2.1")
     "The name of the admin user"
-
 
     first_install_wizard_completed = snmp.Attribute("1.3.6.1.4.1.4115.1.20.1.1.5.62.0",
                                                     snmp.BoolTranslator)
