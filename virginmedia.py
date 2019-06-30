@@ -451,12 +451,6 @@ class Hub:
                                     snmp.BoolTranslator)
     """Whether the hub has got network access."""
 
-    @snmp_property("1.3.6.1.4.1.4115.1.3.4.1.3.8.0")
-    # pylint: disable=R0201
-    def cmDoc30SetupPacketCableRegion(self, snmp_value):
-        "TODO: Figure out what this is..."
-        return int(snmp_value)
-
     @snmp_property("1.3.6.1.4.1.4115.1.20.1.1.1.1.0")
     # pylint: disable=R0201
     def wan_conn_type(self, snmp_value):

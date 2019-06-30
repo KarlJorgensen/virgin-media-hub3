@@ -69,8 +69,7 @@ def info(hub, _args):
                         "wan_ip_prov_mode",
                         "wan_current_ipaddr_ipv4",
                         "wan_current_ipaddr_ipv6",
-                        "dns_servers",
-                        "cmDoc30SetupPacketCableRegion"
+                        "dns_servers"
                     ])
 
 @subcommand
