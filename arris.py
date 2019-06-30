@@ -278,6 +278,17 @@ class EtherPortTable(snmp.Table):
     def __delitem__(self, key):
         raise NotImplementedError("Deleting physical ethernet ports requires more than just python")
 
+class AccessMode(snmp.HumaneEnum):
+    ALLOW_ANY = "1"
+    WHITELIST = "2"
+    """Only stations whose MAC address appears in the
+    arrisRouterMACAccessTable will be allowed to connect.
+    """
+    BLACKLIST = "3"
+    """Only stations whose MAC address do NOT appear in the
+    arrisRouterMACAccessTable will be allowed to connect.
+    """
+
 class BSSTable(snmp.Table):
     """Wifi networks"""
     def __init__(self, hub):
@@ -292,11 +303,12 @@ class BSSTable(snmp.Table):
                              "4": dict(name="ssid_broadcast",
                                        translator=snmp.BoolTranslator),
                              "5": dict(name="security_mode"),
-                             "6": dict(name="access_mode"),
+                             "6": dict(name="access_mode",
+                                       translator=snmp.EnumTranslator(AccessMode)),
                              "7": dict(name="network_isolate",
                                        translator=snmp.BoolTranslator,
                                        doc="when isolated, devices on this network "
-                                       "cannot access other local networks"  ),
+                                       "cannot access other local networks"),
                              # mac_access_count is always zero on TG2492LG-85/10 !?
                              # Useless.
                              # "8": dict(name="mac_access_count",
