@@ -20,6 +20,7 @@ selftest: pylints unittests
 	./hub wan-status
 	./hub wan-networks
 	./hub lan-networks
+	./hub clients
 	./hub wifi-status
 	./hub portforward-list
 	./hub property-get hardware_version firmware_version serial_number

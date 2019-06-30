@@ -177,40 +177,40 @@ def wifi_status(hub, _args):
     ])
 def wifi_clients(hub, args):
     """List WIFI clients."""
-    clients = hub.wifi_clients
+    client_list = hub.wifi_clients
 
     print("There are {0:d} distinct WIFI clients (across {1:d} IP addresses):"
           .format(len(list(utils.unique_everseen([x.macaddr
-                                                  for x in clients.values()]))),
+                                                  for x in client_list.values()]))),
                   len(list(utils.unique_everseen([x.ipaddr
-                                                  for x in clients.values()])))))
+                                                  for x in client_list.values()])))))
     if args.long:
-        print(clients.format_by_row())
+        print(client_list.format_by_row())
     else:
-        clients = utils.select_columns(clients,
-                                       ["macaddr",
-                                        "hostname",
-                                        "ipaddr",
-                                        "tx_packets",
-                                        "tx_fail",
-                                        "rx_unicast_pkts",
-                                        "last_rx_rate",
-                                        "rssi"])
-        best_rssi = max([row['rssi'] for row in clients.values()])
-        worst_rssi = min([row['rssi'] for row in clients.values()])
+        client_list = utils.select_columns(client_list,
+                                           ["macaddr",
+                                            "hostname",
+                                            "ipaddr",
+                                            "tx_packets",
+                                            "tx_fail",
+                                            "rx_unicast_pkts",
+                                            "last_rx_rate",
+                                            "rssi"])
+        best_rssi = max([row['rssi'] for row in client_list.values()])
+        worst_rssi = min([row['rssi'] for row in client_list.values()])
         scale = 10
 
         def rss_scale(rssi):
             val = int(scale * (rssi - worst_rssi) / (best_rssi - worst_rssi) + 0.5)
             return "*" * val
 
-        for row in clients.values():
+        for row in client_list.values():
             row['signal'] = rss_scale(row['rssi'])
 
-        clients = utils.sort_table(clients,
-                                   key=lambda row: (row['macaddr'],
-                                                    row['ipaddr']))
-        print(utils.format_table(clients))
+        client_list = utils.sort_table(client_list,
+                                       key=lambda row: (row['macaddr'],
+                                                        row['ipaddr']))
+        print(utils.format_table(client_list))
 
 @subcommand
 @Args([
@@ -311,17 +311,14 @@ def wifi_networks(hub, args):
         print(utils.format_table(networks))
 
 @subcommand
-def device_list(hub, _args):
-    """List devices connected to the hub."""
-    for dev in hub.device_list():
-        print(dev)
+def clients(hub, _args):
+    """List known clients.
 
-@subcommand
-def lan_clients(hub, _args):
-    """List known LAN clients."""
-    clients = utils.sort_table(hub.lan_clients, key=lambda x: x.mac_address)
-    print("There are %d known clients:" % len(clients))
-    print(utils.format_table(clients))
+    Lists the internal device - both wired and wireless ones.
+    """
+    client_list = utils.sort_table(hub.clients, key=lambda x: x.mac_address)
+    print("There are %d known clients:" % len(client_list))
+    print(utils.format_table(client_list))
     print("Note: This list includes both wired and wireless clients")
 
 @subcommand

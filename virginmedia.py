@@ -443,8 +443,8 @@ class Hub:
         return arris.DNSServerTable(self)
 
     @property
-    def lan_clients(self):
-        """Information about LAN clients.
+    def clients(self):
+        """Information internal clients.
 
         This includes both wired and wireless clients.
 
@@ -558,35 +558,6 @@ class Hub:
     esafeErouterInitModeCtrl = snmp.Attribute("1.3.6.1.4.1.4491.2.1.14.1.5.4.0")
     "TODO: Figure out what this is..."
 
-    def device_list(self):
-        """Iterator which retrieves devices known to the hub.
-
-        This will return successive DeviceInfo instances, which can be
-        queried for each device.
-
-        Beware that since the Virgin Media hub is underpowered,
-        retrieving this list will take some time...
-
-        """
-        mac_prefix = "1.3.6.1.4.1.4115.1.20.1.1.2.4.2.1.4.200.1.4"
-        for oid, mac in list(self.snmp_walk(mac_prefix).items()):
-            yield DeviceInfo(self, oid[len(mac_prefix)+1:], snmp.MacAddressTranslator.pyvalue(mac))
-
-    def get_device(self, ipv4_address):
-        """Get information for the given device
-
-        If the hub knows about a network device on the local lan (or
-        wifi) with the given IP address, a DeviceInfo will be
-        returned.
-
-        If the device is not known to the hub, None will be returned.
-        """
-        mac = self.snmp_get("1.3.6.1.4.1.4115.1.20.1.1.2.4.2.1.4.200.1.4.%s" % ipv4_address)
-        if not mac:
-            return None
-        return DeviceInfo(self, ipv4_address, snmp.MacAddressTranslator.pyvalue(mac))
-
-
     @property
     def portforwards(self):
         """The port forwarding table from the hub
@@ -668,55 +639,6 @@ class Hub:
         """List of WIFI networks"""
         return arris.BSSTable(self)
 
-class DeviceInfo:
-    """Information about a device known to a hub
-
-    This makes the information known about a device available as attributes.
-
-    Generally, querying the Virgin Media hub is agonizingly slow, so
-    attributes are not retrieved from the hub until necessary.
-    """
-    def __init__(self, hub, ipv4_address, mac_address):
-        self._ipv4_address = ipv4_address
-        self._mac_address = mac_address
-        self._hub = hub
-
-    @property
-    def ipv4_address(self):
-        """The IPv4 address of the device"""
-        return self._ipv4_address
-
-    @property
-    def connected(self):
-        """Whether the device is currently connected to the hub.
-
-        For some reason, the hub "remembers" recently connected
-        devices - which is useful.
-        """
-        return self._hub.snmp_get("1.3.6.1.4.1.4115.1.20.1.1.2.4.2.1.14.200.1.4.%s"
-                                  % self._ipv4_address) == "1"
-
-    @property
-    def name(self):
-        """The name the device reports to the hub.
-
-        This name most likely comes from the DHCP request issued by
-        the device, or possibly the mDNS name broadcasted by
-        it.  Nobody knows for sure, but the hub knows somehow!
-        """
-        thename = self._hub.snmp_get("1.3.6.1.4.1.4115.1.20.1.1.2.4.2.1.3.200.1.4.%s" \
-                                    % self._ipv4_address)
-        if thename == "unknown":
-            return None
-        return thename
-
-    @property
-    def mac_address(self):
-        return self._mac_address
-
-    def __str__(self):
-        return "DeviceInfo(ipv4_address=%s, mac_address=%s, connected=%s, name=%s)" \
-            % (self.ipv4_address, self.mac_address, self.connected, self.name)
 
 HUB_PROPERTIES = [name
                   for name, value in Hub.__dict__.items()
@@ -744,9 +666,8 @@ def _demo():
         print("Port Forwardings")
         print(hub.portforwards.format())
 
-        print("Device List")
-        for dev in [x for x in hub.device_list() if x.connected]:
-            print("-", dev)
+        print("Clients:")
+        print(utils.format_table(hub.clients))
 
 if __name__ == '__main__':
     _demo()
