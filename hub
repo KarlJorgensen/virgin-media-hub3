@@ -283,19 +283,30 @@ def portforward_add(hub, args):
 
 @subcommand
 @Args([
-    ("entry", {"help": "Row number of entry to remove"})
+    ("protocol", {"help":"Protocol to no longer forward",
+                  "choices": [p.name for p in snmp.IPProtocol]}),
+    ("external_port", {"type": int,
+                       "help": "The external port number"})
     ])
 def portforward_del(hub, args):
     """Remove a port forwarding entry.
-    """
-    pflist = hub.portforwards
-    if args.entry not in pflist:
-        print(utils.format_by_row(pflist))
-        raise SystemExit("Port forward %s was not found" % args.entry)
 
-    del hub.portforwards[args.entry]
-    hub.apply_settings()
-    print("Port forward entry %s deleted" % args.entry)
+    The entry is identified by giving the protocol and the first port
+    in the range.
+
+    """
+    args.protocol = snmp.IPProtocol[args.protocol]
+    pflist = hub.portforwards
+
+    for rowid, entry in pflist.items():
+        if entry.proto == args.protocol and entry.ext_port_start == args.external_port:
+            print("Removing port forward entry", entry)
+            del pflist[rowid]
+            hub.apply_settings()
+            return
+
+    print("Port forward for %s port %d was not found - nothing removed."
+          % (utils.human(args.protocol), args.external_port))
 
 @subcommand
 def ether_ports(hub, _args):
