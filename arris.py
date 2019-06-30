@@ -233,7 +233,10 @@ class LanClientTable(snmp.Table):
                 "3": dict(name="hostname"),
                 "4": dict(name="mac_address",
                           translator=snmp.MacAddressTranslator),
-                "6": dict(name="adapter_type"),
+                # No idea of what 'adapter_type' indicates.... Cannot
+                # find any documentation on it...
+                #
+                # "6": dict(name="adapter_type"),
                 "7": dict(name="client_type",
                           translator=ClientTypeTranslator),
                 "9": dict(name="lease_end",

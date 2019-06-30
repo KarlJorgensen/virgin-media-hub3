@@ -315,6 +315,8 @@ def wifi_networks(hub, args):
 
 @subcommand
 @Args([
+    (("--long", "-l"), dict(help="Show the long version of the table",
+                            action="store_true")),
     (("--all", "-a"), dict(help="Also show offline clients",
                            action="store_true"))])
 def clients(hub, args):
@@ -341,9 +343,13 @@ def clients(hub, args):
             utils.filter_table(client_list,
                                lambda k, v: v['online']),
             ['online'])
+
     print("There are {0:d} known clients - {1:d} clients online)"
           .format(client_count, online_count))
-    print(utils.format_table(client_list))
+    if args.long:
+        print(utils.format_by_row(client_list))
+    else:
+        print(utils.format_table(client_list))
     print("Note: This list includes both wired and wireless clients")
 
 @subcommand
