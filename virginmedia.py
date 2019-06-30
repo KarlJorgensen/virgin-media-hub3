@@ -538,6 +538,10 @@ class Hub:
 
     @property
     def dns_servers(self):
+        """List DNS servers know by the hub.
+
+        These are the default DNS servers handed out to DHCP clients.
+        """
         return arris.DNSServerTable(self)
 
     @property
