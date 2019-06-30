@@ -9,13 +9,11 @@ work for other varieties too.
 import base64
 import collections
 import json
-import operator
 import os
 import random
 import socket
 import textwrap
 import time
-import types
 import warnings
 
 import requests
@@ -47,94 +45,6 @@ class AccessDenied(IOError):
     """
     def __init__(self, msg):
         IOError.__init__(self, msg)
-
-def snmp_property(oid):
-    """A function decorator to present an MIB value as an attribute.
-
-    This works similar to the built-in property() class, but with a
-    twist:
-
-    - The constructor requires an OID
-
-    - the getter method will receive a keyword argument: snmp_value
-      which contains the value retrieved from SNMP.
-
-    - the setter method is expected to return a value: The return
-      value will be passed to snmp_set
-
-    """
-    class Decorator():
-        """The actual decorator.
-
-        But since this is defined inside the 'snmp_property' function,
-        it has access to the OID
-        """
-        def __init__(self, fget=None, fset=None):
-            self._fget = fget
-            self._fset = fset
-            self._name = None
-            self._datatype = None
-            self._update()
-
-        def getter(self, fget):
-            """Decorator for a getter.
-
-            The getter method will receive a keyword argument:
-            snmp_value which contains the value retrieved from SNMP.
-            """
-            self._fget = fget
-            self._update()
-            return self
-
-        def setter(self, fset):
-            """Decorator for a setter.
-
-            Unlike property()'s getter, this is expected to return a
-            value - this will then be se in SNMP.
-
-            """
-            if isinstance(fset, types.MethodType):
-                self._fset = fset
-                self._update()
-                return self
-
-            self._datatype = fset
-            return self
-
-        def __call__(self, func):
-            # Gets invoked when we have a setter() decorator with a parameter
-            self._fset = func
-            self._update()
-            return self
-
-        def _update(self):
-            for func in filter(operator.truth, [self._fget, self._fset]):
-                self.__doc__ = func.__doc__
-                self.__name__ = func.__name__
-                return
-
-        def __get__(self, hub, *args, **kwargs):
-            if not self._fget:
-                raise AttributeError("Attribute {attr} on {hub} is not settable"
-                                     .format(attr=self._name, hub=hub))
-            kwargs["snmp_value"] = hub.snmp_get(oid)
-            return self._fget(*args, **kwargs)
-
-
-        def __set__(self, hub, *args, **kwargs):
-            if not self._fset:
-                raise AttributeError("Attribute {attr} on {hub} is not readable"
-                                     .format(attr=self._name, hub=hub))
-
-            newval = self._fset(hub, *args, **kwargs)
-            if isinstance(newval, tuple):
-                hub.snmp_set(oid, *newval)
-            else:
-                hub.snmp_set(oid, newval, self._datatype)
-            return newval
-
-    return Decorator
-
 
 class SNMPSetError(AttributeError):
     """Gets raised when the hub refuses an SNMP Set"""
@@ -450,12 +360,6 @@ class Hub:
     network_access = snmp.Attribute("1.3.6.1.4.1.4115.1.3.3.1.1.1.3.2.0",
                                     snmp.BoolTranslator)
     """Whether the hub has got network access."""
-
-    @snmp_property("1.3.6.1.4.1.4115.1.20.1.1.1.1.0")
-    # pylint: disable=R0201
-    def wan_conn_type(self, snmp_value):
-        "The type of WAN connection"
-        return snmp_value
 
     wan_conn_hostname = snmp.Attribute("1.3.6.1.4.1.4115.1.20.1.1.1.2.0")
     "The host name the hub presents to the ISP"
