@@ -496,6 +496,21 @@ def snmp_walk(hub, args):
 
     print(json.dumps(walk_result, sort_keys=True, indent=2))
 
+@subcommand
+def ddns_status(hub, _args):
+    """Show Dynamic DNS settings"""
+    dump_properties(hub,
+                    [
+                        "ddns_enabled",
+                        "ddns_type",
+                        "ddns_username",
+                        "ddns_password",
+                        "ddns_domain_name",
+                        "ddns_addr_type",
+                        "ddns_address",
+                        "ddns_current_status"
+                        ])
+
 def main():
     """Main function. Obviously!"""
 

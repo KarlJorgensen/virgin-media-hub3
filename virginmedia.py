@@ -580,6 +580,17 @@ class Hub:
         """List of WIFI networks"""
         return arris.BSSTable(self)
 
+    ddns_enabled = snmp.Attribute("1.3.6.1.4.1.4115.1.20.1.1.4.18.1.0",
+                                  snmp.BoolTranslator)
+    ddns_type = snmp.Attribute("1.3.6.1.4.1.4115.1.20.1.1.4.18.2.0")
+    ddns_username = snmp.Attribute("1.3.6.1.4.1.4115.1.20.1.1.4.18.3.0")
+    ddns_password = snmp.Attribute("1.3.6.1.4.1.4115.1.20.1.1.4.18.4.0")
+    ddns_domain_name = snmp.Attribute("1.3.6.1.4.1.4115.1.20.1.1.4.18.5.0")
+    ddns_addr_type = snmp.Attribute("1.3.6.1.4.1.4115.1.20.1.1.4.18.6.0",
+                                    snmp.IPVersionTranslator)
+    ddns_address = snmp.Attribute("1.3.6.1.4.1.4115.1.20.1.1.4.18.7.0",
+                                  snmp.IPAddressTranslator)
+    ddns_current_status = snmp.Attribute("1.3.6.1.4.1.4115.1.20.1.1.4.18.8.0")
 
 HUB_PROPERTIES = [name
                   for name, value in Hub.__dict__.items()
