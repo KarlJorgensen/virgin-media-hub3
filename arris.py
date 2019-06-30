@@ -294,9 +294,13 @@ class BSSTable(snmp.Table):
                              "5": dict(name="security_mode"),
                              "6": dict(name="access_mode"),
                              "7": dict(name="network_isolate",
-                                       translator=snmp.BoolTranslator),
-                             "8": dict(name="mac_access_count",
-                                       translator=snmp.IntTranslator),
+                                       translator=snmp.BoolTranslator,
+                                       doc="when isolated, devices on this network "
+                                       "cannot access other local networks"  ),
+                             # mac_access_count is always zero on TG2492LG-85/10 !?
+                             # Useless.
+                             # "8": dict(name="mac_access_count",
+                             #           translator=snmp.IntTranslator),
                              "10": dict(name="arp_audit_interval",
                                         translator=snmp.IntTranslator),
                              "11": dict(name="max_wifi_clients",
