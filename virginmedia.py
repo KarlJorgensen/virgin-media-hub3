@@ -355,7 +355,11 @@ class Hub:
         #
         jsondata = "\n".join([x for x in jsondata.split("\n") if x != "Error in OID formatting!"])
 
-        result = json.loads(jsondata)
+        try:
+            result = json.loads(jsondata)
+        except json.decoder.JSONDecodeError:
+            warnings.warn('Response content:\n%s\n' % jsondata)
+            raise
         # Strip off the final ANNOYING "1" entry!
         if result.get("1") == "Finish":
             del result["1"]
