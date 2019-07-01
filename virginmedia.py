@@ -8,6 +8,7 @@ work for other varieties too.
 
 import base64
 import collections
+import datetime
 import json
 import os
 import random
@@ -81,6 +82,14 @@ class Hub:
         self._unapplied_settings = False
         if kwargs:
             self.login(**kwargs)
+
+    _uptime_centiseconds = snmp.Attribute("1.3.6.1.2.1.1.3.0",
+                                          translator=snmp.IntTranslator)
+
+    @property
+    def uptime(self):
+        """How long the hub has been running for"""
+        return datetime.timedelta(seconds=self._uptime_centiseconds / 100)
 
     language = snmp.Attribute("1.3.6.1.4.1.4115.1.20.1.1.5.6.0",
                               doc="""\
