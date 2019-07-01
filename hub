@@ -514,7 +514,7 @@ def ddns_status(hub, _args):
                         ])
 
 @subcommand
-def mso_log(hub, args):
+def mso_log(hub, _args):
     """Show MSO log.
 
     The MSO log is a log of configuration changes that are not done by
