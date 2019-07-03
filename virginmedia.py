@@ -11,6 +11,7 @@ import collections
 import datetime
 import json
 import os
+import os.path
 import random
 import textwrap
 import time
@@ -59,6 +60,7 @@ class SNMPSetError(AttributeError):
 
 WanNetwork = collections.namedtuple("WanNetwork", ['ipaddr', 'prefix', 'netmask', 'gw'])
 
+# pylint: disable=no-member
 class Hub:
     """A Virgin Media Hub3.
 
@@ -83,31 +85,10 @@ class Hub:
         if kwargs:
             self.login(**kwargs)
 
-    _uptime_centiseconds = snmp.Attribute("1.3.6.1.2.1.1.3.0",
-                                          translator=snmp.IntTranslator)
-
     @property
     def uptime(self):
         """How long the hub has been running for"""
         return datetime.timedelta(seconds=self._uptime_centiseconds / 100)
-
-    language = snmp.Attribute("1.3.6.1.4.1.4115.1.20.1.1.5.6.0",
-                              doc="""\
-                              Hub interface language.
-
-                              On the Virgin Media hub, setting this
-                              appears to have no effect.  """)
-
-    name = snmp.Attribute("1.3.6.1.4.1.4115.1.20.1.1.5.7.0")
-    serial_number = snmp.Attribute("1.3.6.1.4.1.4115.1.20.1.1.5.8.0")
-    bootcode_version = snmp.Attribute("1.3.6.1.4.1.4115.1.20.1.1.5.9.0")
-    hardware_version = snmp.Attribute("1.3.6.1.4.1.4115.1.20.1.1.5.10.0")
-    firmware_version = snmp.Attribute("1.3.6.1.4.1.4115.1.20.1.1.5.11.0")
-    customer_id = snmp.Attribute("1.3.6.1.4.1.4115.1.20.1.1.5.14.0")
-    wifi_24ghz_essid = snmp.Attribute("1.3.6.1.4.1.4115.1.20.1.1.3.22.1.2.10001")
-    wifi_24ghz_password = snmp.Attribute("1.3.6.1.4.1.4115.1.20.1.1.3.26.1.2.10001")
-    wifi_5ghz_essid = snmp.Attribute("1.3.6.1.4.1.4115.1.20.1.1.3.22.1.2.10101")
-    wifi_5ghz_password = snmp.Attribute("1.3.6.1.4.1.4115.1.20.1.1.3.26.1.2.10101")
 
     def _get(self, url, retry401=5, retry500=3, **kwargs):
         """Shorthand for requests.get.
@@ -365,23 +346,6 @@ class Hub:
             del result["1"]
         return result
 
-    max_cpe_allowed = snmp.Attribute("1.3.6.1.4.1.4115.1.3.3.1.1.1.3.1.0",
-                                     snmp.IntTranslator)
-    "This reflects the 'MaxCpeAllowed' parameter in the CM config file"
-
-    network_access = snmp.Attribute("1.3.6.1.4.1.4115.1.3.3.1.1.1.3.2.0",
-                                    snmp.BoolTranslator)
-    """Whether the hub has got network access."""
-
-    wan_conn_hostname = snmp.Attribute("1.3.6.1.4.1.4115.1.20.1.1.1.2.0")
-    "The host name the hub presents to the ISP"
-
-    wan_conn_domainname = snmp.Attribute("1.3.6.1.4.1.4115.1.20.1.1.1.3.0")
-    "The domain name given to the hub by the ISP"
-
-    wan_mtu_size = snmp.Attribute("1.3.6.1.4.1.4115.1.20.1.1.1.4.0",
-                                  snmp.IntTranslator)
-    "The MTU on the WAN"
 
     @property
     def wan_networks(self):
@@ -394,57 +358,6 @@ class Hub:
 
         """
         return arris.WanNetworksTable(self)
-
-    wan_current_ipaddr_ipv4 = snmp.Attribute("1.3.6.1.4.1.4115.1.20.1.1.1.7.1.3.1",
-                                             snmp.IPv4Translator)
-    "The current external IP address of the hub"
-
-    wan_current_ipaddr_ipv6 = snmp.Attribute("1.3.6.1.4.1.4115.1.20.1.1.1.7.1.3.2",
-                                             snmp.IPv6Translator)
-    "Current external IPv6 address of hub"
-
-    wan_current_netmask = snmp.Attribute("1.3.6.1.4.1.4115.1.20.1.1.1.7.1.8.1",
-                                         snmp.IPv4Translator)
-    "The WAN network mask - e.g. '255.255.248.0'"
-
-    wan_current_gw_ipv4 = snmp.Attribute("1.3.6.1.4.1.4115.1.20.1.1.1.7.1.6.1",
-                                         snmp.IPv4Translator)
-    "Default gateway of the hub"
-
-    wan_current_gw_ipv6 = snmp.Attribute("1.3.6.1.4.1.4115.1.20.1.1.1.7.1.6.2",
-                                         snmp.IPv6Translator)
-    "Default IPv6 gateway"
-
-    wan_l2tp_username = snmp.Attribute("1.3.6.1.4.1.4115.1.20.1.1.1.10.1.0")
-    "WAN L2TP user name"
-
-    wan_l2tp_password = snmp.Attribute("1.3.6.1.4.1.4115.1.20.1.1.1.10.2.0")
-    "WAN L2TP password"
-
-    wan_l2tp_enable_idle_timeout = snmp.Attribute("1.3.6.1.4.1.4115.1.20.1.1.1.10.3.0",
-                                                  snmp.BoolTranslator)
-    "enable/disable WAN L2TP idle timeout"
-
-    wan_l2tp_idle_timeout = snmp.Attribute("1.3.6.1.4.1.4115.1.20.1.1.1.10.4.0",
-                                           snmp.IntTranslator)
-    "WAN L2TP idle timeout in seconds"
-
-    wan_l2tp_tunnel_addr = snmp.Attribute("1.3.6.1.4.1.4115.1.20.1.1.1.10.6.0",
-                                          snmp.IPAddressTranslator)
-
-    wan_l2tp_tunnel_hostname = snmp.Attribute("1.3.6.1.4.1.4115.1.20.1.1.1.10.7.0")
-    "Host name of the tunnel server. Either hostname or IP address is required."
-
-    wan_l2tp_keepalive_enabled = snmp.Attribute("1.3.6.1.4.1.4115.1.20.1.1.1.10.8.0",
-                                                snmp.BoolTranslator)
-    "Whether keepalive is enabled on the WAN"
-
-    wan_l2tp_keepalive_timeout = snmp.Attribute("1.3.6.1.4.1.4115.1.20.1.1.1.10.9.0",
-                                                snmp.IntTranslator)
-
-    wan_use_auto_dns = snmp.Attribute("1.3.6.1.4.1.4115.1.20.1.1.1.11.1.0",
-                                      snmp.BoolTranslator)
-    "Use automatic DNS servers as specified by ISP and DHCP"
 
     @property
     def dns_servers(self):
@@ -465,37 +378,6 @@ class Hub:
         """
         return arris.LanClientTable(self)
 
-    wan_if_macaddr = snmp.Attribute("1.3.6.1.4.1.4115.1.20.1.1.1.13.0",
-                                    snmp.MacAddressTranslator)
-    """MAC address on the WAN interface.
-
-    This is the mac address your ISP will see, and it is most likely
-    tied to our account with the ISP.
-    """
-
-    wan_dhcp_duration_ipv4 = snmp.Attribute("1.3.6.1.4.1.4115.1.20.1.1.1.12.3.0",
-                                            snmp.IntTranslator)
-    "The number of seconds the current WAN DHCP ipv4 lease will remain valid"
-
-    wan_dhcp_expire_ipv4 = snmp.Attribute("1.3.6.1.4.1.4115.1.20.1.1.1.12.4.0",
-                                          snmp.DateTimeTranslator)
-    "The date/time the current WAN DHCP lease will expire."
-
-    wan_dhcp_duration_ipv6 = snmp.Attribute("1.3.6.1.4.1.4115.1.20.1.1.1.12.7.0",
-                                            snmp.IntTranslator)
-    "The number of seconds the current WAN DHCP ipv6 lease will remain valid"
-
-    wan_dhcp_expire_ipv6 = snmp.Attribute("1.3.6.1.4.1.4115.1.20.1.1.1.12.8.0",
-                                          snmp.DateTimeTranslator)
-    "The date/time the current WAN DHCP lease will expire."
-
-    wan_dhcp_server_ip = snmp.Attribute("1.3.6.1.4.1.4115.1.20.1.1.1.12.9.0",
-                                        snmp.IPv4Translator)
-    "IP address of DHCP server that gave the hub a lease"
-
-    wan_ip_prov_mode = snmp.Attribute("1.3.6.1.4.1.4115.1.20.1.1.1.17.0")
-    "eRouter initialization mode"
-
     @property
     def lan_networks(self):
         """Information about the local LAN networks
@@ -511,67 +393,6 @@ class Hub:
         """List of WIFI clients"""
         return arris.WifiClientTable(self)
 
-    lan_subnetmask = snmp.Attribute("1.3.6.1.4.1.4115.1.20.1.1.2.2.1.3.200",
-                                    snmp.IPv4Translator)
-
-    lan_gateway = snmp.Attribute("1.3.6.1.4.1.4115.1.20.1.1.2.2.1.5.200",
-                                 snmp.IPAddressTranslator)
-
-    lan_gateway2 = snmp.Attribute("1.3.6.1.4.1.4115.1.20.1.1.2.2.1.7.200",
-                                  snmp.IPAddressTranslator)
-
-    lan_dhcp_enabled = snmp.Attribute("1.3.6.1.4.1.4115.1.20.1.1.2.2.1.9.200",
-                                      snmp.BoolTranslator)
-
-    lan_dhcpv4_range_start = snmp.Attribute("1.3.6.1.4.1.4115.1.20.1.1.2.2.1.11.200",
-                                            snmp.IPv4Translator)
-    "The first IP address of the DHCP allocation range on the LAN"
-
-    lan_dhcpv4_range_end = snmp.Attribute("1.3.6.1.4.1.4115.1.20.1.1.2.2.1.13.200",
-                                          snmp.IPv4Translator)
-    "The last IP address of the DHCP allocation range on the LAN"
-
-    lan_dhcpv4_leasetime = snmp.Attribute("1.3.6.1.4.1.4115.1.20.1.1.2.2.1.14.200",
-                                          snmp.IntTranslator)
-    "The lease time (in seconds)"
-
-
-    lan_dhcpv6_prefixlength = snmp.Attribute("1.3.6.1.4.1.4115.1.20.1.1.2.2.1.29.200",
-                                             snmp.IntTranslator)
-
-    lan_dhcpv6_range_start = snmp.Attribute("1.3.6.1.4.1.4115.1.20.1.1.2.2.1.31.200",
-                                            snmp.IPv6Translator)
-
-    lan_dhcpv6_leasetime = snmp.Attribute("1.3.6.1.4.1.4115.1.20.1.1.2.2.1.33.200",
-                                          snmp.IntTranslator)
-
-    lan_parentalcontrols_enabled = snmp.Attribute("1.3.6.1.4.1.4115.1.20.1.1.2.2.1.39.200",
-                                                  snmp.BoolTranslator)
-    "Whether parental controls are enabled"
-
-    current_time = snmp.Attribute("1.3.6.1.4.1.4115.1.20.1.1.5.15.0",
-                                  snmp.DateTimeTranslator)
-    """The current time on the hub.
-
-    This may or may not be accurate, depending on
-    current_time_status.
-
-    """
-
-    current_time_status = snmp.Attribute("1.3.6.1.4.1.4115.1.3.4.1.1.14.0",
-                                         arris.TODStatusTranslator)
-
-    auth_username = snmp.Attribute("1.3.6.1.4.1.4115.1.20.1.1.5.16.1.2.1")
-    "The name of the admin user"
-
-    first_install_wizard_completed = snmp.Attribute("1.3.6.1.4.1.4115.1.20.1.1.5.62.0",
-                                                    snmp.BoolTranslator)
-
-    esafeErouterInitModeCtrl = snmp.Attribute("1.3.6.1.4.1.4491.2.1.14.1.5.4.0")
-    "TODO: Figure out what this is..."
-
-    firewall_enabled = snmp.Attribute("1.3.6.1.4.1.4115.1.20.1.1.4.1.0",
-                                      snmp.BoolTranslator)
     @property
     def portforwards(self):
         """The port forwarding table from the hub
@@ -595,18 +416,6 @@ class Hub:
         """List of WIFI networks"""
         return arris.BSSTable(self)
 
-    ddns_enabled = snmp.Attribute("1.3.6.1.4.1.4115.1.20.1.1.4.18.1.0",
-                                  snmp.BoolTranslator)
-    ddns_type = snmp.Attribute("1.3.6.1.4.1.4115.1.20.1.1.4.18.2.0")
-    ddns_username = snmp.Attribute("1.3.6.1.4.1.4115.1.20.1.1.4.18.3.0")
-    ddns_password = snmp.Attribute("1.3.6.1.4.1.4115.1.20.1.1.4.18.4.0")
-    ddns_domain_name = snmp.Attribute("1.3.6.1.4.1.4115.1.20.1.1.4.18.5.0")
-    ddns_addr_type = snmp.Attribute("1.3.6.1.4.1.4115.1.20.1.1.4.18.6.0",
-                                    snmp.IPVersionTranslator)
-    ddns_address = snmp.Attribute("1.3.6.1.4.1.4115.1.20.1.1.4.18.7.0",
-                                  snmp.IPAddressTranslator)
-    ddns_current_status = snmp.Attribute("1.3.6.1.4.1.4115.1.20.1.1.4.18.8.0")
-
     @property
     def mso_log(self):
         """MSO Log
@@ -621,6 +430,47 @@ class Hub:
     def fw_log(self):
         """Firewall Log"""
         return arris.FirewallLogTable(self)
+
+def oidsplit(oid):
+    """Split an OID into a tuple with a sequence of integers.
+
+    This is useful for sorting, as string sorts will not sort OIDs
+    right.
+
+    """
+    return tuple([int(x) for x in oid.split('.')])
+
+def _setup_properties(dirname):
+    """Add class variables from the yaml file"""
+    import yaml
+    with open(os.path.join(dirname, "attributes.yml")) as attr_file:
+        attrmap = yaml.load(attr_file)
+
+    oids = list(attrmap.keys())
+    for oid1, oid2 in zip(oids, oids[1:]):
+        if oidsplit(oid2) < oidsplit(oid1):
+            warnings.warn("OID ordering is wrong: %s should be after %s" % (oid2, oid1))
+
+    names = []
+    for oid, settings in attrmap.items():
+        try:
+            if settings['name'] in names:
+                raise ValueError("Duplicate name for oid %s" % oid)
+            names.append(settings['name'])
+
+            kwargs = {"oid": oid}
+            if 'translator' in settings:
+                # pylint: disable=eval-used
+                kwargs['translator'] = eval(settings['translator'])
+            if 'doc' in settings:
+                kwargs['doc'] = settings['doc']
+
+            setattr(Hub, settings['name'], snmp.Attribute(**kwargs))
+        except Exception:
+            warnings.warn("Problem with OID %s" % oid)
+            raise
+
+_setup_properties(os.path.dirname(__file__))
 
 HUB_PROPERTIES = [name
                   for name, value in Hub.__dict__.items()

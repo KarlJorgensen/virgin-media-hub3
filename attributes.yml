@@ -1,0 +1,238 @@
+---
+# SNMP Attributes
+#
+# The virginmedia.Hub class will get these values as attributes. This
+# is far easier to maintain than keeping everything in python code.
+#
+# For the sanity of mere mortals, please keep this in OID order...
+#
+
+1.3.6.1.2.1.1.3.0:
+  name: _uptime_centiseconds
+  translator: snmp.IntTranslator
+
+1.3.6.1.4.1.4115.1.3.3.1.1.1.3.1.0:
+  name: max_cpe_allowed
+  translator: snmp.IntTranslator
+  doc: This reflects the 'MaxCpeAllowed' parameter in the CM config file
+1.3.6.1.4.1.4115.1.3.3.1.1.1.3.2.0:
+  name: network_access
+  translator: snmp.BoolTranslator
+  doc: Whether the hub has got network access
+
+1.3.6.1.4.1.4115.1.3.4.1.1.14.0:
+  name: current_time_status
+  translator: arris.TODStatusTranslator
+
+1.3.6.1.4.1.4115.1.20.1.1.1.2.0:
+  name: wan_conn_hostname
+  doc: The host name the hub presents to the ISP
+1.3.6.1.4.1.4115.1.20.1.1.1.3.0:
+  name: wan_conn_domainname
+  doc: The domain name given to the hub by the ISP
+1.3.6.1.4.1.4115.1.20.1.1.1.4.0:
+  name: wan_mtu_size
+  translator: snmp.IntTranslator
+  doc: The MTU on the WAN
+
+1.3.6.1.4.1.4115.1.20.1.1.1.7.1.3.1:
+  name: wan_current_ipaddr_ipv4
+  translator: snmp.IPv4Translator
+  doc: The current external IP address of the hub
+1.3.6.1.4.1.4115.1.20.1.1.1.7.1.3.2:
+  name: wan_current_ipaddr_ipv6
+  translator: snmp.IPv6Translator
+  doc: Current external IPv6 address of hub
+1.3.6.1.4.1.4115.1.20.1.1.1.7.1.6.1:
+  name: wan_current_gw_ipv4
+  translator: snmp.IPv4Translator
+  doc: Default gateway of the hub
+1.3.6.1.4.1.4115.1.20.1.1.1.7.1.6.2:
+  name: wan_current_gw_ipv6
+  translator: snmp.IPv6Translator
+1.3.6.1.4.1.4115.1.20.1.1.1.7.1.8.1:
+  name: wan_current_netmask
+  translator: snmp.IPv4Translator
+  doc: The WAN network mask - e.g. '255.255.248.0'
+
+1.3.6.1.4.1.4115.1.20.1.1.1.10.1.0:
+  name: wan_l2tp_username
+  doc: Default IPv6 gateway
+1.3.6.1.4.1.4115.1.20.1.1.1.10.1.0:
+  name: wan_l2tp_username
+1.3.6.1.4.1.4115.1.20.1.1.1.10.2.0:
+  name: wan_l2tp_password
+1.3.6.1.4.1.4115.1.20.1.1.1.10.3.0:
+  name: wan_l2tp_enable_idle_timeout
+  translator: snmp.BoolTranslator
+1.3.6.1.4.1.4115.1.20.1.1.1.10.4.0:
+  name: wan_l2tp_idle_timeout
+  translator: snmp.IntTranslator
+  doc: WAN L2TP idle timeout in seconds
+1.3.6.1.4.1.4115.1.20.1.1.1.10.6.0:
+  name: wan_l2tp_tunnel_addr
+  translator: snmp.IPAddressTranslator
+1.3.6.1.4.1.4115.1.20.1.1.1.10.7.0:
+  name: wan_l2tp_tunnel_hostname
+  doc: Host name of the tunnel server. Either hostname or IP address is required.
+1.3.6.1.4.1.4115.1.20.1.1.1.10.8.0:
+  name: wan_l2tp_keepalive_enabled
+  translator: snmp.BoolTranslator
+  doc: Whether keepalive is enabled on the WAN
+1.3.6.1.4.1.4115.1.20.1.1.1.10.9.0:
+  name: wan_l2tp_keepalive_timeout
+  translator: snmp.IntTranslator
+
+1.3.6.1.4.1.4115.1.20.1.1.1.11.1.0:
+  name: wan_use_auto_dns
+  translator: snmp.BoolTranslator
+  doc: Use automatic DNS servers as specified by ISP and DHCP
+
+1.3.6.1.4.1.4115.1.20.1.1.1.12.3.0:
+  name: wan_dhcp_duration_ipv4
+  translator: snmp.IntTranslator
+  doc: |
+    The number of seconds the current WAN DHCP ipv4 lease will remain
+    valid
+1.3.6.1.4.1.4115.1.20.1.1.1.12.4.0:
+  name: wan_dhcp_expire_ipv4
+  translator: snmp.DateTimeTranslator
+  doc: The date/time the current WAN DHCP lease will expire.
+1.3.6.1.4.1.4115.1.20.1.1.1.12.7.0:
+  name: wan_dhcp_duration_ipv6
+  translator: snmp.IntTranslator
+  doc: The number of seconds the current WAN DHCP ipv6 lease will remain valid
+1.3.6.1.4.1.4115.1.20.1.1.1.12.8.0:
+  name: wan_dhcp_expire_ipv6
+  translator: snmp.DateTimeTranslator
+  doc: The date/time the current WAN DHCP lease will expire.
+1.3.6.1.4.1.4115.1.20.1.1.1.12.9.0:
+  name: wan_dhcp_server_ip
+  translator: snmp.IPv4Translator
+  doc: IP address of DHCP server that gave the hub a lease
+
+1.3.6.1.4.1.4115.1.20.1.1.1.13.0:
+  name: wan_if_macaddr
+  translator: snmp.MacAddressTranslator
+  doc: |
+    MAC address on the WAN interface.
+
+    This is the mac address your ISP will see, and it is most likely
+    tied to our account with the ISP.
+
+1.3.6.1.4.1.4115.1.20.1.1.1.17.0:
+  name: wan_ip_prov_mode
+  doc: eRouter initialization mode
+
+# TODO: These properties are actually looking into a table, and should
+# probably be refactored...
+1.3.6.1.4.1.4115.1.20.1.1.2.2.1.3.200:
+  name: lan_subnetmask
+  translator: snmp.IPv4Translator
+1.3.6.1.4.1.4115.1.20.1.1.2.2.1.5.200:
+  name: lan_gateway
+  translator: snmp.IPAddressTranslator
+1.3.6.1.4.1.4115.1.20.1.1.2.2.1.7.200:
+  name: lan_gateway2
+  translator: snmp.IPAddressTranslator
+1.3.6.1.4.1.4115.1.20.1.1.2.2.1.9.200:
+  name: lan_dhcp_enabled
+  translator: snmp.BoolTranslator
+1.3.6.1.4.1.4115.1.20.1.1.2.2.1.11.200:
+  name: lan_dhcpv4_range_start
+  translator: snmp.IPv4Translator
+  doc:  The first IP address of the DHCP allocation range on the LAN
+1.3.6.1.4.1.4115.1.20.1.1.2.2.1.13.200:
+  name: lan_dhcpv4_range_end
+  translator: snmp.IPv4Translator
+  doc: The last IP address of the DHCP allocation range on the LAN
+1.3.6.1.4.1.4115.1.20.1.1.2.2.1.14.200:
+  name: lan_dhcpv4_leasetime
+  translator: snmp.IntTranslator
+  doc: The lease time (in seconds)
+1.3.6.1.4.1.4115.1.20.1.1.2.2.1.29.200:
+  name: lan_dhcpv6_prefixlength
+  translator: snmp.IntTranslator
+1.3.6.1.4.1.4115.1.20.1.1.2.2.1.31.200:
+  name: lan_dhcpv6_range_start
+  translator: snmp.IPv6Translator
+1.3.6.1.4.1.4115.1.20.1.1.2.2.1.33.200:
+  name: lan_dhcpv6_leasetime
+  translator: snmp.IntTranslator
+1.3.6.1.4.1.4115.1.20.1.1.2.2.1.39.200:
+  name: lan_parentalcontrols_enabled
+  translator: snmp.BoolTranslator
+  doc: Whether parental controls are enabled
+
+# TODO: These properties are actually looking into a table, and should
+# probably be refactored...
+1.3.6.1.4.1.4115.1.20.1.1.3.22.1.2.10001:
+  name: wifi_24ghz_essid
+1.3.6.1.4.1.4115.1.20.1.1.3.22.1.2.10101:
+  name: wifi_5ghz_essid
+1.3.6.1.4.1.4115.1.20.1.1.3.26.1.2.10001:
+  name: wifi_24ghz_password
+1.3.6.1.4.1.4115.1.20.1.1.3.26.1.2.10101:
+  name: wifi_5ghz_password
+
+1.3.6.1.4.1.4115.1.20.1.1.4.1.0:
+  name: firewall_enabled
+  translator: snmp.BoolTranslator
+
+1.3.6.1.4.1.4115.1.20.1.1.4.18.1.0:
+  name: ddns_enabled
+  translator: snmp.BoolTranslator
+1.3.6.1.4.1.4115.1.20.1.1.4.18.2.0:
+  name: ddns_type
+1.3.6.1.4.1.4115.1.20.1.1.4.18.3.0:
+  name: ddns_username
+1.3.6.1.4.1.4115.1.20.1.1.4.18.4.0:
+  name: ddns_password
+1.3.6.1.4.1.4115.1.20.1.1.4.18.5.0:
+  name: ddns_domain_name
+1.3.6.1.4.1.4115.1.20.1.1.4.18.6.0:
+  name: ddns_addr_type
+  translator: snmp.IPVersionTranslator
+1.3.6.1.4.1.4115.1.20.1.1.4.18.7.0:
+  name: ddns_address
+  translator: snmp.IPAddressTranslator
+1.3.6.1.4.1.4115.1.20.1.1.4.18.8.0:
+  name: ddns_current_status
+
+1.3.6.1.4.1.4115.1.20.1.1.5.6.0:
+  name: language
+  doc: |
+    Hub interface language.
+
+    On the Virgin Media hub, setting this appears to have no effect
+1.3.6.1.4.1.4115.1.20.1.1.5.7.0:
+  name: name
+1.3.6.1.4.1.4115.1.20.1.1.5.8.0:
+  name: serial_number
+1.3.6.1.4.1.4115.1.20.1.1.5.9.0:
+  name: bootcode_version
+1.3.6.1.4.1.4115.1.20.1.1.5.10.0:
+  name: hardware_version
+1.3.6.1.4.1.4115.1.20.1.1.5.11.0:
+  name: firmware_version
+1.3.6.1.4.1.4115.1.20.1.1.5.14.0:
+  name: customer_id
+1.3.6.1.4.1.4115.1.20.1.1.5.15.0:
+  name: current_time
+  translator: snmp.DateTimeTranslator
+  doc: |
+    The current time on the hub.
+
+    This may or may not be accurate, depending on
+    current_time_status.
+1.3.6.1.4.1.4115.1.20.1.1.5.16.1.2.1:
+  name: auth_username
+  doc: The name of the admin user
+
+1.3.6.1.4.1.4115.1.20.1.1.5.62.0:
+  name: first_install_wizard_completed
+  translator: snmp.BoolTranslator
+
+1.3.6.1.4.1.4491.2.1.14.1.5.4.0:
+  name: esafeErouterInitModeCtrl
+  doc: "TODO: Figure out what this is..."

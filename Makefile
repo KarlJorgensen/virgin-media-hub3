@@ -35,7 +35,7 @@ clean ::
 
 # Unit tests that do not require access to an actual Virgin Media Hub
 .PHONY: unittests
-unittests: pylints
+unittests: pylints $(PYFILES) attributes.yml
 	python3 ./utils.py
 	python3 ./snmp.py
 	python3 ./arris.py
