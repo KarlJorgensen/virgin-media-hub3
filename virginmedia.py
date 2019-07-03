@@ -570,6 +570,8 @@ class Hub:
     esafeErouterInitModeCtrl = snmp.Attribute("1.3.6.1.4.1.4491.2.1.14.1.5.4.0")
     "TODO: Figure out what this is..."
 
+    firewall_enabled = snmp.Attribute("1.3.6.1.4.1.4115.1.20.1.1.4.1.0",
+                                      snmp.BoolTranslator)
     @property
     def portforwards(self):
         """The port forwarding table from the hub

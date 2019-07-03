@@ -257,6 +257,9 @@ def portforward_list(hub, args):
                                        "local_ports"])
         print(utils.format_table(pflist))
 
+    if not hub.firewall_enabled:
+        print("Warning: Port forwarding will not work: firewalling is disabled...")
+
 @subcommand
 @Args([
     ("protocol", {"help":"Protocol to forward",
@@ -274,8 +277,10 @@ def portforward_add(hub, args):
     external interface) on that port to some port internally.
 
     """
-    pflist = hub.portforwards
+    if not hub.firewall_enabled:
+        print("Warning: Port forwarding will not work: firewalling is disabled...")
 
+    pflist = hub.portforwards
     pflist.append(
         proto=snmp.IPProtocol[args.protocol],
         ext_port_start=args.external_port,
@@ -436,6 +441,7 @@ def property_set(hub, args):
         print("Set", args.property, "to", args.value)
     else:
         print("Changed", args.property, "from", oldvalue, "to", args.value)
+    hub.apply_settings()
 
 @subcommand
 @Args([
