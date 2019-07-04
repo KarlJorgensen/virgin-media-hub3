@@ -20,20 +20,32 @@ router:
 
 - End user documentation : https://fccid.io/UIDTG2492/User-Manual/Users-Guide-3118366
 
-
 At the moment, this repo is somewhat basic: There is no python pip
-package structure. Yet. And no Debian or RedHat packages. To use it,
-you use the source:
+package structure. Yet. And no Debian or RedHat packages.
 
-    git clone git@github.com:KarlJorgensen/virgin-media-hub3.git
-	cd virgin-media-hub3
-	export HUB_PASSWORD=YouRouterPassword
-	./hub info
-	./hub --help
-
-For this to work, you also need to install its dependencies:
+And it has dependencies: Nothing serious:
 
 - python-requests
 - python-netaddr
+
+To use it, you use the source:
+
+    git clone git@github.com:KarlJorgensen/virgin-media-hub3.git
+    cd virgin-media-hub3
+    export HUB_PASSWORD=YouRouterPassword
+    ./hub info
+    ./hub --help
+
+
+There is a sizeable number of subcommands - check the output of
+<kbd>hub --help</kbd> for details.  For more details about each
+subcommand, invoke the subcommand with the <kbd>--help</kbd>
+parameter - e.g. <kbd>./hub portforward-add --help</kbd>.
+
+For example, to add a port forwarding to your internal web server at
+<kbd>192.168.0.16</kbd>:
+
+    ./hub portforward-add TCP 80 192.168.0.16 80
+	./hub property-set firewall_enabled True
 
 Enjoy!
