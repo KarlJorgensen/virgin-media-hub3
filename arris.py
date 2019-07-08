@@ -513,6 +513,20 @@ class MSOLogTable(snmp.Table):
                              "3": dict(name="text")
                              })
 
+class FirewallLogTable(snmp.Table):
+    """The firewall log.
+    """
+    def __init__(self, transport):
+        super().__init__(table_oid="1.3.6.1.4.1.4115.1.20.1.1.5.19.1.1.1",
+                         transport=transport,
+                         column_mapping={
+                             "1": dict(name="index",
+                                       translator=snmp.IntTranslator),
+                             "2": dict(name="stamp",
+                                       translator=snmp.DateTimeTranslator),
+                             "3": dict(name="text")
+                             })
+
 def _run_tests():
     import doctest
     import sys

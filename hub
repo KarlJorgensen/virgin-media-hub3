@@ -531,6 +531,14 @@ def mso_log(hub, _args):
     for entry in log.values():
         print(entry.stamp, entry.text)
 
+@subcommand
+def fw_log(hub, _args):
+    """Show the firewall log
+    """
+    log = hub.fw_log
+    for entry in log.values():
+        print(entry.stamp, entry.text)
+
 def main():
     """Main function. Obviously!"""
 

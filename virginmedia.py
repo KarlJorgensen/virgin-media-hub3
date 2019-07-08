@@ -617,6 +617,11 @@ class Hub:
         """
         return arris.MSOLogTable(self)
 
+    @property
+    def fw_log(self):
+        """Firewall Log"""
+        return arris.FirewallLogTable(self)
+
 HUB_PROPERTIES = [name
                   for name, value in Hub.__dict__.items()
                   if not name.startswith("_") and not callable(value)]
