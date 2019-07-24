@@ -6,6 +6,7 @@ import argparse
 import json
 import os
 
+import netaddr
 import snmp
 import utils
 import virginmedia
@@ -348,7 +349,7 @@ def clients(hub, args):
     long time - 90 seconds is not unheard of.
 
     """
-    client_list = utils.sort_table(hub.clients, key=lambda x: x.get('mac_address'))
+    client_list = utils.sort_table(hub.clients, key=lambda x: x.get('mac_address', netaddr.EUI(addr=0)))
     client_list = utils.unselect_columns(client_list, ['rowstatus',
                                                        'device_name',
                                                        'last_change_secs',
