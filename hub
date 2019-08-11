@@ -358,11 +358,11 @@ def clients(hub, args):
                                                    for e in client_list.values()])))
     online_count = len(list(utils.unique_everseen([e['mac_address']
                                                    for e in client_list.values()
-                                                   if e['online']])))
+                                                   if e.get('online')])))
     if not args.all:
         client_list = utils.unselect_columns(
             utils.filter_table(client_list,
-                               lambda k, v: v['online']),
+                               lambda k, v: v.get('online')),
             ['online'])
 
     print("There are {0:d} known clients - {1:d} clients online)"
