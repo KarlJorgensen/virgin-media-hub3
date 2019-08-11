@@ -354,11 +354,12 @@ def clients(hub, args):
                                                        'device_name',
                                                        'last_change_secs',
                                                        'connected_secs'])
-    client_count = len(list(utils.unique_everseen([e['mac_address']
-                                                   for e in client_list.values()])))
-    online_count = len(list(utils.unique_everseen([e['mac_address']
+    client_count = len(list(utils.unique_everseen([e.get('mac_address')
                                                    for e in client_list.values()
-                                                   if e.get('online')])))
+                                                   if e.get('mac_address')])))
+    online_count = len(list(utils.unique_everseen([e.get('mac_address')
+                                                   for e in client_list.values()
+                                                   if e.get('online') and e.get('mac_address')])))
     if not args.all:
         client_list = utils.unselect_columns(
             utils.filter_table(client_list,
