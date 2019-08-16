@@ -153,7 +153,7 @@ class Hub:
         resp = self._get('login',
                          retry401=0,
                          params=self._params({
-                             "arg": base64.b64encode((username + ':' + password).encode('ascii'))}))
+                             "arg": base64.b64encode((username + ':' + password).encode('ascii')).replace(b'=', b'')}))
 
         if not resp.content:
             raise LoginFailed(textwrap.dedent(
