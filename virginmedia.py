@@ -218,7 +218,7 @@ class Hub:
 
         The actual backup is returned
         """
-        resp = self._get('/backup?' + self._nonce_str)
+        resp = self._get('backup?' + self._nonce_str)
         resp.raise_for_status()
         return bytearray(resp.content)
 
