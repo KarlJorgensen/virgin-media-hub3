@@ -27,12 +27,15 @@ And it has dependencies: Nothing serious:
 
 - python-requests
 - python-netaddr
+- pyyaml
 
 To use it, you use the source:
 
     git clone git@github.com:KarlJorgensen/virgin-media-hub3.git
     cd virgin-media-hub3
-    export HUB_PASSWORD=YouRouterPassword
+    pip install -r requirements.txt
+    export HUB_PASSWORD=YourRouterPassword
+    export HUB=YourRouterAddress
     ./hub info
     ./hub --help
 
