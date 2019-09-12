@@ -597,7 +597,7 @@ def main():
         needs_hub = True
 
     if needs_hub:
-        with virginmedia.Hub() as hub:
+        with virginmedia.Hub(args.host) as hub:
             if args.timeout:
                 hub.http_timeout = args.timeout
             if needs_login and args.password:
