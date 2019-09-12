@@ -150,10 +150,9 @@ class Hub:
         if not username:
             username = self.auth_username
 
-        resp = self._get('login',
-                         retry401=0,
-                         params=self._params({
-                             "arg": base64.b64encode((username + ':' + password).encode('ascii'))}))
+        # Arris does not handle URL-encoded equals signs.
+        resp = self._get('login?arg=' + base64.b64encode((username + ':' + password).encode('ascii')).decode('ascii') + '&' + self._nonce_str,
+                         retry401=0)
 
         if not resp.content:
             raise LoginFailed(textwrap.dedent(
