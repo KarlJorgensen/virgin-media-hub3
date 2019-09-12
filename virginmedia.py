@@ -444,7 +444,7 @@ def _setup_properties(dirname):
     """Add class variables from the yaml file"""
     import yaml
     with open(os.path.join(dirname, "attributes.yml")) as attr_file:
-        attrmap = yaml.load(attr_file)
+        attrmap = yaml.load(attr_file, Loader=yaml.BaseLoader)
 
     oids = list(attrmap.keys())
     for oid1, oid2 in zip(oids, oids[1:]):
