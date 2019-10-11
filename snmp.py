@@ -351,6 +351,9 @@ class IPv4Translator(Translator):
     IPAddress('192.168.4.100')
     >>> IPv4Translator.pyvalue("$c0a80464").version
     4
+    >>> IPv4Translator.pyvalue("Qkl9")
+    IPAddress('81.107.108.57')
+
     """
     @staticmethod
     def snmp(python_value):
@@ -367,14 +370,20 @@ class IPv4Translator(Translator):
     @staticmethod
     def pyvalue(snmp_value):
         "Translates a hub-representation of an ipv4 address to a python-friendly form"
-        if snmp_value == "":
+        if snmp_value in ["", "$00000000"]:
             return None
-        if not snmp_value.startswith("$") or len(snmp_value) != 9:
-            raise ValueError("Value '%s' is not an SNMP IPv4Address" % snmp_value)
-        if {x for x in snmp_value[1:]} == set('0'):   # All zeros
-            return None
+        if snmp_value.startswith('$') and len(snmp_value) == 9:
+            return netaddr.IPAddress(int(snmp_value[1:], 16))
 
-        return netaddr.IPAddress(int(snmp_value[1:], 16))
+        if len(snmp_value) == 4:
+            return netaddr.IPAddress(ord(snmp_value[0]) << 24 \
+                                     | ord(snmp_value[1]) << 16 \
+                                     | ord(snmp_value[2]) << 8 \
+                                     | ord(snmp_value[3]))
+
+        # ok. we have no idea of what it is...
+        raise ValueError("Value '%s' is not an SNMP IPv4Address" % snmp_value)
+
 
 class IPv6Translator(Translator):
     """The router encodes IPv6 address in hex, prefixed by a dollar sign.
