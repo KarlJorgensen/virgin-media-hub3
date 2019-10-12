@@ -71,7 +71,8 @@ Interesting other stuff:
 - Teardown:
   https://www.mobile-computer-repairs.co.uk/blog/topic/29/routers/Arris-TG2492
 - https://www.netscylla.com/blog/2019/02/04/Arris-CableModem-SNMP.html
-
+- https://shop.wernerelectronic.de/media/documents/T/M/3/TM3402SCE85_3.PDF -
+  seems to be for a similar modem
 
 MIBs:
 - https://mibs.observium.org/mib/SNMPv2-MIB/
