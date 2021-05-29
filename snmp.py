@@ -224,8 +224,6 @@ class BoolTranslator(Translator):
     def pyvalue(snmp_value):
         if snmp_value is None:
             raise ValueError("This could not have come from SNMP...")
-        if snmp_value is None:
-            raise ValueError("This could not have come from SNMP...")
         return snmp_value == "1"
 
 # pylint: disable=invalid-name
