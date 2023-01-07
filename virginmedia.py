@@ -206,7 +206,11 @@ class Hub:
         """Logs out from the hub"""
         if self.is_loggedin:
             try:
-                self._get('logout', retry401=0, params=self._nonce)
+                # The logout request returns a 500 by default.
+                self._get('logout', retry401=0, retry500=0, params=self._nonce)
+            except requests.exceptions.HTTPError as e:
+                if e.response.status_code != 500:
+                    raise
             finally:
                 self._credential = None
                 self._username = None
