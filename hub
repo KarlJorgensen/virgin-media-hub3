@@ -269,7 +269,11 @@ def portforward_list(hub, args):
                        "help": "The external port number to map"}),
     ("internal_ip", {"help": "Internal IP address to map it to"}),
     ("internal_port", {"type": int,
-                       "help": "The internal port number to map it to"})
+                       "help": "The internal port number to map it to"}),
+    ("number_of_ports", {"type": int,
+                         "help": "The number of ports to map, starting at external_port / internal_port",
+                         "default": 1,
+                         "nargs": "?"})
 ])
 def portforward_add(hub, args):
     """Add a port forwarding entry.
@@ -285,7 +289,9 @@ def portforward_add(hub, args):
     pflist.append(
         proto=snmp.IPProtocol[args.protocol],
         ext_port_start=args.external_port,
+        ext_port_end=args.external_port + args.number_of_ports - 1,
         local_port_start=args.internal_port,
+        local_port_end=args.internal_port + args.number_of_ports - 1,
         local_addr=args.internal_ip)
     hub.apply_settings()
 
